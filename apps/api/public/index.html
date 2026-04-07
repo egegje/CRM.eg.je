@@ -79,6 +79,13 @@
   </div>
 </div>
 
+<nav class="tabbar" id="tabbar">
+  <button onclick="state.currentFolder='__inbox';refreshList()">📥</button>
+  <button onclick="openCompose()">✉️</button>
+  <button onclick="document.getElementById('search-input').focus()">🔍</button>
+  <button onclick="toggleSidebar()">☰</button>
+</nav>
+
 <div id="compose-modal" class="modal hidden">
   <div class="modal-box">
     <div class="modal-header">
@@ -90,10 +97,13 @@
       <label>Кому: <input name="to" placeholder="to@example.com, ..." required /></label>
       <label>Копия: <input name="cc" placeholder="cc@example.com, ..." /></label>
       <label>Тема: <input name="subject" /></label>
-      <textarea name="bodyText" rows="14" placeholder="текст..."></textarea>
+      <textarea name="bodyText" rows="12" placeholder="текст..."></textarea>
+      <label>Вложения: <input type="file" id="compose-files" multiple /></label>
+      <div id="compose-attachments"></div>
       <label class="inline">
         Отложить до: <input type="datetime-local" name="sendAt" />
       </label>
+      <progress id="upload-progress" class="hidden" value="0" max="100" style="width:100%"></progress>
       <div class="compose-actions">
         <button type="button" onclick="closeCompose()">Отмена</button>
         <button type="submit">Отправить</button>

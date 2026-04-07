@@ -210,6 +210,7 @@ function renderList() {
       </div>
     `;
     d.onclick = () => selectMessage(m.id);
+    addSwipe(d, m);
     el.appendChild(d);
   }
 }
@@ -338,22 +339,48 @@ function closeCompose() {
   document.getElementById("compose-error").textContent = "";
 }
 
+function validateEmails(s) {
+  if (!s.trim()) return true;
+  return s.split(",").map((x) => x.trim()).filter(Boolean).every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
+
+document.getElementById("compose-form").addEventListener("input", (e) => {
+  if (e.target.name === "to" || e.target.name === "cc") {
+    e.target.style.borderColor = validateEmails(e.target.value) ? "" : "var(--danger)";
+  }
+});
+
 document.getElementById("compose-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   const to = String(f.get("to") || "").split(",").map((s) => s.trim()).filter(Boolean);
   const cc = String(f.get("cc") || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!to.every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))) {
+    document.getElementById("compose-error").textContent = "Невалидный email в поле «Кому»";
+    return;
+  }
   try {
     const draft = await api("/messages", {
       method: "POST",
       body: JSON.stringify({
         mailboxId: f.get("mailboxId"),
-        to,
-        cc,
+        to, cc,
         subject: f.get("subject") || "",
         bodyText: f.get("bodyText") || "",
       }),
     });
+    // upload attachments with progress
+    const files = document.getElementById("compose-files").files;
+    const progress = document.getElementById("upload-progress");
+    if (files && files.length) {
+      progress.classList.remove("hidden");
+      for (let i = 0; i < files.length; i++) {
+        await uploadFile("/messages/" + draft.id + "/attachments", files[i], (pct) => {
+          progress.value = ((i + pct / 100) / files.length) * 100;
+        });
+      }
+      progress.classList.add("hidden");
+    }
     const sendAt = f.get("sendAt");
     await api("/messages/" + draft.id + "/send", {
       method: "POST",
@@ -365,6 +392,25 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     document.getElementById("compose-error").textContent = "Ошибка: " + err.message;
   }
 });
+
+function uploadFile(url, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable && onProgress) onProgress((e.loaded / e.total) * 100);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve(JSON.parse(xhr.responseText || "{}"));
+      else reject(new Error(`upload ${xhr.status}: ${xhr.responseText}`));
+    };
+    xhr.onerror = () => reject(new Error("upload network error"));
+    const fd = new FormData();
+    fd.append("file", file);
+    xhr.send(fd);
+  });
+}
 
 async function createFolder() {
   const name = prompt("Название папки:");
@@ -402,6 +448,35 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
   if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n? — эта справка");
 });
+
+/* mobile swipes */
+function addSwipe(el, m) {
+  let startX = 0, currentX = 0, swiping = false;
+  el.addEventListener("touchstart", (e) => {
+    startX = e.touches[0].clientX;
+    swiping = true;
+  }, { passive: true });
+  el.addEventListener("touchmove", (e) => {
+    if (!swiping) return;
+    currentX = e.touches[0].clientX - startX;
+    el.style.transform = `translateX(${currentX}px)`;
+    el.style.background = currentX > 40 ? "#fde68a" : currentX < -40 ? "#fecaca" : "";
+  }, { passive: true });
+  el.addEventListener("touchend", async () => {
+    if (!swiping) return;
+    swiping = false;
+    el.style.transition = "transform 0.2s";
+    el.style.transform = "";
+    el.style.background = "";
+    setTimeout(() => (el.style.transition = ""), 200);
+    if (currentX > 80) {
+      await toggleStar(m.id, m.isStarred);
+    } else if (currentX < -80) {
+      await deleteMsg(m.id);
+    }
+    currentX = 0;
+  });
+}
 
 /* admin */
 let adminTab = "users";
@@ -564,6 +639,22 @@ async function renderAuditTab() {
   </tr>`).join("");
   return `<table class="admin-table"><thead><tr><th>Время</th><th>User</th><th>Действие</th><th>Детали</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
+
+/* offline indicator */
+window.addEventListener("offline", () => {
+  let n = document.getElementById("offline-banner");
+  if (!n) {
+    n = document.createElement("div");
+    n.id = "offline-banner";
+    n.textContent = "⚠ Нет соединения";
+    n.style.cssText = "position:fixed;top:0;left:0;right:0;background:var(--danger);color:white;text-align:center;padding:6px;z-index:1000;font-size:13px";
+    document.body.appendChild(n);
+  }
+});
+window.addEventListener("online", () => {
+  document.getElementById("offline-banner")?.remove();
+  refreshList().catch(() => {});
+});
 
 /* live polling */
 setInterval(() => {

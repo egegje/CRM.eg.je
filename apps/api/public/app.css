@@ -127,7 +127,7 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
 .admin-form input, .admin-form select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); }
 .admin-form button { padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; }
 
-.burger { display: none; }
+.burger, .tabbar { display: none; }
 
 /* mobile */
 @media (max-width: 900px) {
@@ -151,4 +151,11 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
   #app.show-preview .list-pane { display: none; }
   #app.show-preview .preview-pane { display: block; }
   #app.show-preview .burger { left: auto; right: 10px; }
+  .messages-list, .preview-pane { padding-bottom: 60px; }
+  .tabbar {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 56px;
+    background: var(--bg); border-top: 1px solid var(--border); z-index: 40;
+  }
+  .tabbar button { flex: 1; background: none; border: none; font-size: 22px; color: var(--text); cursor: pointer; }
+  .tabbar button:active { background: var(--bg-hover); }
 }
