@@ -10,6 +10,9 @@ import { notifyNewMail } from "../services/notifier.js";
 const cfg = loadConfig();
 const clients = new Map<string, ImapFlow>();
 
+const stripNul = (s: string | undefined | null): string | undefined =>
+  s == null ? undefined : s.replace(/\u0000/g, "");
+
 async function persistMessage(
   mailboxId: string,
   inboxId: string,
@@ -17,18 +20,24 @@ async function persistMessage(
 ): Promise<void> {
   if (!msg.source) return;
   const parsed = await parseRaw(msg.source);
+  if (parsed.messageId) {
+    const exists = await prisma.message.findUnique({
+      where: { messageId: parsed.messageId },
+    });
+    if (exists) return;
+  }
   const created = await prisma.message.create({
     data: {
       mailboxId,
       folderId: inboxId,
       imapUid: msg.uid,
       messageId: parsed.messageId,
-      fromAddr: parsed.from,
+      fromAddr: stripNul(parsed.from) ?? "",
       toAddrs: parsed.to,
       ccAddrs: parsed.cc,
-      subject: parsed.subject,
-      bodyText: parsed.text,
-      bodyHtml: parsed.html,
+      subject: stripNul(parsed.subject) ?? "",
+      bodyText: stripNul(parsed.text),
+      bodyHtml: stripNul(parsed.html),
       receivedAt: parsed.date ?? msg.internalDate ?? new Date(),
     },
   });
