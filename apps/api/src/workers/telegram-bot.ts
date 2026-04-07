@@ -1,5 +1,7 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
+import { generateReply } from "../services/ai.js";
+import { sendTelegram } from "../services/notifier.js";
 
 const cfg = loadConfig();
 let offset = 0;
@@ -49,6 +51,27 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>): Promis
         });
       }
       await answerCallback(cb.id, "в корзине");
+    } else if (action === "aireply") {
+      await answerCallback(cb.id, "генерирую черновик...");
+      const m = await prisma.message.findUnique({ where: { id }, include: { mailbox: true } });
+      if (!m) return;
+      const text = await generateReply({ from: m.fromAddr, subject: m.subject, bodyText: m.bodyText });
+      const drafts =
+        (await prisma.folder.findFirst({ where: { mailboxId: m.mailboxId, kind: "drafts" } })) ??
+        (await prisma.folder.create({ data: { mailboxId: m.mailboxId, name: "Drafts", kind: "drafts" } }));
+      await prisma.message.create({
+        data: {
+          mailboxId: m.mailboxId,
+          folderId: drafts.id,
+          isDraft: true,
+          fromAddr: m.mailbox.email,
+          toAddrs: [m.fromAddr],
+          ccAddrs: [],
+          subject: m.subject.startsWith("Re:") ? m.subject : "Re: " + m.subject,
+          bodyText: text,
+        },
+      });
+      await sendTelegram(`📝 Черновик ответа на «${m.subject}»:\n\n${text}\n\n— сохранён в папку Drafts ящика ${m.mailbox.email}`);
     } else {
       await answerCallback(cb.id, "неизвестное действие");
     }

@@ -66,6 +66,8 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
       { text: "✓ прочитано", callback_data: `read:${message.id}` },
       { text: "⭐ важное", callback_data: `star:${message.id}` },
       { text: "🗑 удалить", callback_data: `del:${message.id}` },
+    ], [
+      { text: "🤖 ответить AI", callback_data: `aireply:${message.id}` },
     ]],
   });
 }

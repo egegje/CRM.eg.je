@@ -8,6 +8,7 @@ const state = {
   currentMailbox: null,
   messages: [],
   selectedId: null,
+  selectedIds: new Set(),
 };
 
 /* theme */
@@ -186,6 +187,56 @@ async function refreshList() {
   renderList();
 }
 
+function toggleSelect(id) {
+  if (state.selectedIds.has(id)) state.selectedIds.delete(id);
+  else state.selectedIds.add(id);
+  renderBulkBar();
+}
+
+function renderBulkBar() {
+  let bar = document.getElementById("bulk-bar");
+  if (state.selectedIds.size === 0) {
+    bar?.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "bulk-bar";
+    bar.className = "bulk-bar";
+    document.querySelector(".list-pane").prepend(bar);
+  }
+  bar.innerHTML = `
+    <span>${state.selectedIds.size} выбрано</span>
+    <button onclick="bulkAction('read')">прочитано</button>
+    <button onclick="bulkAction('star')">⭐</button>
+    <button onclick="bulkAction('delete')">🗑</button>
+    <button onclick="state.selectedIds.clear();renderList();renderBulkBar()">×</button>
+  `;
+}
+
+async function bulkAction(action) {
+  const ids = [...state.selectedIds];
+  await api("/messages/bulk", { method: "POST", body: JSON.stringify({ ids, action }) });
+  if (action === "delete") {
+    showToast(`${ids.length} удалено`, async () => {
+      await api("/messages/bulk", { method: "POST", body: JSON.stringify({ ids, action: "restore" }) });
+      refreshList();
+    });
+  }
+  state.selectedIds.clear();
+  renderBulkBar();
+  refreshList();
+}
+
+function showToast(text, onUndo) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = `<span>${escapeHtml(text)}</span> ${onUndo ? '<button>отменить</button>' : ""}`;
+  if (onUndo) t.querySelector("button").onclick = () => { onUndo(); t.remove(); };
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 6000);
+}
+
 function renderList() {
   const el = document.getElementById("messages-list");
   if (!state.messages.length) {
@@ -200,8 +251,9 @@ function renderList() {
     const d = document.createElement("div");
     d.className = "msg-item" + (!m.isRead ? " unread" : "") + (state.selectedId === m.id ? " selected" : "");
     const star = m.isStarred ? "⭐" : "";
-    const clip = 0; // attachments count not in list response
+    const checked = state.selectedIds.has(m.id) ? "checked" : "";
     d.innerHTML = `
+      <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
         <div class="msg-head"><div class="msg-from">${escapeHtml(m.fromAddr || "")}</div><div class="msg-date">${date}</div></div>
@@ -256,6 +308,7 @@ function renderPreview(m) {
       <div class="preview-actions">
         <button class="mobile-back" onclick="closePreview()">← Назад</button>
         <button onclick="replyTo('${m.id}')">↩️ Ответить</button>
+        <button onclick="aiReply('${m.id}')">🤖 AI ответ</button>
         <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
         <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
@@ -297,12 +350,33 @@ async function toggleStar(id, cur) {
 }
 
 async function deleteMsg(id) {
-  if (!confirm("Удалить письмо?")) return;
   await api("/messages/" + id, { method: "DELETE" });
   state.selectedId = null;
   document.getElementById("message-preview").className = "empty";
   document.getElementById("message-preview").textContent = "Выберите письмо";
+  showToast("Письмо в корзине", async () => {
+    await api("/messages/" + id + "/restore", { method: "POST" });
+    refreshList();
+  });
   refreshList();
+}
+
+async function aiReply(id) {
+  showToast("Генерирую ответ...", null);
+  try {
+    const r = await api("/messages/" + id + "/ai-reply", { method: "POST" });
+    showToast("Черновик в Drafts", null);
+    // Open compose with the draft
+    const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
+    openCompose({
+      to: m.fromAddr,
+      subject: m.subject.startsWith("Re:") ? m.subject : "Re: " + m.subject,
+      bodyText: r.bodyText,
+      mailboxId: m.mailboxId,
+    });
+  } catch (e) {
+    showToast("Ошибка: " + e.message, null);
+  }
 }
 
 async function replyTo(id) {
@@ -711,6 +785,11 @@ setInterval(() => {
   if (!state.user || document.hidden) return;
   refreshList().catch(() => {});
 }, 30000);
+
+/* PWA */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
 
 /* init */
 initTheme();

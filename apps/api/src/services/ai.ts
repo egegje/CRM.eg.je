@@ -61,6 +61,28 @@ export async function summarizeEmail(input: {
   }
 }
 
+const REPLY_SYSTEM = `Ты — помощник менеджера по аренде недвижимости. Тебе дают входящее письмо. Сгенерируй короткий вежливый ответ на русском от лица менеджера. Только текст ответа, без markdown, без приветствия "Здравствуйте, [имя]" — сразу по делу.`;
+
+export async function generateReply(input: {
+  from: string;
+  subject: string;
+  bodyText?: string | null;
+}): Promise<string> {
+  const body = (input.bodyText ?? "").slice(0, 6000);
+  const userMsg = `От: ${input.from}\nТема: ${input.subject}\n\n${body}`;
+  const response = await getClient().messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 800,
+    system: REPLY_SYSTEM,
+    messages: [{ role: "user", content: userMsg }],
+  });
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("")
+    .trim();
+}
+
 function stripHtml(html: string): string {
   return html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")

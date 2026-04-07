@@ -147,6 +147,80 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
+  const Bulk = z.object({
+    ids: z.array(z.string()).min(1).max(500),
+    action: z.enum(["delete", "restore", "read", "unread", "star", "unstar", "move"]),
+    folderId: z.string().optional(),
+  });
+  app.post("/messages/bulk", { preHandler: requireUser() }, async (req) => {
+    const body = Bulk.parse(req.body);
+    const where = { id: { in: body.ids } };
+    if (body.action === "read") return prisma.message.updateMany({ where, data: { isRead: true } });
+    if (body.action === "unread") return prisma.message.updateMany({ where, data: { isRead: false } });
+    if (body.action === "star") return prisma.message.updateMany({ where, data: { isStarred: true } });
+    if (body.action === "unstar") return prisma.message.updateMany({ where, data: { isStarred: false } });
+    if (body.action === "delete") {
+      // soft-delete: set deletedAt; folder move per-mailbox
+      const ms = await prisma.message.findMany({ where, select: { id: true, mailboxId: true } });
+      const byMb = new Map<string, string[]>();
+      for (const m of ms) {
+        if (!byMb.has(m.mailboxId)) byMb.set(m.mailboxId, []);
+        byMb.get(m.mailboxId)!.push(m.id);
+      }
+      let count = 0;
+      for (const [mailboxId, ids] of byMb) {
+        const trash = await getOrCreateFolder(mailboxId, "trash", "Trash");
+        const r = await prisma.message.updateMany({
+          where: { id: { in: ids } },
+          data: { deletedAt: new Date(), folderId: trash.id },
+        });
+        count += r.count;
+      }
+      return { count };
+    }
+    if (body.action === "restore") {
+      const ms = await prisma.message.findMany({ where, select: { id: true, mailboxId: true } });
+      let count = 0;
+      for (const m of ms) {
+        const inbox = await getOrCreateFolder(m.mailboxId, "inbox", "INBOX");
+        await prisma.message.update({ where: { id: m.id }, data: { deletedAt: null, folderId: inbox.id } });
+        count++;
+      }
+      return { count };
+    }
+    if (body.action === "move") {
+      if (!body.folderId) throw new BadRequest("folderId required");
+      return prisma.message.updateMany({ where, data: { folderId: body.folderId } });
+    }
+    throw new BadRequest("unknown action");
+  });
+
+  app.post("/messages/:id/ai-reply", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const m = await prisma.message.findUnique({ where: { id }, include: { mailbox: true } });
+    if (!m) throw new NotFound();
+    const { generateReply } = await import("../services/ai.js");
+    const draftText = await generateReply({
+      from: m.fromAddr,
+      subject: m.subject,
+      bodyText: m.bodyText,
+    });
+    const drafts = await getOrCreateFolder(m.mailboxId, "drafts", "Drafts");
+    const draft = await prisma.message.create({
+      data: {
+        mailboxId: m.mailboxId,
+        folderId: drafts.id,
+        isDraft: true,
+        fromAddr: m.mailbox.email,
+        toAddrs: [m.fromAddr],
+        ccAddrs: [],
+        subject: m.subject.startsWith("Re:") ? m.subject : "Re: " + m.subject,
+        bodyText: draftText,
+      },
+    });
+    return { draftId: draft.id, bodyText: draftText };
+  });
+
   app.post("/messages/:id/summarize", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });
