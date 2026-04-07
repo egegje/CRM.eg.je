@@ -8,6 +8,7 @@ import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
 import { sendQueue } from "../queue.js";
 import { audit } from "../services/audit.js";
+import { accessibleMailboxIds } from "../services/access.js";
 
 const ListQuery = z.object({
   folderId: z.string().optional(),
@@ -60,6 +61,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/messages", { preHandler: requireUser() }, async (req) => {
     const q = ListQuery.parse(req.query);
+    const accessIds = await accessibleMailboxIds(req.user!);
     if (q.q) {
       // First narrow by FTS, then apply the same buildWhere filters so search
       // honors current folder/mailbox/trash/status context.
@@ -79,7 +81,11 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         trash: q.trash,
       });
       return prisma.message.findMany({
-        where: { ...baseWhere, id: { in: ids } },
+        where: {
+          ...baseWhere,
+          id: { in: ids },
+          ...(accessIds ? { mailboxId: { in: accessIds } } : {}),
+        },
         orderBy: { receivedAt: "desc" },
         take: q.limit,
       });
@@ -93,6 +99,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       status: q.status,
       trash: q.trash,
     });
+    if (accessIds) (where as { mailboxId?: { in: string[] } }).mailboxId = { in: accessIds };
     const args: Prisma.MessageFindManyArgs = {
       where,
       orderBy: { receivedAt: "desc" },

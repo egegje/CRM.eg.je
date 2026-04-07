@@ -50,11 +50,23 @@ model Mailbox {
   smtpHost             String          @default("smtp.mail.ru")
   smtpPort             Int             @default(465)
   enabled              Boolean         @default(true)
+  signature            String?
   createdAt            DateTime        @default(now())
   folders              Folder[]
   messages             Message[]
   scheduled            ScheduledSend[]
   syncState            SyncState?
+  users                UserMailbox[]
+}
+
+model UserMailbox {
+  userId    String
+  mailboxId String
+  mailbox   Mailbox  @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, mailboxId])
+  @@index([mailboxId])
 }
 
 model SyncState {

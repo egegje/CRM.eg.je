@@ -65,12 +65,46 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch("/admin/mailboxes/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const { id } = Params.parse(req.params);
-    const body = z.object({ enabled: z.boolean().optional(), displayName: z.string().optional() }).parse(req.body);
+    const body = z.object({
+      enabled: z.boolean().optional(),
+      displayName: z.string().optional(),
+      signature: z.string().optional(),
+    }).parse(req.body);
     return prisma.mailbox.update({
       where: { id },
       data: body,
-      select: { id: true, email: true, displayName: true, enabled: true },
+      select: { id: true, email: true, displayName: true, enabled: true, signature: true },
     });
+  });
+
+  // ---- user ↔ mailbox access ----
+  app.get("/admin/users/:id/mailboxes", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const rows = await prisma.userMailbox.findMany({ where: { userId: id }, select: { mailboxId: true } });
+    return rows.map((r) => r.mailboxId);
+  });
+
+  app.put("/admin/users/:id/mailboxes", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ mailboxIds: z.array(z.string()) }).parse(req.body);
+    await prisma.$transaction([
+      prisma.userMailbox.deleteMany({ where: { userId: id } }),
+      prisma.userMailbox.createMany({
+        data: body.mailboxIds.map((mb) => ({ userId: id, mailboxId: mb })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { count: body.mailboxIds.length };
+  });
+
+  // PATCH user (rename, role change)
+  app.patch("/admin/users/:id", { preHandler: requireRole("owner") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({
+      name: z.string().optional(),
+      role: z.enum(["owner", "admin", "manager"]).optional(),
+    }).parse(req.body);
+    return prisma.user.update({ where: { id }, data: body, select: { id: true, name: true, role: true } });
   });
 
   app.delete("/admin/mailboxes/:id", { preHandler: requireRole("owner") }, async (req, reply) => {

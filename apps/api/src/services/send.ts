@@ -18,6 +18,9 @@ export type SendPayload = {
 
 export async function sendMessage(ctx: SendCtx, p: SendPayload): Promise<{ messageId: string }> {
   const pass = ctx.decrypt(ctx.mailbox.encryptedAppPassword);
+  if (ctx.mailbox.signature && p.text) {
+    p = { ...p, text: p.text + "\n\n--\n" + ctx.mailbox.signature };
+  }
   const result = await sendMail({
     host: ctx.mailbox.smtpHost,
     port: ctx.mailbox.smtpPort,

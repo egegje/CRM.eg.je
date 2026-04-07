@@ -295,13 +295,25 @@ function renderBulkBar() {
     bar.className = "bulk-bar";
     document.querySelector(".list-pane").prepend(bar);
   }
+  const customs = state.folders.filter((f) => f.kind === "custom");
+  const moveOpts = customs.map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("");
   bar.innerHTML = `
     <span>${state.selectedIds.size} выбрано</span>
     <button onclick="bulkAction('read')">прочитано</button>
     <button onclick="bulkAction('star')">⭐</button>
     <button onclick="bulkAction('delete')">🗑</button>
+    ${customs.length ? `<select onchange="bulkMove(this.value);this.value=''"><option value="">→ в папку</option>${moveOpts}</select>` : ""}
     <button onclick="state.selectedIds.clear();renderList();renderBulkBar()">×</button>
   `;
+}
+
+async function bulkMove(folderId) {
+  if (!folderId) return;
+  const ids = [...state.selectedIds];
+  await api("/messages/bulk", { method: "POST", body: JSON.stringify({ ids, action: "move", folderId }) });
+  state.selectedIds.clear();
+  renderBulkBar();
+  refreshList();
 }
 
 async function bulkAction(action) {
@@ -599,7 +611,16 @@ async function forwardMsg(id) {
   });
 }
 
+async function loadContactsDatalist() {
+  try {
+    const list = await api("/admin/contacts?limit=200").catch(() => []);
+    const dl = document.getElementById("contacts-list");
+    dl.innerHTML = list.map((c) => `<option value="${escapeHtml(c.email)}">${escapeHtml(c.name || c.email)}</option>`).join("");
+  } catch {}
+}
+
 function openCompose(defaults = {}) {
+  loadContactsDatalist();
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
@@ -840,7 +861,10 @@ async function renderUsersTab() {
     <td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.name)}</td>
     <td>${escapeHtml(u.role)}</td>
     <td>${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
-    <td><button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button></td>
+    <td>
+      <button onclick="manageUserAccess('${u.id}','${escapeHtml(u.email)}','${u.role}')">доступ</button>
+      <button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button>
+    </td>
   </tr>`).join("");
   return `
     <form class="admin-form" onsubmit="adminCreateUser(event)">
@@ -860,6 +884,36 @@ async function adminCreateUser(e) {
   await api("/admin/users", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
   renderAdminTab();
 }
+async function manageUserAccess(userId, email, role) {
+  if (role === "owner" || role === "admin") {
+    return alert(`${role} имеет доступ ко всем ящикам автоматически.`);
+  }
+  const [allMailboxes, assigned] = await Promise.all([
+    api("/admin/mailboxes"),
+    api("/admin/users/" + userId + "/mailboxes"),
+  ]);
+  const assignedSet = new Set(assigned);
+  const list = allMailboxes
+    .map((mb) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-mb="${mb.id}" ${assignedSet.has(mb.id) ? "checked" : ""}> ${escapeHtml(mb.displayName)} (${escapeHtml(mb.email)})</label>`)
+    .join("");
+  const c = document.getElementById("admin-content");
+  const html = `
+    <h4 style="margin-top:0">Доступ к ящикам: ${escapeHtml(email)}</h4>
+    <div id="access-list">${list}</div>
+    <div style="display:flex;gap:8px;margin-top:14px">
+      <button onclick="saveAccess('${userId}')" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">Сохранить</button>
+      <button onclick="renderAdminTab()">← Назад</button>
+    </div>
+  `;
+  c.innerHTML = html;
+}
+
+async function saveAccess(userId) {
+  const ids = [...document.querySelectorAll('#access-list input[type=checkbox]:checked')].map((c) => c.dataset.mb);
+  await api("/admin/users/" + userId + "/mailboxes", { method: "PUT", body: JSON.stringify({ mailboxIds: ids }) });
+  renderAdminTab();
+}
+
 async function adminDeleteUser(id) {
   if (!confirm("Удалить пользователя?")) return;
   await api("/admin/users/" + id, { method: "DELETE" });
@@ -873,7 +927,10 @@ async function renderMailboxesTab() {
     <td>
       <label><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"> вкл</label>
     </td>
-    <td><button class="danger" onclick="adminDeleteMailbox('${m.id}')">удалить</button></td>
+    <td>
+      <button onclick="editSignature('${m.id}', ${JSON.stringify(m.signature || "").replace(/"/g,'&quot;')})">✏️ подпись</button>
+      <button class="danger" onclick="adminDeleteMailbox('${m.id}')">удалить</button>
+    </td>
   </tr>`).join("");
   return `
     <form class="admin-form" onsubmit="adminCreateMailbox(event)">
@@ -885,6 +942,13 @@ async function renderMailboxesTab() {
     <table class="admin-table"><thead><tr><th>Email</th><th>Название</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   `;
 }
+async function editSignature(id, current) {
+  const sig = prompt("Подпись (добавляется ко всем исходящим письмам с этого ящика):", current || "");
+  if (sig === null) return;
+  await api("/admin/mailboxes/" + id, { method: "PATCH", body: JSON.stringify({ signature: sig }) });
+  renderAdminTab();
+}
+
 async function adminCreateMailbox(e) {
   e.preventDefault();
   const f = new FormData(e.target);
@@ -1022,6 +1086,28 @@ if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
 
+/* password reset flow */
+function checkResetParam() {
+  const params = new URLSearchParams(location.search);
+  const token = params.get("reset");
+  if (!token) return;
+  const np = prompt("Введите новый пароль (минимум 4 символа):");
+  if (!np || np.length < 4) return;
+  fetch("/auth/reset", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ token, newPassword: np }),
+  }).then((r) => r.json()).then((j) => {
+    if (j.ok) {
+      alert("Пароль сброшен. Можно войти.");
+      history.replaceState({}, "", "/");
+    } else {
+      alert("Ошибка: " + (j.error || "?"));
+    }
+  });
+}
+
 /* init */
 initTheme();
+checkResetParam();
 bootApp().catch(() => showLogin());
