@@ -145,6 +145,48 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // ---- analytics: heatmap (hour×weekday) ----
+  app.get("/admin/analytics/heatmap", { preHandler: requireRole("owner", "admin") }, async () => {
+    return prisma.$queryRaw<{ dow: number; hr: number; c: bigint }[]>`
+      SELECT extract(dow from "createdAt")::int AS dow,
+             extract(hour from "createdAt")::int AS hr,
+             count(*)::bigint AS c
+        FROM "AuditLog"
+       WHERE "createdAt" >= now() - interval '30 days'
+         AND action = 'message.send'
+       GROUP BY 1, 2
+       ORDER BY 1, 2
+    `;
+  });
+
+  // ---- analytics: leaderboard last 7 days ----
+  app.get("/admin/analytics/leaderboard", { preHandler: requireRole("owner", "admin") }, async () => {
+    return prisma.$queryRaw<{ userId: string; email: string; sent: bigint }[]>`
+      SELECT u.id AS "userId", u.email, count(a.id)::bigint AS sent
+        FROM "User" u
+        LEFT JOIN "AuditLog" a ON a."userId" = u.id
+                              AND a.action = 'message.send'
+                              AND a."createdAt" >= now() - interval '7 days'
+       GROUP BY u.id, u.email
+       ORDER BY sent DESC
+       LIMIT 10
+    `;
+  });
+
+  // ---- analytics: top contacts per user ----
+  app.get("/admin/analytics/contacts/:userId", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { userId } = z.object({ userId: z.string() }).parse(req.params);
+    return prisma.$queryRaw<{ contact: string; c: bigint }[]>`
+      SELECT (a.details->>'to')::text AS contact, count(*)::bigint AS c
+        FROM "AuditLog" a
+       WHERE a."userId" = ${userId}
+         AND a.action = 'message.send'
+       GROUP BY 1
+       ORDER BY c DESC
+       LIMIT 20
+    `;
+  });
+
   // ---- analytics ----
   app.get("/admin/analytics", { preHandler: requireRole("owner", "admin") }, async () => {
     const users = await prisma.user.findMany({
@@ -187,18 +229,56 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
           prisma.auditLog.count({ where: { userId: u.id, action: "message.ai_reply" } }),
         ]);
 
+        const inactiveDays = u.lastLoginAt
+          ? Math.floor((Date.now() - u.lastLoginAt.getTime()) / (24 * 3600 * 1000))
+          : null;
+
+        // Avg response time: for each "send" event, find the most recent inbound
+        // message in the same mailbox from any of the recipients before that send,
+        // and compute the delta. Aggregate.
+        const sentEvents = await prisma.auditLog.findMany({
+          where: { userId: u.id, action: "message.send" },
+          select: { createdAt: true, details: true },
+          take: 200,
+        });
+        let respTotal = 0;
+        let respCount = 0;
+        for (const ev of sentEvents) {
+          const det = ev.details as { to?: string[] } | null;
+          if (!det?.to?.length) continue;
+          const inbound = await prisma.message.findFirst({
+            where: {
+              fromAddr: { in: det.to },
+              receivedAt: { lt: ev.createdAt, not: null },
+            },
+            orderBy: { receivedAt: "desc" },
+            select: { receivedAt: true },
+          });
+          if (inbound?.receivedAt) {
+            const dt = ev.createdAt.getTime() - inbound.receivedAt.getTime();
+            if (dt > 0 && dt < 7 * 24 * 3600 * 1000) {
+              respTotal += dt;
+              respCount++;
+            }
+          }
+        }
+        const avgResponseHours = respCount ? Math.round((respTotal / respCount / 3600000) * 10) / 10 : null;
+
         return {
           id: u.id,
           email: u.email,
           name: u.name,
           role: u.role,
           lastLoginAt: u.lastLoginAt,
+          inactiveDays,
           sessionCount,
           totalSessionHours: Math.round((totalSessionMs / 3600000) * 10) / 10,
           sent: sentCount,
           deleted: deletedCount,
           aiSummarize: summarizeCount,
           aiReply: aiReplyCount,
+          aiUsageRatio: sentCount ? Math.round((aiReplyCount / sentCount) * 100) : 0,
+          avgResponseHours,
         };
       }),
     );

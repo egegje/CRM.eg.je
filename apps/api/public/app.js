@@ -1108,33 +1108,92 @@ async function adminDeleteContact(id) {
 }
 
 async function renderAnalyticsTab() {
-  const list = await api("/admin/analytics");
-  const rows = list.map((u) => `<tr>
-    <td>${escapeHtml(u.email)}<br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(u.name)} · ${escapeHtml(u.role)}</span></td>
-    <td style="text-align:center">${u.sessionCount}</td>
-    <td style="text-align:center">${u.totalSessionHours}ч</td>
-    <td style="text-align:center"><b>${u.sent}</b></td>
-    <td style="text-align:center">${u.deleted}</td>
-    <td style="text-align:center">${u.aiSummarize}</td>
-    <td style="text-align:center">${u.aiReply}</td>
-    <td style="font-size:11px">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
-  </tr>`).join("");
+  const [list, leaderboard, heatmap] = await Promise.all([
+    api("/admin/analytics"),
+    api("/admin/analytics/leaderboard"),
+    api("/admin/analytics/heatmap"),
+  ]);
+  window._analytics = list;
+
+  // build heatmap grid 7×24
+  const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let maxV = 0;
+  for (const cell of heatmap) {
+    grid[cell.dow][cell.hr] = Number(cell.c);
+    if (Number(cell.c) > maxV) maxV = Number(cell.c);
+  }
+  const dows = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+  const hmHtml = `
+    <h4>Heatmap отправки за 30 дней</h4>
+    <table style="border-collapse:collapse;font-size:10px"><tr><th></th>${Array.from({length:24},(_,h)=>`<th style="padding:2px 4px;text-align:center;color:var(--text-muted)">${h}</th>`).join("")}</tr>
+    ${dows.map((d,i)=>`<tr><td style="padding:2px 6px;color:var(--text-muted)">${d}</td>${grid[i].map(v=>{
+      const a = maxV ? v/maxV : 0;
+      return `<td style="width:18px;height:18px;background:rgba(37,99,235,${a});border:1px solid var(--border)" title="${v}"></td>`;
+    }).join("")}</tr>`).join("")}
+    </table>
+  `;
+
+  const lbHtml = `
+    <h4>🏆 Лидерборд за 7 дней</h4>
+    <ol style="font-size:13px">${leaderboard.filter((l) => Number(l.sent) > 0).map((l) => `<li>${escapeHtml(l.email)} — <b>${Number(l.sent)}</b> писем</li>`).join("") || "<li>нет данных</li>"}</ol>
+  `;
+
+  const rows = list.map((u) => {
+    const inactive = u.inactiveDays !== null && u.inactiveDays > 7 ? `<span title="неактивен ${u.inactiveDays} дн" style="color:var(--danger)">⚠</span> ` : "";
+    return `<tr>
+      <td>${inactive}${escapeHtml(u.email)}<br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(u.name)} · ${escapeHtml(u.role)}</span></td>
+      <td style="text-align:center">${u.sessionCount}</td>
+      <td style="text-align:center">${u.totalSessionHours}ч</td>
+      <td style="text-align:center"><b>${u.sent}</b></td>
+      <td style="text-align:center">${u.deleted}</td>
+      <td style="text-align:center">${u.avgResponseHours !== null ? u.avgResponseHours + "ч" : "—"}</td>
+      <td style="text-align:center">${u.aiSummarize}/${u.aiReply}</td>
+      <td style="text-align:center">${u.aiUsageRatio}%</td>
+      <td style="font-size:11px">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
+    </tr>`;
+  }).join("");
+
   return `
-    <p style="color:var(--text-muted);font-size:12px;margin-top:0">Метрики собираются из журнала аудита (auth.login/logout, message.send/delete/summarize/ai_reply)</p>
+    <div style="display:flex;gap:24px;margin-bottom:18px">
+      <div style="flex:1">${lbHtml}</div>
+      <div style="flex:2;overflow-x:auto">${hmHtml}</div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <p style="color:var(--text-muted);font-size:12px;margin:0">⚠ — неактивен >7 дней</p>
+      <button onclick="exportAnalyticsCSV()" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);color:var(--text);cursor:pointer">📊 экспорт CSV</button>
+    </div>
     <table class="admin-table">
       <thead><tr>
         <th>Пользователь</th>
-        <th title="Количество сессий">Сессии</th>
-        <th title="Суммарное время за компьютером">Время</th>
-        <th title="Отправлено писем">Отправлено</th>
-        <th title="Удалено писем">Удалено</th>
-        <th title="Сгенерировано саммари">AI саммари</th>
-        <th title="Сгенерировано черновиков AI">AI ответы</th>
-        <th>Последний вход</th>
+        <th title="Сессии">Сесс.</th>
+        <th title="Суммарное время">Время</th>
+        <th title="Отправлено">Отпр.</th>
+        <th title="Удалено">Удал.</th>
+        <th title="Среднее время ответа на входящее">Ответ</th>
+        <th title="AI саммари / AI ответы">AI</th>
+        <th title="% использования AI ответов">AI%</th>
+        <th>Посл. вход</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+function exportAnalyticsCSV() {
+  const list = window._analytics || [];
+  const headers = ["email", "name", "role", "sessions", "hours", "sent", "deleted", "avgResponseHours", "aiSummarize", "aiReply", "aiUsageRatio", "lastLogin", "inactiveDays"];
+  const rows = list.map((u) => [
+    u.email, u.name, u.role, u.sessionCount, u.totalSessionHours,
+    u.sent, u.deleted, u.avgResponseHours ?? "", u.aiSummarize, u.aiReply,
+    u.aiUsageRatio, u.lastLoginAt || "", u.inactiveDays ?? "",
+  ]);
+  const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = `analytics-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 async function renderAuditTab() {
