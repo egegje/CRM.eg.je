@@ -37,6 +37,11 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
   registerErrorHandler(app);
 
   app.get("/health", async () => ({ ok: true }));
+  app.get("/version", async () => ({
+    version: process.env.CRM_VERSION ?? "0.1.0",
+    commit: process.env.CRM_COMMIT ?? "dev",
+    builtAt: process.env.CRM_BUILT_AT ?? new Date().toISOString(),
+  }));
 
   const __dirname = dirname(fileURLToPath(import.meta.url));
   await app.register(fastifyStatic, {

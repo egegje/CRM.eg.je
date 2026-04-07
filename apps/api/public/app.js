@@ -120,6 +120,11 @@ async function bootApp() {
   }
   showApp();
   document.getElementById("user-email").textContent = state.user.email;
+  // version footer
+  fetch("/version").then((r) => r.json()).then((v) => {
+    const el = document.getElementById("version-footer");
+    if (el) el.textContent = `v${v.version} · ${v.commit.slice(0, 7)}`;
+  }).catch(() => {});
   if (state.user.role === "owner" || state.user.role === "admin") {
     document.getElementById("admin-btn").classList.remove("hidden");
   }
