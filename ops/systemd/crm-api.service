@@ -1,0 +1,17 @@
+[Unit]
+Description=crm.eg.je API
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=crm
+WorkingDirectory=/opt/crm.eg.je/apps/api
+EnvironmentFile=/etc/crm/secrets.env
+Environment=NODE_ENV=production
+ExecStartPre=/usr/bin/pnpm --filter @crm/db exec prisma migrate deploy
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

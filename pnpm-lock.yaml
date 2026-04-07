@@ -17,6 +17,9 @@ importers:
       '@crm/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@crm/mail':
+        specifier: workspace:*
+        version: link:../../packages/mail
       '@fastify/multipart':
         specifier: ^9.0.1
         version: 9.4.0
@@ -79,6 +82,31 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/mail:
+    dependencies:
+      imapflow:
+        specifier: ^1.0.171
+        version: 1.2.18
+      mailparser:
+        specifier: ^3.7.2
+        version: 3.9.6
+      nodemailer:
+        specifier: ^6.9.16
+        version: 6.10.1
+    devDependencies:
+      '@types/mailparser':
+        specifier: ^3.4.5
+        version: 3.4.6
+      '@types/nodemailer':
+        specifier: ^6.4.16
+        version: 6.4.23
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.5
+        version: 2.1.9(@types/node@22.19.17)
 
 packages:
 

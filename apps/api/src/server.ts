@@ -5,6 +5,10 @@ import { loadConfig } from "./config.js";
 import { setKey } from "./crypto.js";
 import { registerErrorHandler } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
+import { mailboxRoutes } from "./routes/mailboxes.js";
+import { folderRoutes } from "./routes/folders.js";
+import { messageRoutes } from "./routes/messages.js";
+import { attachmentRoutes } from "./routes/attachments.js";
 
 export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnType<typeof loadConfig> }> {
   const cfg = loadConfig();
@@ -29,6 +33,10 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
 
   app.get("/health", async () => ({ ok: true }));
   await app.register(authRoutes);
+  await app.register(mailboxRoutes);
+  await app.register(folderRoutes);
+  await app.register(messageRoutes);
+  await app.register(attachmentRoutes);
 
   return { app, cfg };
 }
