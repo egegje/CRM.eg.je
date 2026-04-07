@@ -32,9 +32,12 @@ async function persistMessage(
     },
   });
   for (const a of parsed.attachments) {
+    const cleaned = a.filename.replace(/[/\\]/g, "_");
+    const buf = Buffer.from(cleaned, "utf8");
+    const safe = buf.length > 200 ? buf.subarray(0, 200).toString("utf8") + "_" : cleaned;
     const dir = join(cfg.attachmentDir, mailboxId, created.id);
     await mkdir(dir, { recursive: true });
-    const path = join(dir, a.filename);
+    const path = join(dir, safe);
     await writeFile(path, a.content);
     await prisma.attachment.create({
       data: {
