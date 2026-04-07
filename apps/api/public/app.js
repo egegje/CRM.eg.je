@@ -128,20 +128,27 @@ async function bootApp() {
 }
 
 async function loadMailboxes() {
-  state.mailboxes = await api("/mailboxes");
+  const [mailboxes, unread] = await Promise.all([
+    api("/mailboxes"),
+    api("/mailboxes/unread").catch(() => ({})),
+  ]);
+  state.mailboxes = mailboxes;
+  state.unreadByMailbox = unread;
   const list = document.getElementById("mailboxes-list");
   list.innerHTML = "";
+  const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0);
   const all = document.createElement("div");
   all.className = "folder-item" + (state.currentMailbox === null ? " active" : "");
-  all.textContent = "Все ящики";
-  all.onclick = () => { state.currentMailbox = null; refreshList(); };
+  all.innerHTML = `<span>Все ящики</span>${totalUnread ? `<span class="count">${totalUnread}</span>` : ""}`;
+  all.onclick = () => { state.currentMailbox = null; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
   list.appendChild(all);
   for (const mb of state.mailboxes) {
+    const u = unread[mb.id] || 0;
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentMailbox === mb.id ? " active" : "");
-    d.textContent = mb.displayName;
+    d.innerHTML = `<span>${escapeHtml(mb.displayName)}</span>${u ? `<span class="count">${u}</span>` : ""}`;
     d.title = mb.email;
-    d.onclick = () => { state.currentMailbox = mb.id; refreshList(); };
+    d.onclick = () => { state.currentMailbox = mb.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
   const sel = document.getElementById("compose-mailbox");

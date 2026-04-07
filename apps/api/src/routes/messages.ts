@@ -8,7 +8,7 @@ import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
 import { sendQueue } from "../queue.js";
 import { audit } from "../services/audit.js";
-import { accessibleMailboxIds } from "../services/access.js";
+import { accessibleMailboxIds, assertMessageAccess } from "../services/access.js";
 
 const ListQuery = z.object({
   folderId: z.string().optional(),
@@ -119,7 +119,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       include: { attachments: true },
     });
     if (!m) throw new NotFound();
-    if (!m.isRead) {
+    await assertMessageAccess(req.user!, m);
+    if (!m!.isRead) {
       await prisma.message.update({ where: { id }, data: { isRead: true } });
     }
     return m;
@@ -145,6 +146,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch("/messages/:id", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
+    await assertMessageAccess(req.user!, await prisma.message.findUnique({ where: { id }, select: { mailboxId: true } }));
     const body = Patch.parse(req.body);
     const data: Prisma.MessageUpdateInput = {};
     if (body.to) data.toAddrs = body.to;
@@ -169,6 +171,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });
     if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
     const trash = await getOrCreateFolder(m.mailboxId, "trash", "Trash");
     await prisma.message.update({
       where: { id },
@@ -185,6 +188,16 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   });
   app.post("/messages/bulk", { preHandler: requireUser() }, async (req) => {
     const body = Bulk.parse(req.body);
+    const accessIds = await accessibleMailboxIds(req.user!);
+    if (accessIds) {
+      // Restrict ids to those in accessible mailboxes
+      const allowed = await prisma.message.findMany({
+        where: { id: { in: body.ids }, mailboxId: { in: accessIds } },
+        select: { id: true },
+      });
+      body.ids = allowed.map((m) => m.id);
+      if (!body.ids.length) return { count: 0 };
+    }
     const where = { id: { in: body.ids } };
     if (body.action === "read") return prisma.message.updateMany({ where, data: { isRead: true } });
     if (body.action === "unread") return prisma.message.updateMany({ where, data: { isRead: false } });
@@ -230,6 +243,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id }, include: { mailbox: true } });
     if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
     const { generateReply } = await import("../services/ai.js");
     const draftText = await generateReply({
       from: m.fromAddr,
@@ -255,6 +269,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   const SnoozeBody = z.object({ until: z.coerce.date() });
   app.post("/messages/:id/snooze", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
+    await assertMessageAccess(req.user!, await prisma.message.findUnique({ where: { id }, select: { mailboxId: true } }));
     const body = SnoozeBody.parse(req.body);
     if (body.until.getTime() <= Date.now()) throw new BadRequest("until must be in the future");
     return prisma.snooze.upsert({
@@ -274,6 +289,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });
     if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
     if (m.aiSummary) return { summary: m.aiSummary, actions: m.aiActions, priority: m.aiPriority };
     const { summarizeEmail } = await import("../services/ai.js");
     const r = await summarizeEmail({
@@ -292,7 +308,9 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   app.post("/messages/:id/restore", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });
-    if (!m || !m.deletedAt) throw new BadRequest("not in trash");
+    if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
+    if (!m!.deletedAt) throw new BadRequest("not in trash");
     const inbox = await getOrCreateFolder(m.mailboxId, "inbox", "INBOX");
     return prisma.message.update({
       where: { id },
@@ -308,6 +326,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       include: { mailbox: true },
     });
     if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
     if (!m.mailbox.enabled) throw new BadRequest("mailbox disabled");
     const user = req.user!;
 

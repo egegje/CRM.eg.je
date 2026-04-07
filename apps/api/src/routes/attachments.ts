@@ -6,6 +6,7 @@ import { prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { loadConfig } from "../config.js";
 import { NotFound, BadRequest } from "../errors.js";
+import { assertMessageAccess } from "../services/access.js";
 
 export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
   const cfg = loadConfig();
@@ -14,6 +15,7 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
     const id = (req.params as { id: string }).id;
     const m = await prisma.message.findUnique({ where: { id } });
     if (!m) throw new NotFound();
+    await assertMessageAccess(req.user!, m);
     const file = await req.file();
     if (!file) throw new BadRequest("no file");
     const buf = await file.toBuffer();
@@ -37,8 +39,12 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
 
   app.get("/attachments/:id", { preHandler: requireUser() }, async (req, reply) => {
     const id = (req.params as { id: string }).id;
-    const a = await prisma.attachment.findUnique({ where: { id } });
+    const a = await prisma.attachment.findUnique({
+      where: { id },
+      include: { message: { select: { mailboxId: true } } },
+    });
     if (!a) throw new NotFound();
+    await assertMessageAccess(req.user!, a.message);
     reply.header("content-type", a.mime);
     reply.header("content-disposition", `attachment; filename="${a.filename}"`);
     return reply.send(createReadStream(a.storagePath));
