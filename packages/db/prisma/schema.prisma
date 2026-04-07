@@ -153,6 +153,15 @@ model SmartFolder {
   createdAt DateTime @default(now())
 }
 
+model TgNotify {
+  id          String   @id @default(cuid())
+  messageId   String
+  tgMessageId Int
+  createdAt   DateTime @default(now())
+
+  @@index([tgMessageId])
+}
+
 model PasswordReset {
   id        String   @id @default(cuid())
   userId    String
