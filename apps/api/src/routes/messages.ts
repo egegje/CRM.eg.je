@@ -243,7 +243,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });
     if (!m) throw new NotFound();
-    if (m.aiSummary) return { summary: m.aiSummary, actions: m.aiActions };
+    if (m.aiSummary) return { summary: m.aiSummary, actions: m.aiActions, priority: m.aiPriority };
     const { summarizeEmail } = await import("../services/ai.js");
     const r = await summarizeEmail({
       from: m.fromAddr,
@@ -253,9 +253,9 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     });
     await prisma.message.update({
       where: { id },
-      data: { aiSummary: r.summary, aiActions: r.actionItems },
+      data: { aiSummary: r.summary, aiActions: r.actionItems, aiPriority: r.priority },
     });
-    return { summary: r.summary, actions: r.actionItems };
+    return { summary: r.summary, actions: r.actionItems, priority: r.priority };
   });
 
   app.post("/messages/:id/restore", { preHandler: requireUser() }, async (req) => {

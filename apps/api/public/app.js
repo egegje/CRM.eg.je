@@ -291,6 +291,19 @@ function showToast(text, onUndo) {
   setTimeout(() => t.remove(), 6000);
 }
 
+function dateGroup(d) {
+  if (!d) return "Раньше";
+  const now = new Date();
+  const t = new Date(d);
+  const sameDay = t.toDateString() === now.toDateString();
+  if (sameDay) return "Сегодня";
+  const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
+  if (t.toDateString() === yesterday.toDateString()) return "Вчера";
+  const week = new Date(now); week.setDate(now.getDate() - 7);
+  if (t > week) return "На этой неделе";
+  return "Раньше";
+}
+
 function renderList() {
   const el = document.getElementById("messages-list");
   if (!state.messages.length) {
@@ -298,7 +311,16 @@ function renderList() {
     return;
   }
   el.innerHTML = "";
+  let lastGroup = null;
   for (const m of state.messages) {
+    const g = dateGroup(m.receivedAt);
+    if (g !== lastGroup) {
+      const h = document.createElement("div");
+      h.className = "list-group";
+      h.textContent = g;
+      el.appendChild(h);
+      lastGroup = g;
+    }
     const initial = (m.fromAddr || "?")[0].toUpperCase();
     const date = m.receivedAt ? new Date(m.receivedAt).toLocaleDateString("ru", { day: "2-digit", month: "short" }) : "";
     const snippet = (m.bodyText || "").replace(/\s+/g, " ").slice(0, 120);
@@ -306,11 +328,13 @@ function renderList() {
     d.className = "msg-item" + (!m.isRead ? " unread" : "") + (state.selectedId === m.id ? " selected" : "");
     const star = m.isStarred ? "⭐" : "";
     const checked = state.selectedIds.has(m.id) ? "checked" : "";
+    const prio = m.aiPriority || "";
+    const prioBadge = prio === "high" ? '<span class="prio prio-high">!</span>' : prio === "spam" ? '<span class="prio prio-spam">×</span>' : "";
     d.innerHTML = `
       <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
-        <div class="msg-head"><div class="msg-from">${escapeHtml(m.fromAddr || "")}</div><div class="msg-date">${date}</div></div>
+        <div class="msg-head"><div class="msg-from">${prioBadge}${escapeHtml(m.fromAddr || "")}</div><div class="msg-date">${date}</div></div>
         <div class="msg-subject">${star} ${escapeHtml(m.subject || "(без темы)")}</div>
         <div class="msg-snippet">${escapeHtml(snippet)}</div>
       </div>
@@ -336,7 +360,13 @@ function renderPreview(m) {
   const el = document.getElementById("message-preview");
   const date = m.receivedAt ? new Date(m.receivedAt).toLocaleString("ru") : "";
   const attachHtml = (m.attachments || [])
-    .map((a) => `<a class="attachment" href="/attachments/${a.id}" download>📎 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a>`)
+    .map((a) => {
+      const isImg = /^image\//.test(a.mime || "");
+      if (isImg) {
+        return `<div style="display:inline-block;margin:6px 8px 6px 0;vertical-align:top"><img src="/attachments/${a.id}" alt="${escapeHtml(a.filename)}" style="max-width:240px;max-height:240px;border-radius:6px;border:1px solid var(--border);display:block"><a class="attachment" href="/attachments/${a.id}" download style="display:block;margin-top:4px;font-size:11px">⬇ ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a></div>`;
+      }
+      return `<a class="attachment" href="/attachments/${a.id}" download>📎 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a>`;
+    })
     .join("");
   const body = m.bodyText || stripHtml(m.bodyHtml || "");
   const aiActions = (m.aiActions || []).filter((a) => !a.startsWith("_"));

@@ -19,11 +19,13 @@ function getClient(): Anthropic {
 export type EmailSummary = {
   summary: string;
   actionItems: string[];
+  priority: "high" | "normal" | "low" | "spam";
 };
 
-const SYSTEM = `Ты — помощник менеджера по аренде недвижимости. Тебе дают входящее письмо. Верни JSON с двумя полями:
+const SYSTEM = `Ты — помощник менеджера по аренде недвижимости. Тебе дают входящее письмо. Верни JSON с тремя полями:
 - "summary": суть письма в 1-2 коротких предложениях на русском
 - "actionItems": массив строк (действия, которые нужно сделать получателю; пустой массив если действий нет)
+- "priority": одно из "high" (срочно/жалоба/деньги), "normal", "low" (информационное), "spam" (реклама/мусор)
 Только JSON, без markdown-обёртки.`;
 
 export async function summarizeEmail(input: {
@@ -50,14 +52,19 @@ export async function summarizeEmail(input: {
   try {
     const cleaned = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
     const parsed = JSON.parse(cleaned) as EmailSummary;
+    const allowed = ["high", "normal", "low", "spam"] as const;
+    const priority = (allowed as readonly string[]).includes(parsed.priority)
+      ? (parsed.priority as EmailSummary["priority"])
+      : "normal";
     return {
       summary: String(parsed.summary ?? "").slice(0, 500),
       actionItems: Array.isArray(parsed.actionItems)
         ? parsed.actionItems.slice(0, 10).map((s) => String(s).slice(0, 300))
         : [],
+      priority,
     };
   } catch {
-    return { summary: text.slice(0, 500), actionItems: [] };
+    return { summary: text.slice(0, 500), actionItems: [], priority: "normal" };
   }
 }
 

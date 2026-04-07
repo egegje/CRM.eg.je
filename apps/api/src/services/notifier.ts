@@ -44,7 +44,7 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
     actions = r.actionItems;
     await prisma.message.update({
       where: { id: message.id },
-      data: { aiSummary: summary, aiActions: actions },
+      data: { aiSummary: summary, aiActions: actions, aiPriority: r.priority },
     });
   } catch (e) {
     summary = "(AI-саммари недоступно: " + (e as Error).message + ")";
