@@ -26,7 +26,10 @@
 <div id="app" class="hidden">
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar">
-    <div class="brand">crm.eg.je <span id="outbox-badge" class="badge"></span></div>
+    <div class="brand">
+      <span>crm.eg.je <span id="outbox-badge" class="badge"></span></span>
+      <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
+    </div>
     <button class="compose-btn" onclick="openCompose()">✉️ Написать</button>
     <div class="folders">
       <div class="folder-group">
