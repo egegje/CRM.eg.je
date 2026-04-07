@@ -5,6 +5,7 @@ import { prisma } from "@crm/db";
 import { parseRaw } from "@crm/mail";
 import { decrypt } from "../crypto.js";
 import { loadConfig } from "../config.js";
+import { notifyNewMail } from "../services/notifier.js";
 
 const cfg = loadConfig();
 const clients = new Map<string, ImapFlow>();
@@ -48,6 +49,13 @@ async function persistMessage(
         storagePath: path,
       },
     });
+  }
+  // fire-and-forget AI summary + telegram notification
+  const mailboxRow = await prisma.mailbox.findUnique({ where: { id: mailboxId } });
+  if (mailboxRow) {
+    notifyNewMail(created, mailboxRow).catch((e) =>
+      console.error("notify failed:", (e as Error).message),
+    );
   }
 }
 

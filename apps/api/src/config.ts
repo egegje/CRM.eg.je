@@ -8,6 +8,10 @@ const Schema = z.object({
   ATTACHMENT_DIR: z.string().min(1),
   PORT: z.coerce.number().int().nonnegative(),
   NODE_ENV: z.enum(["development", "test", "production"]),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ANTHROPIC_AUTH_TOKEN: z.string().optional(),
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  TELEGRAM_CHAT_ID: z.string().optional(),
 });
 
 export type Config = {
@@ -18,6 +22,10 @@ export type Config = {
   attachmentDir: string;
   port: number;
   env: "development" | "test" | "production";
+  anthropicApiKey?: string;
+  anthropicAuthToken?: string;
+  telegramBotToken?: string;
+  telegramChatId?: string;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -34,5 +42,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     attachmentDir: p.ATTACHMENT_DIR,
     port: p.PORT,
     env: p.NODE_ENV,
+    anthropicApiKey: p.ANTHROPIC_API_KEY,
+    anthropicAuthToken: p.ANTHROPIC_AUTH_TOKEN,
+    telegramBotToken: p.TELEGRAM_BOT_TOKEN,
+    telegramChatId: p.TELEGRAM_CHAT_ID,
   };
 }
