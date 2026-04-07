@@ -24,6 +24,9 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (err instanceof HttpError) {
       return reply.status(err.status).send({ error: err.message, details: err.details });
     }
+    if (typeof (err as { statusCode?: number }).statusCode === "number" && (err as { statusCode: number }).statusCode < 500) {
+      return reply.status((err as { statusCode: number }).statusCode).send({ error: err.message });
+    }
     req.log.error({ err }, "unhandled");
     return reply.status(500).send({ error: "internal", requestId: req.id });
   });

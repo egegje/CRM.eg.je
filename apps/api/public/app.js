@@ -43,6 +43,10 @@ function toggleTheme() {
 
 /* api */
 async function api(path, opts = {}) {
+  const method = (opts.method || "GET").toUpperCase();
+  if (["POST", "PATCH", "PUT"].includes(method) && opts.body === undefined) {
+    opts.body = "{}";
+  }
   const res = await fetch(path, {
     credentials: "include",
     headers: { "content-type": "application/json", ...(opts.headers || {}) },
