@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
+import { accessibleMailboxIds } from "../services/access.js";
 
 const Create = z.object({
   name: z.string().min(1).max(80),
@@ -14,8 +15,10 @@ const Params = z.object({ id: z.string() });
 export async function folderRoutes(app: FastifyInstance): Promise<void> {
   app.get("/folders", { preHandler: requireUser() }, async (req) => {
     const user = req.user!;
+    const ids = await accessibleMailboxIds(user);
+    const mailboxFilter = ids ? { mailboxId: { in: ids } } : { mailboxId: { not: null } };
     return prisma.folder.findMany({
-      where: { OR: [{ ownerId: user.id }, { mailboxId: { not: null } }] },
+      where: { OR: [{ ownerId: user.id }, mailboxFilter] },
       orderBy: [{ kind: "asc" }, { name: "asc" }],
     });
   });

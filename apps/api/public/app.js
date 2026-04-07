@@ -171,7 +171,10 @@ async function loadFolders() {
     d.textContent = f.label;
     d.onclick = () => {
       state.currentFolder = f.key;
+      state.selectedIds.clear();
+      renderBulkBar();
       document.getElementById("app").classList.remove("show-sidebar");
+      document.getElementById("sidebar-overlay")?.remove();
       refreshList();
     };
     list.appendChild(d);
@@ -181,7 +184,7 @@ async function loadFolders() {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.id ? " active" : "");
     d.innerHTML = `<span>📁 ${escapeHtml(f.name)}</span>`;
-    d.onclick = () => { state.currentFolder = f.id; refreshList(); };
+    d.onclick = () => { state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
   // Smart folders
