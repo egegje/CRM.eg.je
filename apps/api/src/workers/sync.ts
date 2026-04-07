@@ -72,7 +72,13 @@ async function persistMessage(
     }
   }
   // upsert contacts (auto-collected address book)
-  const addrs = new Set([parsed.from, ...parsed.to, ...parsed.cc].filter(Boolean));
+  const ownEmails = new Set((await prisma.mailbox.findMany({ select: { email: true } })).map((m) => m.email.toLowerCase()));
+  const addrs = new Set(
+    [parsed.from, ...parsed.to, ...parsed.cc]
+      .filter(Boolean)
+      .map((e) => e.toLowerCase())
+      .filter((e) => !ownEmails.has(e)),
+  );
   for (const email of addrs) {
     await prisma.contact
       .upsert({

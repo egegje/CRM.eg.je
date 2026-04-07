@@ -147,7 +147,14 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     if (body.bodyHtml !== undefined) data.bodyHtml = body.bodyHtml;
     if (body.isRead !== undefined) data.isRead = body.isRead;
     if (body.isStarred !== undefined) data.isStarred = body.isStarred;
-    if (body.folderId) data.folder = { connect: { id: body.folderId } };
+    if (body.folderId) {
+      const target = await prisma.folder.findUnique({ where: { id: body.folderId } });
+      if (!target) throw new NotFound("folder not found");
+      data.folder = { connect: { id: body.folderId } };
+      // keep deletedAt consistent with target folder kind
+      if (target.kind === "trash") data.deletedAt = new Date();
+      else data.deletedAt = null;
+    }
     return prisma.message.update({ where: { id }, data });
   });
 

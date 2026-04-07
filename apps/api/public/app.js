@@ -575,10 +575,14 @@ async function aiReply(id) {
 
 async function replyTo(id) {
   const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
+  const quoted = (m.bodyText || "")
+    .split("\n")
+    .map((line) => (line.length ? "> " + line : ">"))
+    .join("\n");
   openCompose({
     to: m.fromAddr,
     subject: m.subject.startsWith("Re:") ? m.subject : "Re: " + m.subject,
-    bodyText: "\n\n---\n> " + (m.bodyText || "").split("\n").join("\n> "),
+    bodyText: "\n\n--- " + new Date(m.receivedAt || Date.now()).toLocaleString("ru") + ", " + (m.fromAddr || "") + " писал:\n" + quoted,
     mailboxId: m.mailboxId,
   });
 }
