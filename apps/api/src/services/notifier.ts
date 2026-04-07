@@ -4,7 +4,9 @@ import { prisma, type Message, type Mailbox } from "@crm/db";
 
 const cfg = loadConfig();
 
-export async function sendTelegram(text: string): Promise<void> {
+type InlineKeyboard = { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> };
+
+export async function sendTelegram(text: string, replyMarkup?: InlineKeyboard): Promise<void> {
   if (!cfg.telegramBotToken || !cfg.telegramChatId) return;
   const url = `https://api.telegram.org/bot${cfg.telegramBotToken}/sendMessage`;
   const res = await fetch(url, {
@@ -15,6 +17,7 @@ export async function sendTelegram(text: string): Promise<void> {
       text,
       parse_mode: "HTML",
       disable_web_page_preview: true,
+      reply_markup: replyMarkup,
     }),
   });
   if (!res.ok) {
@@ -58,5 +61,11 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
     lines.push("", "<b>Что сделать:</b>");
     for (const a of actions) lines.push(`• ${esc(a)}`);
   }
-  await sendTelegram(lines.join("\n"));
+  await sendTelegram(lines.join("\n"), {
+    inline_keyboard: [[
+      { text: "✓ прочитано", callback_data: `read:${message.id}` },
+      { text: "⭐ важное", callback_data: `star:${message.id}` },
+      { text: "🗑 удалить", callback_data: `del:${message.id}` },
+    ]],
+  });
 }

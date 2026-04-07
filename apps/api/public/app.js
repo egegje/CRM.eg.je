@@ -442,11 +442,61 @@ function debouncedSearch() {
 
 /* hotkeys */
 document.addEventListener("keydown", (e) => {
+  // Cmd/Ctrl+Enter in compose form → submit
+  if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if (!composeBox().classList.contains("hidden")) {
+      e.preventDefault();
+      document.getElementById("compose-form").requestSubmit();
+      return;
+    }
+  }
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-  if (e.key === "Escape") closeCompose();
+  if (e.key === "Escape") { closeCompose(); closeSettings(); closeAdmin(); }
   if (e.key === "r" && state.selectedId) replyTo(state.selectedId);
   if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
-  if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n? — эта справка");
+  if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n⌘/Ctrl+Enter — отправить письмо\n? — эта справка");
+});
+
+/* settings */
+function openSettings() {
+  document.getElementById("settings-modal").classList.remove("hidden");
+}
+function closeSettings() {
+  document.getElementById("settings-modal").classList.add("hidden");
+  document.getElementById("settings-msg").textContent = "";
+}
+document.getElementById("settings-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const msg = document.getElementById("settings-msg");
+  try {
+    await api("/me/password", {
+      method: "POST",
+      body: JSON.stringify({ oldPassword: f.get("oldPassword"), newPassword: f.get("newPassword") }),
+    });
+    msg.style.color = "var(--accent)";
+    msg.textContent = "пароль обновлён";
+    setTimeout(closeSettings, 1500);
+  } catch (err) {
+    msg.style.color = "var(--danger)";
+    msg.textContent = "ошибка: " + err.message;
+  }
+});
+
+/* drag-drop on compose */
+const composeBox = () => document.getElementById("compose-modal");
+document.addEventListener("dragover", (e) => {
+  if (composeBox().classList.contains("hidden")) return;
+  e.preventDefault();
+});
+document.addEventListener("drop", (e) => {
+  if (composeBox().classList.contains("hidden")) return;
+  e.preventDefault();
+  const dt = new DataTransfer();
+  const cur = document.getElementById("compose-files").files;
+  for (const f of cur) dt.items.add(f);
+  for (const f of e.dataTransfer.files) dt.items.add(f);
+  document.getElementById("compose-files").files = dt.files;
 });
 
 /* mobile swipes */

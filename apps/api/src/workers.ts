@@ -5,6 +5,7 @@ import { startSyncFor } from "./workers/sync.js";
 import { startScheduledSendWorker } from "./workers/scheduled-send.js";
 import { startTrashCleanupWorker } from "./workers/trash-cleanup.js";
 import { runReminders, runFollowups } from "./workers/reminders.js";
+import { startTelegramBot } from "./workers/telegram-bot.js";
 
 const cfg = loadConfig();
 setKey(cfg.encKey);
@@ -29,5 +30,7 @@ async function tick() {
 }
 setInterval(tick, HOUR);
 setTimeout(tick, 30 * 1000); // first tick 30s after boot
+
+void startTelegramBot();
 
 console.log(`workers up: ${mailboxes.length} mailboxes`);

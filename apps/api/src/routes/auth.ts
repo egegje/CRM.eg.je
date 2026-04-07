@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma } from "@crm/db";
-import { verifyPassword, currentUser } from "../auth.js";
+import { verifyPassword, currentUser, hashPassword, requireUser } from "../auth.js";
 import { audit } from "../services/audit.js";
 
 const LoginBody = z.object({
@@ -27,6 +27,17 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   app.post("/auth/logout", async (req) => {
     await audit(req, "auth.logout");
     req.session.delete();
+    return { ok: true };
+  });
+
+  app.post("/me/password", { preHandler: requireUser() }, async (req, reply) => {
+    const body = z.object({ oldPassword: z.string().min(1), newPassword: z.string().min(4) }).parse(req.body);
+    const u = req.user!;
+    if (!(await verifyPassword(u.passwordHash, body.oldPassword))) {
+      return reply.status(400).send({ error: "wrong old password" });
+    }
+    await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await hashPassword(body.newPassword) } });
+    await audit(req, "user.password_change");
     return { ok: true };
   });
 
