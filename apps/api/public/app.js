@@ -517,25 +517,24 @@ async function deleteMsg(id) {
 
 async function exportPdf(id) {
   const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
+  // Render preview-pane via html2canvas (browser fonts → perfect Cyrillic)
+  showToast("Генерация PDF...", null);
+  const node = document.getElementById("message-preview");
+  const canvas = await html2canvas(node, { scale: 2, backgroundColor: "#ffffff" });
+  const img = canvas.toDataURL("image/png");
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(m.subject || "(без темы)", 40, 50, { maxWidth: 515 });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(120);
-  let y = 80;
-  doc.text(`От: ${m.fromAddr}`, 40, y); y += 14;
-  doc.text(`Кому: ${(m.toAddrs || []).join(", ")}`, 40, y); y += 14;
-  if (m.receivedAt) { doc.text(`Дата: ${new Date(m.receivedAt).toLocaleString("ru")}`, 40, y); y += 14; }
-  y += 10;
-  doc.setTextColor(0);
-  doc.setFontSize(11);
-  const body = (m.bodyText || "").replace(/\u0000/g, "");
-  const lines = doc.splitTextToSize(body, 515);
-  doc.text(lines, 40, y);
-  doc.save(`${(m.subject || "email").replace(/[^a-z0-9а-я]+/gi, "_").slice(0, 60)}.pdf`);
+  const pdf = new jsPDF({ unit: "pt", format: "a4" });
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
+  const ratio = canvas.width / canvas.height;
+  let imgW = pageW - 40;
+  let imgH = imgW / ratio;
+  if (imgH > pageH - 40) {
+    imgH = pageH - 40;
+    imgW = imgH * ratio;
+  }
+  pdf.addImage(img, "PNG", 20, 20, imgW, imgH);
+  pdf.save(`${(m.subject || "email").replace(/[^a-z0-9а-яё]+/gi, "_").slice(0, 60)}.pdf`);
 }
 
 async function blockSender(email) {
