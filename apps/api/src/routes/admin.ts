@@ -147,7 +147,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   // ---- analytics: heatmap (hour×weekday) ----
   app.get("/admin/analytics/heatmap", { preHandler: requireRole("owner", "admin") }, async () => {
-    return prisma.$queryRaw<{ dow: number; hr: number; c: bigint }[]>`
+    const rows = await prisma.$queryRaw<{ dow: number; hr: number; c: bigint }[]>`
       SELECT extract(dow from "createdAt")::int AS dow,
              extract(hour from "createdAt")::int AS hr,
              count(*)::bigint AS c
@@ -157,11 +157,12 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
        GROUP BY 1, 2
        ORDER BY 1, 2
     `;
+    return rows.map((r) => ({ dow: r.dow, hr: r.hr, c: Number(r.c) }));
   });
 
   // ---- analytics: leaderboard last 7 days ----
   app.get("/admin/analytics/leaderboard", { preHandler: requireRole("owner", "admin") }, async () => {
-    return prisma.$queryRaw<{ userId: string; email: string; sent: bigint }[]>`
+    const rows = await prisma.$queryRaw<{ userId: string; email: string; sent: bigint }[]>`
       SELECT u.id AS "userId", u.email, count(a.id)::bigint AS sent
         FROM "User" u
         LEFT JOIN "AuditLog" a ON a."userId" = u.id
@@ -171,12 +172,13 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY sent DESC
        LIMIT 10
     `;
+    return rows.map((r) => ({ userId: r.userId, email: r.email, sent: Number(r.sent) }));
   });
 
   // ---- analytics: top contacts per user ----
   app.get("/admin/analytics/contacts/:userId", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const { userId } = z.object({ userId: z.string() }).parse(req.params);
-    return prisma.$queryRaw<{ contact: string; c: bigint }[]>`
+    const rows = await prisma.$queryRaw<{ contact: string; c: bigint }[]>`
       SELECT (a.details->>'to')::text AS contact, count(*)::bigint AS c
         FROM "AuditLog" a
        WHERE a."userId" = ${userId}
@@ -185,6 +187,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
        ORDER BY c DESC
        LIMIT 20
     `;
+    return rows.map((r) => ({ contact: r.contact, c: Number(r.c) }));
   });
 
   // ---- analytics ----
