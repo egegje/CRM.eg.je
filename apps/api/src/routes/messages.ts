@@ -52,6 +52,12 @@ async function getOrCreateFolder(mailboxId: string, kind: "drafts" | "trash" | "
 }
 
 export async function messageRoutes(app: FastifyInstance): Promise<void> {
+  app.get("/outbox", { preHandler: requireUser() }, async () => {
+    const pending = await prisma.scheduledSend.count({ where: { status: "pending" } });
+    const failed = await prisma.scheduledSend.count({ where: { status: "failed" } });
+    return { pending, failed };
+  });
+
   app.get("/messages", { preHandler: requireUser() }, async (req) => {
     const q = ListQuery.parse(req.query);
     if (q.q) {

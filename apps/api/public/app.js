@@ -237,7 +237,25 @@ async function refreshList() {
     if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
   }
   if (state.currentFolder === "__starred") messages = messages.filter((m) => m.isStarred);
+  // outbox indicator
+  try {
+    const ob = await api("/outbox");
+    const badge = document.getElementById("outbox-badge");
+    if (badge) badge.textContent = ob.pending > 0 ? `📤 ${ob.pending}` : "";
+  } catch {}
   state.messages = messages;
+  renderList();
+}
+
+async function loadMore() {
+  if (!state.messages.length) return;
+  const last = state.messages[state.messages.length - 1];
+  const params = new URLSearchParams();
+  params.set("cursor", last.id);
+  params.set("limit", "100");
+  if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
+  const more = await api("/messages?" + params.toString());
+  state.messages = state.messages.concat(more);
   renderList();
 }
 
@@ -304,6 +322,13 @@ function dateGroup(d) {
   return "Раньше";
 }
 
+function highlight(text, q) {
+  if (!q) return escapeHtml(text || "");
+  const safeText = escapeHtml(text || "");
+  const safeQ = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return safeText.replace(new RegExp("(" + safeQ + ")", "gi"), "<mark>$1</mark>");
+}
+
 function renderList() {
   const el = document.getElementById("messages-list");
   if (!state.messages.length) {
@@ -330,18 +355,26 @@ function renderList() {
     const checked = state.selectedIds.has(m.id) ? "checked" : "";
     const prio = m.aiPriority || "";
     const prioBadge = prio === "high" ? '<span class="prio prio-high">!</span>' : prio === "spam" ? '<span class="prio prio-spam">×</span>' : "";
+    const q = document.getElementById("search-input").value.trim();
     d.innerHTML = `
       <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
-        <div class="msg-head"><div class="msg-from">${prioBadge}${escapeHtml(m.fromAddr || "")}</div><div class="msg-date">${date}</div></div>
-        <div class="msg-subject">${star} ${escapeHtml(m.subject || "(без темы)")}</div>
-        <div class="msg-snippet">${escapeHtml(snippet)}</div>
+        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromAddr || "", q)}</div><div class="msg-date">${date}</div></div>
+        <div class="msg-subject">${star} ${highlight(m.subject || "(без темы)", q)}</div>
+        <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
     `;
     d.onclick = () => selectMessage(m.id);
     addSwipe(d, m);
     el.appendChild(d);
+  }
+  if (state.messages.length >= 100) {
+    const more = document.createElement("button");
+    more.style.cssText = "display:block;margin:14px auto;padding:8px 16px;background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;cursor:pointer;color:var(--text)";
+    more.textContent = "Загрузить ещё";
+    more.onclick = loadMore;
+    el.appendChild(more);
   }
 }
 
@@ -888,11 +921,38 @@ window.addEventListener("online", () => {
   refreshList().catch(() => {});
 });
 
+/* sound */
+let lastUnreadCount = -1;
+function playDing() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.frequency.value = 880; g.gain.value = 0.05;
+    o.start(); o.stop(ctx.currentTime + 0.15);
+  } catch {}
+}
+
 /* live polling */
-setInterval(() => {
+setInterval(async () => {
   if (!state.user || document.hidden) return;
-  refreshList().catch(() => {});
+  const before = state.messages.length;
+  const beforeUnread = state.messages.filter((m) => !m.isRead).length;
+  await refreshList().catch(() => {});
+  const afterUnread = state.messages.filter((m) => !m.isRead).length;
+  if (lastUnreadCount >= 0 && afterUnread > lastUnreadCount) {
+    playDing();
+    if (Notification.permission === "granted") {
+      new Notification("Новое письмо в crm.eg.je", { body: `Непрочитано: ${afterUnread}` });
+    }
+  }
+  lastUnreadCount = afterUnread;
 }, 30000);
+
+if ("Notification" in window && Notification.permission === "default") {
+  setTimeout(() => Notification.requestPermission().catch(() => {}), 5000);
+}
 
 /* PWA */
 if ("serviceWorker" in navigator) {
