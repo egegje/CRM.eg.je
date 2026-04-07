@@ -55,13 +55,16 @@ function toggleTheme() {
 /* api */
 async function api(path, opts = {}) {
   const method = (opts.method || "GET").toUpperCase();
+  const headers = { ...(opts.headers || {}) };
   if (["POST", "PATCH", "PUT"].includes(method) && opts.body === undefined) {
     opts.body = "{}";
   }
+  if (opts.body !== undefined) headers["content-type"] = "application/json";
+  const { headers: _ignored, ...rest } = opts;
   const res = await fetch(path, {
     credentials: "include",
-    headers: { "content-type": "application/json", ...(opts.headers || {}) },
-    ...opts,
+    ...rest,
+    headers,
   });
   if (res.status === 401 || res.status === 403) {
     showLogin();

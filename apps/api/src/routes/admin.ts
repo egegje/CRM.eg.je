@@ -28,8 +28,9 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
   app.post("/admin/users", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const body = CreateUser.parse(req.body);
+    const { password, ...rest } = body;
     return prisma.user.create({
-      data: { ...body, passwordHash: await hashPassword(body.password) },
+      data: { ...rest, passwordHash: await hashPassword(password) },
       select: { id: true, email: true, name: true, role: true },
     });
   });
