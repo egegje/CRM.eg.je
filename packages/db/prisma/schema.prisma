@@ -147,6 +147,16 @@ model Contact {
   createdAt   DateTime @default(now())
 }
 
+model Template {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  body      String
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+}
+
 model Snooze {
   id          String   @id @default(cuid())
   messageId   String   @unique

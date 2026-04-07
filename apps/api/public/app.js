@@ -229,6 +229,10 @@ async function refreshList() {
   if (q) params.set("q", q);
   const status = document.getElementById("status-filter").value;
   if (status !== "all") params.set("status", status);
+  const df = document.getElementById("date-from").value;
+  const dt = document.getElementById("date-to").value;
+  if (df) params.set("dateFrom", df);
+  if (dt) params.set("dateTo", dt);
   if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
   const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
   const sysKind = sysMap[state.currentFolder];
@@ -611,6 +615,41 @@ async function forwardMsg(id) {
   });
 }
 
+async function loadTemplates() {
+  try {
+    const list = await api("/templates");
+    const sel = document.getElementById("template-select");
+    sel.innerHTML = '<option value="">📋 шаблон...</option>' +
+      list.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("") +
+      '<option value="__delete">— управление —</option>';
+    window._templates = list;
+  } catch {}
+}
+
+function applyTemplate(id) {
+  if (!id) return;
+  if (id === "__delete") {
+    const list = window._templates || [];
+    if (!list.length) return alert("нет шаблонов");
+    const lines = list.map((t, i) => `${i + 1}. ${t.name}`).join("\n");
+    const idx = parseInt(prompt("Номер шаблона для удаления:\n" + lines), 10);
+    if (!idx || idx < 1 || idx > list.length) return;
+    api("/templates/" + list[idx - 1].id, { method: "DELETE" }).then(loadTemplates);
+    return;
+  }
+  const t = (window._templates || []).find((x) => x.id === id);
+  if (t) document.getElementById("compose-form").bodyText.value = t.body;
+}
+
+async function saveAsTemplate() {
+  const body = document.getElementById("compose-form").bodyText.value;
+  if (!body.trim()) return alert("пусто");
+  const name = prompt("Название шаблона:");
+  if (!name) return;
+  await api("/templates", { method: "POST", body: JSON.stringify({ name, body }) });
+  loadTemplates();
+}
+
 async function loadContactsDatalist() {
   try {
     const list = await api("/admin/contacts?limit=200").catch(() => []);
@@ -621,6 +660,7 @@ async function loadContactsDatalist() {
 
 function openCompose(defaults = {}) {
   loadContactsDatalist();
+  loadTemplates();
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
@@ -753,6 +793,36 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n⌘/Ctrl+Enter — отправить письмо\n? — эта справка");
 });
 
+/* stats */
+async function openStats() {
+  const s = await api("/stats");
+  const days = s.last7days.map((d) => `<div style="display:inline-block;width:36px;text-align:center;font-size:11px"><div style="height:${Math.min(80, d.c)}px;background:var(--accent);margin-bottom:4px"></div>${new Date(d.d).getDate()}.${new Date(d.d).getMonth()+1}<br><b>${d.c}</b></div>`).join("");
+  const mb = s.byMailbox.map((m) => `<tr><td>${escapeHtml(m.email)}</td><td style="text-align:right">${m.c}</td></tr>`).join("");
+  const pr = s.byPriority.map((p) => `<tr><td>${escapeHtml(p.p || "—")}</td><td style="text-align:right">${p.c}</td></tr>`).join("");
+  const html = `
+    <div class="modal-box admin-box">
+      <div class="modal-header"><h3>📊 Статистика</h3><button onclick="this.closest('.modal').remove()">✕</button></div>
+      <div style="padding:20px">
+        <div style="display:flex;gap:24px;margin-bottom:24px">
+          <div><div style="font-size:24px;font-weight:700">${s.total}</div><div style="color:var(--text-muted);font-size:12px">всего писем</div></div>
+          <div><div style="font-size:24px;font-weight:700">${s.unread}</div><div style="color:var(--text-muted);font-size:12px">непрочитано</div></div>
+        </div>
+        <h4>Поступление за 7 дней</h4>
+        <div style="display:flex;gap:4px;align-items:flex-end;height:120px;margin:10px 0 24px">${days || "<i>нет данных</i>"}</div>
+        <div style="display:flex;gap:24px">
+          <div style="flex:1"><h4>По ящикам</h4><table class="admin-table">${mb}</table></div>
+          <div style="flex:1"><h4>По приоритету</h4><table class="admin-table">${pr || "<tr><td>нет данных</td></tr>"}</table></div>
+        </div>
+      </div>
+    </div>
+  `;
+  const modal = document.createElement("div");
+  modal.className = "modal";
+  modal.innerHTML = html;
+  modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
+  document.body.appendChild(modal);
+}
+
 /* settings */
 function openSettings() {
   document.getElementById("settings-modal").classList.remove("hidden");
@@ -862,6 +932,7 @@ async function renderUsersTab() {
     <td>${escapeHtml(u.role)}</td>
     <td>${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
     <td>
+      <button onclick="editUser('${u.id}','${escapeHtml(u.name)}','${u.role}')">✏️</button>
       <button onclick="manageUserAccess('${u.id}','${escapeHtml(u.email)}','${u.role}')">доступ</button>
       <button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button>
     </td>
@@ -884,6 +955,15 @@ async function adminCreateUser(e) {
   await api("/admin/users", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
   renderAdminTab();
 }
+async function editUser(id, currentName, currentRole) {
+  const name = prompt("Имя:", currentName);
+  if (name === null) return;
+  const role = prompt("Роль (owner/admin/manager):", currentRole);
+  if (!["owner", "admin", "manager"].includes(role)) return alert("неверная роль");
+  await api("/admin/users/" + id, { method: "PATCH", body: JSON.stringify({ name, role }) });
+  renderAdminTab();
+}
+
 async function manageUserAccess(userId, email, role) {
   if (role === "owner" || role === "admin") {
     return alert(`${role} имеет доступ ко всем ящикам автоматически.`);

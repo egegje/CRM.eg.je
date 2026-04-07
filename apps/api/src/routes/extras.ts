@@ -68,6 +68,51 @@ export async function extraRoutes(app: FastifyInstance): Promise<void> {
     return prisma.message.findMany({ where, orderBy: { receivedAt: "desc" }, take: 200 });
   });
 
+  // ---- templates ----
+  app.get("/templates", { preHandler: requireUser() }, async (req) => {
+    const user = req.user!;
+    return prisma.template.findMany({ where: { ownerId: user.id }, orderBy: { name: "asc" } });
+  });
+
+  app.post("/templates", { preHandler: requireUser() }, async (req) => {
+    const body = z.object({ name: z.string().min(1), body: z.string().min(1) }).parse(req.body);
+    const user = req.user!;
+    return prisma.template.create({ data: { ownerId: user.id, name: body.name, body: body.body } });
+  });
+
+  app.delete("/templates/:id", { preHandler: requireUser() }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    const user = req.user!;
+    const t = await prisma.template.findUnique({ where: { id } });
+    if (!t || t.ownerId !== user.id) throw new NotFound();
+    await prisma.template.delete({ where: { id } });
+    return reply.status(204).send();
+  });
+
+  // ---- stats dashboard ----
+  app.get("/stats", { preHandler: requireUser() }, async () => {
+    const [total, unread, last7daysRows, byMailbox, byPriority] = await Promise.all([
+      prisma.message.count({ where: { deletedAt: null } }),
+      prisma.message.count({ where: { deletedAt: null, isRead: false } }),
+      prisma.$queryRawUnsafe<{ d: Date; c: bigint }[]>(
+        `SELECT date_trunc('day', "receivedAt")::date AS d, count(*)::bigint AS c FROM "Message" WHERE "receivedAt" >= now() - interval '7 days' AND "deletedAt" IS NULL GROUP BY 1 ORDER BY 1`,
+      ),
+      prisma.$queryRawUnsafe<{ email: string; c: bigint }[]>(
+        `SELECT mb.email, count(m.id)::bigint AS c FROM "Mailbox" mb LEFT JOIN "Message" m ON m."mailboxId" = mb.id AND m."deletedAt" IS NULL GROUP BY mb.email ORDER BY c DESC`,
+      ),
+      prisma.$queryRawUnsafe<{ p: string | null; c: bigint }[]>(
+        `SELECT "aiPriority" AS p, count(*)::bigint AS c FROM "Message" WHERE "deletedAt" IS NULL AND "aiPriority" IS NOT NULL GROUP BY "aiPriority"`,
+      ),
+    ]);
+    return {
+      total,
+      unread,
+      last7days: last7daysRows.map((r) => ({ d: r.d, c: Number(r.c) })),
+      byMailbox: byMailbox.map((r) => ({ email: r.email, c: Number(r.c) })),
+      byPriority: byPriority.map((r) => ({ p: r.p, c: Number(r.c) })),
+    };
+  });
+
   // ---- forgot password ----
   // Sends a reset link via the first enabled mailbox.
   const ForgotBody = z.object({ email: z.string().email() });
