@@ -33,6 +33,17 @@ async function forgotPassword() {
 function toggleSidebar() {
   const app = document.getElementById("app");
   app.classList.toggle("show-sidebar");
+  let ov = document.getElementById("sidebar-overlay");
+  if (app.classList.contains("show-sidebar")) {
+    if (!ov) {
+      ov = document.createElement("div");
+      ov.id = "sidebar-overlay";
+      ov.onclick = () => toggleSidebar();
+      document.body.appendChild(ov);
+    }
+  } else {
+    ov?.remove();
+  }
 }
 function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme") || "light";
@@ -432,6 +443,8 @@ function renderPreview(m) {
         <button onclick="aiReply('${m.id}')">🤖 AI ответ</button>
         <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
         <button onclick="snoozeMsg('${m.id}')">⏰ Напомнить</button>
+        <button onclick="exportPdf('${m.id}')">📄 PDF</button>
+        <button onclick="blockSender('${escapeHtml(m.fromAddr)}')">🚫 Блок отправителя</button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
         <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
       </div>
@@ -481,6 +494,42 @@ async function deleteMsg(id) {
     refreshList();
   });
   refreshList();
+}
+
+async function exportPdf(id) {
+  const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: "pt", format: "a4" });
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.text(m.subject || "(без темы)", 40, 50, { maxWidth: 515 });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  doc.setTextColor(120);
+  let y = 80;
+  doc.text(`От: ${m.fromAddr}`, 40, y); y += 14;
+  doc.text(`Кому: ${(m.toAddrs || []).join(", ")}`, 40, y); y += 14;
+  if (m.receivedAt) { doc.text(`Дата: ${new Date(m.receivedAt).toLocaleString("ru")}`, 40, y); y += 14; }
+  y += 10;
+  doc.setTextColor(0);
+  doc.setFontSize(11);
+  const body = (m.bodyText || "").replace(/\u0000/g, "");
+  const lines = doc.splitTextToSize(body, 515);
+  doc.text(lines, 40, y);
+  doc.save(`${(m.subject || "email").replace(/[^a-z0-9а-я]+/gi, "_").slice(0, 60)}.pdf`);
+}
+
+async function blockSender(email) {
+  if (!confirm(`Заблокировать отправителя ${email}? (создастся правило → переместить в Корзину)`)) return;
+  // Find or create a Trash folder for any mailbox; rules are global so use first trash
+  const folders = await api("/folders");
+  const trash = folders.find((f) => f.kind === "trash");
+  if (!trash) return alert("нет папки trash");
+  await api("/admin/rules", {
+    method: "POST",
+    body: JSON.stringify({ triggerType: "from", contains: email, folderId: trash.id, enabled: true }),
+  });
+  showToast("Отправитель заблокирован", null);
 }
 
 async function snoozeMsg(id) {
