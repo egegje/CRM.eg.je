@@ -145,6 +145,67 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // ---- analytics ----
+  app.get("/admin/analytics", { preHandler: requireRole("owner", "admin") }, async () => {
+    const users = await prisma.user.findMany({
+      select: { id: true, email: true, name: true, role: true, lastLoginAt: true, createdAt: true },
+    });
+
+    const result = await Promise.all(
+      users.map(async (u) => {
+        // Session pairing: walk login/logout events ordered by time.
+        const events = await prisma.auditLog.findMany({
+          where: { userId: u.id, action: { in: ["auth.login", "auth.logout"] } },
+          orderBy: { createdAt: "asc" },
+          select: { action: true, createdAt: true },
+        });
+
+        let sessionCount = 0;
+        let totalSessionMs = 0;
+        let openLogin: Date | null = null;
+        for (const e of events) {
+          if (e.action === "auth.login") {
+            if (openLogin) {
+              // implicit close at next login
+              const dur = e.createdAt.getTime() - openLogin.getTime();
+              if (dur > 0 && dur < 12 * 3600 * 1000) totalSessionMs += dur;
+            }
+            openLogin = e.createdAt;
+            sessionCount++;
+          } else if (e.action === "auth.logout" && openLogin) {
+            const dur = e.createdAt.getTime() - openLogin.getTime();
+            if (dur > 0 && dur < 12 * 3600 * 1000) totalSessionMs += dur;
+            openLogin = null;
+          }
+        }
+        // Don't count still-open session.
+
+        const [sentCount, deletedCount, summarizeCount, aiReplyCount] = await Promise.all([
+          prisma.auditLog.count({ where: { userId: u.id, action: "message.send" } }),
+          prisma.auditLog.count({ where: { userId: u.id, action: "message.delete" } }),
+          prisma.auditLog.count({ where: { userId: u.id, action: "message.summarize" } }),
+          prisma.auditLog.count({ where: { userId: u.id, action: "message.ai_reply" } }),
+        ]);
+
+        return {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          lastLoginAt: u.lastLoginAt,
+          sessionCount,
+          totalSessionHours: Math.round((totalSessionMs / 3600000) * 10) / 10,
+          sent: sentCount,
+          deleted: deletedCount,
+          aiSummarize: summarizeCount,
+          aiReply: aiReplyCount,
+        };
+      }),
+    );
+
+    return result.sort((a, b) => b.sent - a.sent);
+  });
+
   // ---- rules ----
   app.get("/admin/rules", { preHandler: requireRole("owner", "admin") }, async () => {
     return prisma.rule.findMany({ orderBy: { createdAt: "desc" } });

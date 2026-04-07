@@ -263,6 +263,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         bodyText: draftText,
       },
     });
+    await audit(req, "message.ai_reply", { messageId: id, draftId: draft.id });
     return { draftId: draft.id, bodyText: draftText };
   });
 
@@ -302,6 +303,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       where: { id },
       data: { aiSummary: r.summary, aiActions: r.actionItems, aiPriority: r.priority },
     });
+    await audit(req, "message.summarize", { messageId: id });
     return { summary: r.summary, actions: r.actionItems, priority: r.priority };
   });
 

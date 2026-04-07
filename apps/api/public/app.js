@@ -929,6 +929,7 @@ async function renderAdminTab() {
     else if (adminTab === "rules") c.innerHTML = await renderRulesTab();
     else if (adminTab === "contacts") c.innerHTML = await renderContactsTab();
     else if (adminTab === "audit") c.innerHTML = await renderAuditTab();
+    else if (adminTab === "analytics") c.innerHTML = await renderAnalyticsTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
   }
@@ -1104,6 +1105,36 @@ async function adminDeleteContact(id) {
   if (!confirm("Удалить контакт?")) return;
   await api("/admin/contacts/" + id, { method: "DELETE" });
   renderAdminTab();
+}
+
+async function renderAnalyticsTab() {
+  const list = await api("/admin/analytics");
+  const rows = list.map((u) => `<tr>
+    <td>${escapeHtml(u.email)}<br><span style="color:var(--text-muted);font-size:11px">${escapeHtml(u.name)} · ${escapeHtml(u.role)}</span></td>
+    <td style="text-align:center">${u.sessionCount}</td>
+    <td style="text-align:center">${u.totalSessionHours}ч</td>
+    <td style="text-align:center"><b>${u.sent}</b></td>
+    <td style="text-align:center">${u.deleted}</td>
+    <td style="text-align:center">${u.aiSummarize}</td>
+    <td style="text-align:center">${u.aiReply}</td>
+    <td style="font-size:11px">${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
+  </tr>`).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px;margin-top:0">Метрики собираются из журнала аудита (auth.login/logout, message.send/delete/summarize/ai_reply)</p>
+    <table class="admin-table">
+      <thead><tr>
+        <th>Пользователь</th>
+        <th title="Количество сессий">Сессии</th>
+        <th title="Суммарное время за компьютером">Время</th>
+        <th title="Отправлено писем">Отправлено</th>
+        <th title="Удалено писем">Удалено</th>
+        <th title="Сгенерировано саммари">AI саммари</th>
+        <th title="Сгенерировано черновиков AI">AI ответы</th>
+        <th>Последний вход</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
 }
 
 async function renderAuditTab() {
