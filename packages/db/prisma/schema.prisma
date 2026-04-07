@@ -1,0 +1,128 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  admin
+  manager
+}
+
+enum FolderKind {
+  inbox
+  sent
+  drafts
+  trash
+  custom
+}
+
+enum SendStatus {
+  pending
+  sent
+  failed
+  cancelled
+}
+
+model User {
+  id           String          @id @default(cuid())
+  email        String          @unique
+  passwordHash String
+  name         String
+  role         Role
+  createdAt    DateTime        @default(now())
+  lastLoginAt  DateTime?
+  folders      Folder[]
+  scheduled    ScheduledSend[]
+}
+
+model Mailbox {
+  id                   String          @id @default(cuid())
+  email                String          @unique
+  displayName          String
+  encryptedAppPassword Bytes
+  imapHost             String          @default("imap.mail.ru")
+  imapPort             Int             @default(993)
+  smtpHost             String          @default("smtp.mail.ru")
+  smtpPort             Int             @default(465)
+  enabled              Boolean         @default(true)
+  createdAt            DateTime        @default(now())
+  folders              Folder[]
+  messages             Message[]
+  scheduled            ScheduledSend[]
+  syncState            SyncState?
+}
+
+model SyncState {
+  mailboxId String   @id
+  mailbox   Mailbox  @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  lastUid   Int      @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Folder {
+  id        String     @id @default(cuid())
+  mailbox   Mailbox?   @relation(fields: [mailboxId], references: [id])
+  mailboxId String?
+  owner     User?      @relation(fields: [ownerId], references: [id])
+  ownerId   String?
+  name      String
+  kind      FolderKind
+  parentId  String?
+  messages  Message[]
+
+  @@index([mailboxId, kind])
+}
+
+model Message {
+  id          String       @id @default(cuid())
+  mailbox     Mailbox      @relation(fields: [mailboxId], references: [id])
+  mailboxId   String
+  folder      Folder       @relation(fields: [folderId], references: [id])
+  folderId    String
+  imapUid     Int?
+  messageId   String?      @unique
+  fromAddr    String
+  toAddrs     String[]
+  ccAddrs     String[]
+  subject     String
+  bodyText    String?
+  bodyHtml    String?
+  isRead      Boolean      @default(false)
+  isStarred   Boolean      @default(false)
+  isDraft     Boolean      @default(false)
+  receivedAt  DateTime?
+  sentAt      DateTime?
+  deletedAt   DateTime?
+  attachments Attachment[]
+
+  @@index([mailboxId, folderId, receivedAt])
+  @@index([deletedAt])
+}
+
+model Attachment {
+  id          String  @id @default(cuid())
+  message     Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId   String
+  filename    String
+  mime        String
+  size        Int
+  storagePath String
+}
+
+model ScheduledSend {
+  id        String     @id @default(cuid())
+  user      User       @relation(fields: [userId], references: [id])
+  userId    String
+  mailbox   Mailbox    @relation(fields: [mailboxId], references: [id])
+  mailboxId String
+  payload   Json
+  sendAt    DateTime
+  status    SendStatus @default(pending)
+  jobId     String?
+  createdAt DateTime   @default(now())
+}
