@@ -1,6 +1,9 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import secureSession from "@fastify/secure-session";
 import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { loadConfig } from "./config.js";
 import { setKey } from "./crypto.js";
 import { registerErrorHandler } from "./errors.js";
@@ -32,6 +35,14 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
   registerErrorHandler(app);
 
   app.get("/health", async () => ({ ok: true }));
+
+  const __dirname = dirname(fileURLToPath(import.meta.url));
+  await app.register(fastifyStatic, {
+    root: join(__dirname, "..", "public"),
+    prefix: "/",
+    decorateReply: false,
+  });
+
   await app.register(authRoutes);
   await app.register(mailboxRoutes);
   await app.register(folderRoutes);
