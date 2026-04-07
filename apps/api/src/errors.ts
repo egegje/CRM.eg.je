@@ -28,6 +28,11 @@ export function registerErrorHandler(app: FastifyInstance): void {
     if (typeof sc === "number" && sc < 500) {
       return reply.status(sc).send({ error: (err as Error).message });
     }
+    // Prisma "record not found" → 404
+    const code = (err as unknown as { code?: string }).code;
+    if (code === "P2025") {
+      return reply.status(404).send({ error: "not found" });
+    }
     req.log.error({ err }, "unhandled");
     return reply.status(500).send({ error: "internal", requestId: req.id });
   });
