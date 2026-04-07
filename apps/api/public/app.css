@@ -154,7 +154,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
     box-shadow: 4px 0 20px rgba(0,0,0,0.2);
   }
   #app.show-sidebar .sidebar { transform: translateX(0); }
-  #sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 55; }
+  #sidebar-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 280px; background: rgba(0,0,0,0.45); z-index: 55; cursor: pointer; -webkit-tap-highlight-color: transparent; }
   .toolbar { padding-left: 60px; }
   .preview-pane { display: none; }
   #app.show-preview .list-pane { display: none; }
