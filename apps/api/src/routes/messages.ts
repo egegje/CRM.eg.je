@@ -145,6 +145,25 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
+  app.post("/messages/:id/summarize", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const m = await prisma.message.findUnique({ where: { id } });
+    if (!m) throw new NotFound();
+    if (m.aiSummary) return { summary: m.aiSummary, actions: m.aiActions };
+    const { summarizeEmail } = await import("../services/ai.js");
+    const r = await summarizeEmail({
+      from: m.fromAddr,
+      subject: m.subject,
+      bodyText: m.bodyText,
+      bodyHtml: m.bodyHtml,
+    });
+    await prisma.message.update({
+      where: { id },
+      data: { aiSummary: r.summary, aiActions: r.actionItems },
+    });
+    return { summary: r.summary, actions: r.actionItems };
+  });
+
   app.post("/messages/:id/restore", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });

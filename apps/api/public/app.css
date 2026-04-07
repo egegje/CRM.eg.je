@@ -88,6 +88,8 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
 .preview-actions { display: flex; gap: 6px; margin: 14px 0; }
 .preview-actions button { padding: 6px 12px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--text); }
 .preview-actions button:hover { background: var(--bg-hover); }
+.mobile-back { display: none; }
+@media (max-width: 900px) { .mobile-back { display: inline-block; } }
 .ai-block { background: var(--summary-bg); border-left: 3px solid var(--summary-border); padding: 12px 14px; margin: 14px 0; border-radius: 4px; font-size: 13px; }
 .ai-block .ai-label { font-size: 11px; text-transform: uppercase; color: var(--summary-border); font-weight: 600; margin-bottom: 4px; }
 .preview-body { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
@@ -110,11 +112,28 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
 .compose-actions button { padding: 8px 16px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-alt); cursor: pointer; color: var(--text); }
 .compose-actions button[type="submit"] { background: var(--accent); color: white; border-color: var(--accent); }
 
+.burger { display: none; }
+
 /* mobile */
 @media (max-width: 900px) {
-  #app { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
+  #app { grid-template-columns: 1fr; position: relative; }
+  .burger {
+    display: block; position: fixed; top: 10px; left: 10px; z-index: 50;
+    width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--text); font-size: 20px; cursor: pointer;
+  }
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+    transform: translateX(-100%); transition: transform 0.2s; z-index: 60;
+    box-shadow: 4px 0 20px rgba(0,0,0,0.2);
+  }
+  #app.show-sidebar .sidebar { transform: translateX(0); }
+  #app.show-sidebar::after {
+    content: ""; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 55;
+  }
+  .toolbar { padding-left: 60px; }
   .preview-pane { display: none; }
   #app.show-preview .list-pane { display: none; }
   #app.show-preview .preview-pane { display: block; }
+  #app.show-preview .burger { left: auto; right: 10px; }
 }

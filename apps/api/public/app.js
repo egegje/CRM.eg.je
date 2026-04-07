@@ -15,6 +15,10 @@ function initTheme() {
   const saved = localStorage.getItem("theme") || "light";
   document.documentElement.setAttribute("data-theme", saved);
 }
+function toggleSidebar() {
+  const app = document.getElementById("app");
+  app.classList.toggle("show-sidebar");
+}
 function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme") || "light";
   const next = cur === "light" ? "dark" : "light";
@@ -118,16 +122,24 @@ async function loadFolders() {
   state.folders = await api("/folders");
   const list = document.getElementById("folders-list");
   list.innerHTML = "";
-  const inbox = document.createElement("div");
-  inbox.className = "folder-item" + (state.currentFolder === "__inbox" ? " active" : "");
-  inbox.textContent = "📥 Входящие";
-  inbox.onclick = () => { state.currentFolder = "__inbox"; refreshList(); };
-  list.appendChild(inbox);
-  const trash = document.createElement("div");
-  trash.className = "folder-item" + (state.currentFolder === "__trash" ? " active" : "");
-  trash.textContent = "🗑 Корзина";
-  trash.onclick = () => { state.currentFolder = "__trash"; refreshList(); };
-  list.appendChild(trash);
+  const systemFolders = [
+    { key: "__inbox", label: "📥 Входящие", kind: "inbox" },
+    { key: "__sent", label: "📤 Отправленные", kind: "sent" },
+    { key: "__drafts", label: "📝 Черновики", kind: "drafts" },
+    { key: "__starred", label: "⭐ Важные", kind: null },
+    { key: "__trash", label: "🗑 Корзина", kind: "trash" },
+  ];
+  for (const f of systemFolders) {
+    const d = document.createElement("div");
+    d.className = "folder-item" + (state.currentFolder === f.key ? " active" : "");
+    d.textContent = f.label;
+    d.onclick = () => {
+      state.currentFolder = f.key;
+      document.getElementById("app").classList.remove("show-sidebar");
+      refreshList();
+    };
+    list.appendChild(d);
+  }
   const custom = state.folders.filter((f) => f.kind === "custom");
   for (const f of custom) {
     const d = document.createElement("div");
@@ -147,12 +159,26 @@ async function refreshList() {
   const status = document.getElementById("status-filter").value;
   if (status !== "all") params.set("status", status);
   if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
-  if (state.currentFolder && state.currentFolder !== "__inbox" && state.currentFolder !== "__trash") {
+  const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
+  const sysKind = sysMap[state.currentFolder];
+  if (sysKind) {
+    const ids = state.folders.filter((f) => f.kind === sysKind).map((f) => f.id);
+    if (ids.length === 1) params.set("folderId", ids[0]);
+    // If multiple, leave unfiltered and post-filter client-side below
+  } else if (state.currentFolder === "__trash") {
+    params.set("trash", "true");
+  } else if (state.currentFolder === "__starred") {
+    // post-filter
+  } else if (state.currentFolder) {
     params.set("folderId", state.currentFolder);
   }
-  if (state.currentFolder === "__trash") params.set("trash", "true");
   params.set("limit", "100");
-  const messages = await api("/messages?" + params.toString());
+  let messages = await api("/messages?" + params.toString());
+  if (sysKind) {
+    const ids = new Set(state.folders.filter((f) => f.kind === sysKind).map((f) => f.id));
+    if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
+  }
+  if (state.currentFolder === "__starred") messages = messages.filter((m) => m.isStarred);
   state.messages = messages;
   renderList();
 }
@@ -212,7 +238,7 @@ function renderPreview(m) {
               .join("")}</ul>`
           : ""
       }</div>`
-    : "";
+    : `<div class="ai-block" id="ai-block-${m.id}"><div class="ai-label">AI · суть</div><span style="color:var(--text-muted)">не сгенерировано</span> <button class="link-btn" onclick="generateSummary('${m.id}')">сгенерировать</button></div>`;
   el.className = "";
   el.innerHTML = `
     <div class="preview-header">
@@ -224,6 +250,7 @@ function renderPreview(m) {
         <b>Дата:</b> ${date}
       </div>
       <div class="preview-actions">
+        <button class="mobile-back" onclick="closePreview()">← Назад</button>
         <button onclick="replyTo('${m.id}')">↩️ Ответить</button>
         <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
@@ -234,6 +261,30 @@ function renderPreview(m) {
     <div class="preview-body">${escapeHtml(body)}</div>
     ${attachHtml ? `<div class="attachments">${attachHtml}</div>` : ""}
   `;
+}
+
+function closePreview() {
+  document.getElementById("app").classList.remove("show-preview");
+  state.selectedId = null;
+  renderList();
+}
+
+async function generateSummary(id) {
+  const block = document.getElementById("ai-block-" + id);
+  if (block) block.innerHTML = '<div class="ai-label">AI · суть</div><span style="color:var(--text-muted)">генерирую...</span>';
+  try {
+    const r = await api("/messages/" + id + "/summarize", { method: "POST" });
+    const acts = (r.actions || []).filter((a) => !a.startsWith("_"));
+    if (block) {
+      block.innerHTML = `<div class="ai-label">AI · суть</div>${escapeHtml(r.summary)}${
+        acts.length
+          ? `<div class="ai-label" style="margin-top:8px">Что сделать</div><ul style="margin:4px 0 0 18px;padding:0">${acts.map((a) => `<li>${escapeHtml(a)}</li>`).join("")}</ul>`
+          : ""
+      }`;
+    }
+  } catch (e) {
+    if (block) block.innerHTML = '<div class="ai-label">AI · суть</div><span style="color:var(--danger)">ошибка: ' + escapeHtml(e.message) + "</span>";
+  }
 }
 
 async function toggleStar(id, cur) {
