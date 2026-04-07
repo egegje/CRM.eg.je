@@ -7,6 +7,7 @@ import { buildWhere } from "../services/search.js";
 import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
 import { sendQueue } from "../queue.js";
+import { audit } from "../services/audit.js";
 
 const ListQuery = z.object({
   folderId: z.string().optional(),
@@ -142,6 +143,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       where: { id },
       data: { deletedAt: new Date(), folderId: trash.id },
     });
+    await audit(req, "message.delete", { messageId: id, subject: m.subject });
     return reply.status(204).send();
   });
 
@@ -227,6 +229,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         fromAddr: m.mailbox.email,
       },
     });
+    await audit(req, "message.send", { messageId: id, to: m.toAddrs, subject: m.subject });
     return { sent: true };
   });
 }

@@ -112,6 +112,21 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
 .compose-actions button { padding: 8px 16px; border-radius: 5px; border: 1px solid var(--border); background: var(--bg-alt); cursor: pointer; color: var(--text); }
 .compose-actions button[type="submit"] { background: var(--accent); color: white; border-color: var(--accent); }
 
+/* admin */
+.admin-box { width: 900px; max-width: 95vw; }
+.admin-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); padding: 0 16px; }
+.admin-tabs .tab { padding: 10px 16px; background: none; border: none; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; }
+.admin-tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+#admin-content { padding: 16px 20px; max-height: 65vh; overflow-y: auto; }
+.admin-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-table th, .admin-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.admin-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+.admin-table button { padding: 4px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); cursor: pointer; color: var(--text); }
+.admin-table button.danger { color: var(--danger); border-color: var(--danger); }
+.admin-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: end; }
+.admin-form input, .admin-form select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); }
+.admin-form button { padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; }
+
 .burger { display: none; }
 
 /* mobile */

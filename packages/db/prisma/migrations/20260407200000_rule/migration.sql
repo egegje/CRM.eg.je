@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS "Rule" (id text PRIMARY KEY, "triggerType" text NOT NULL, contains text NOT NULL, "folderId" text NOT NULL, enabled boolean NOT NULL DEFAULT true, "createdAt" timestamptz NOT NULL DEFAULT now());

@@ -116,6 +116,15 @@ model Attachment {
   storagePath String
 }
 
+model Rule {
+  id        String   @id @default(cuid())
+  triggerType String  // "from" | "to" | "subject"
+  contains  String
+  folderId  String
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
 model Contact {
   id          String   @id @default(cuid())
   email       String   @unique

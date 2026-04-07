@@ -110,7 +110,31 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
-  // ---- rules (simple) ----
-  // Rules use the AuditLog-style approach: store as rows in a JSON-config table.
-  // For now, hardcoded as part of admin (defer Rule model).
+  // ---- rules ----
+  app.get("/admin/rules", { preHandler: requireRole("owner", "admin") }, async () => {
+    return prisma.rule.findMany({ orderBy: { createdAt: "desc" } });
+  });
+
+  const CreateRule = z.object({
+    triggerType: z.enum(["from", "to", "subject"]),
+    contains: z.string().min(1),
+    folderId: z.string().min(1),
+    enabled: z.boolean().default(true),
+  });
+  app.post("/admin/rules", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const body = CreateRule.parse(req.body);
+    return prisma.rule.create({ data: body });
+  });
+
+  app.patch("/admin/rules/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ enabled: z.boolean().optional(), contains: z.string().optional() }).parse(req.body);
+    return prisma.rule.update({ where: { id }, data: body });
+  });
+
+  app.delete("/admin/rules/:id", { preHandler: requireRole("owner", "admin") }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    await prisma.rule.delete({ where: { id } });
+    return reply.status(204).send();
+  });
 }

@@ -87,6 +87,9 @@ async function bootApp() {
   }
   showApp();
   document.getElementById("user-email").textContent = state.user.email;
+  if (state.user.role === "owner" || state.user.role === "admin") {
+    document.getElementById("admin-btn").classList.remove("hidden");
+  }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();
 }
@@ -399,6 +402,168 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
   if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n? — эта справка");
 });
+
+/* admin */
+let adminTab = "users";
+function openAdmin() {
+  document.getElementById("admin-modal").classList.remove("hidden");
+  switchTab("users");
+}
+function closeAdmin() {
+  document.getElementById("admin-modal").classList.add("hidden");
+}
+function switchTab(tab) {
+  adminTab = tab;
+  document.querySelectorAll(".admin-tabs .tab").forEach((el) => {
+    el.classList.toggle("active", el.dataset.tab === tab);
+  });
+  renderAdminTab();
+}
+
+async function renderAdminTab() {
+  const c = document.getElementById("admin-content");
+  c.innerHTML = "<div style='color:var(--text-muted)'>загрузка...</div>";
+  try {
+    if (adminTab === "users") c.innerHTML = await renderUsersTab();
+    else if (adminTab === "mailboxes") c.innerHTML = await renderMailboxesTab();
+    else if (adminTab === "rules") c.innerHTML = await renderRulesTab();
+    else if (adminTab === "contacts") c.innerHTML = await renderContactsTab();
+    else if (adminTab === "audit") c.innerHTML = await renderAuditTab();
+  } catch (e) {
+    c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
+  }
+}
+
+async function renderUsersTab() {
+  const users = await api("/admin/users");
+  const rows = users.map((u) => `<tr>
+    <td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.name)}</td>
+    <td>${escapeHtml(u.role)}</td>
+    <td>${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
+    <td><button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button></td>
+  </tr>`).join("");
+  return `
+    <form class="admin-form" onsubmit="adminCreateUser(event)">
+      <input name="email" type="email" placeholder="email" required>
+      <input name="password" type="password" placeholder="пароль" required>
+      <input name="name" placeholder="имя" required>
+      <select name="role"><option value="manager">manager</option><option value="admin">admin</option><option value="owner">owner</option></select>
+      <button type="submit">+ Добавить</button>
+    </form>
+    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Последний вход</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
+
+async function adminCreateUser(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api("/admin/users", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  renderAdminTab();
+}
+async function adminDeleteUser(id) {
+  if (!confirm("Удалить пользователя?")) return;
+  await api("/admin/users/" + id, { method: "DELETE" });
+  renderAdminTab();
+}
+
+async function renderMailboxesTab() {
+  const list = await api("/admin/mailboxes");
+  const rows = list.map((m) => `<tr>
+    <td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.displayName)}</td>
+    <td>
+      <label><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"> вкл</label>
+    </td>
+    <td><button class="danger" onclick="adminDeleteMailbox('${m.id}')">удалить</button></td>
+  </tr>`).join("");
+  return `
+    <form class="admin-form" onsubmit="adminCreateMailbox(event)">
+      <input name="email" type="email" placeholder="user@mail.ru" required>
+      <input name="displayName" placeholder="название" required>
+      <input name="appPassword" type="password" placeholder="пароль приложения" required>
+      <button type="submit">+ Добавить</button>
+    </form>
+    <table class="admin-table"><thead><tr><th>Email</th><th>Название</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
+async function adminCreateMailbox(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api("/admin/mailboxes", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  renderAdminTab();
+}
+async function adminToggleMailbox(id, enabled) {
+  await api("/admin/mailboxes/" + id, { method: "PATCH", body: JSON.stringify({ enabled }) });
+}
+async function adminDeleteMailbox(id) {
+  if (!confirm("Удалить ящик? (только если пустой)")) return;
+  try { await api("/admin/mailboxes/" + id, { method: "DELETE" }); renderAdminTab(); }
+  catch (e) { alert(e.message); }
+}
+
+async function renderRulesTab() {
+  const [rules, folders] = await Promise.all([api("/admin/rules"), api("/folders")]);
+  const folderMap = Object.fromEntries(folders.map((f) => [f.id, f.name]));
+  const folderOpts = folders.filter((f) => f.kind === "custom" || f.kind === "trash").map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("");
+  const rows = rules.map((r) => `<tr>
+    <td>${escapeHtml(r.triggerType)}</td>
+    <td>${escapeHtml(r.contains)}</td>
+    <td>${escapeHtml(folderMap[r.folderId] || r.folderId)}</td>
+    <td><label><input type="checkbox" ${r.enabled ? "checked" : ""} onchange="adminToggleRule('${r.id}', this.checked)"> вкл</label></td>
+    <td><button class="danger" onclick="adminDeleteRule('${r.id}')">удалить</button></td>
+  </tr>`).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px;margin-top:0">Если в письме поле <b>type</b> содержит <b>значение</b>, то переместить в указанную папку.</p>
+    <form class="admin-form" onsubmit="adminCreateRule(event)">
+      <select name="triggerType"><option value="from">from</option><option value="to">to</option><option value="subject">subject</option></select>
+      <input name="contains" placeholder="значение" required>
+      <select name="folderId" required>${folderOpts}</select>
+      <button type="submit">+ Добавить</button>
+    </form>
+    <table class="admin-table"><thead><tr><th>Тип</th><th>Содержит</th><th>→ Папка</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
+async function adminCreateRule(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api("/admin/rules", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  renderAdminTab();
+}
+async function adminToggleRule(id, enabled) {
+  await api("/admin/rules/" + id, { method: "PATCH", body: JSON.stringify({ enabled }) });
+}
+async function adminDeleteRule(id) {
+  if (!confirm("Удалить правило?")) return;
+  await api("/admin/rules/" + id, { method: "DELETE" });
+  renderAdminTab();
+}
+
+async function renderContactsTab() {
+  const list = await api("/admin/contacts?limit=200");
+  const rows = list.map((c) => `<tr>
+    <td>${escapeHtml(c.email)}</td><td>${escapeHtml(c.name || "")}</td>
+    <td>${c.useCount}</td>
+    <td>${c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString("ru") : "—"}</td>
+    <td><button class="danger" onclick="adminDeleteContact('${c.id}')">удалить</button></td>
+  </tr>`).join("");
+  return `<table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Использований</th><th>Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+async function adminDeleteContact(id) {
+  if (!confirm("Удалить контакт?")) return;
+  await api("/admin/contacts/" + id, { method: "DELETE" });
+  renderAdminTab();
+}
+
+async function renderAuditTab() {
+  const list = await api("/admin/audit?limit=200");
+  const rows = list.map((a) => `<tr>
+    <td>${new Date(a.createdAt).toLocaleString("ru")}</td>
+    <td>${escapeHtml(a.userId || "—")}</td>
+    <td>${escapeHtml(a.action)}</td>
+    <td><code style="font-size:11px">${escapeHtml(JSON.stringify(a.details || {}))}</code></td>
+    <td>${escapeHtml(a.ip || "")}</td>
+  </tr>`).join("");
+  return `<table class="admin-table"><thead><tr><th>Время</th><th>User</th><th>Действие</th><th>Детали</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
 
 /* live polling */
 setInterval(() => {

@@ -59,6 +59,18 @@ async function persistMessage(
       },
     });
   }
+  // apply routing rules
+  const rules = await prisma.rule.findMany({ where: { enabled: true } });
+  for (const r of rules) {
+    const haystack =
+      r.triggerType === "from" ? parsed.from
+      : r.triggerType === "to" ? parsed.to.join(",")
+      : parsed.subject;
+    if (haystack.toLowerCase().includes(r.contains.toLowerCase())) {
+      await prisma.message.update({ where: { id: created.id }, data: { folderId: r.folderId } }).catch(() => {});
+      break;
+    }
+  }
   // upsert contacts (auto-collected address book)
   const addrs = new Set([parsed.from, ...parsed.to, ...parsed.cc].filter(Boolean));
   for (const email of addrs) {
