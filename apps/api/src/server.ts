@@ -1,0 +1,40 @@
+import Fastify, { type FastifyInstance } from "fastify";
+import secureSession from "@fastify/secure-session";
+import multipart from "@fastify/multipart";
+import { loadConfig } from "./config.js";
+import { setKey } from "./crypto.js";
+import { registerErrorHandler } from "./errors.js";
+import { authRoutes } from "./routes/auth.js";
+
+export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnType<typeof loadConfig> }> {
+  const cfg = loadConfig();
+  setKey(cfg.encKey);
+
+  const app = Fastify({
+    logger: { level: cfg.env === "test" ? "warn" : "info" },
+  });
+
+  await app.register(secureSession, {
+    key: cfg.sessionSecret,
+    cookie: {
+      path: "/",
+      httpOnly: true,
+      sameSite: "lax",
+      secure: cfg.env === "production",
+    },
+  });
+  await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
+
+  registerErrorHandler(app);
+
+  app.get("/health", async () => ({ ok: true }));
+  await app.register(authRoutes);
+
+  return { app, cfg };
+}
+
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  const { app, cfg } = await buildApp();
+  await app.listen({ host: "127.0.0.1", port: cfg.port });
+}
