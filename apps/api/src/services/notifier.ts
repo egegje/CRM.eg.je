@@ -44,6 +44,22 @@ export async function sendTelegramPhoto(filePath: string, caption?: string): Pro
   if (!res.ok) throw new Error(`tg sendPhoto ${res.status}`);
 }
 
+export async function editTelegramMessage(messageId: number, text: string, replyMarkup?: InlineKeyboard): Promise<void> {
+  if (!cfg.telegramBotToken || !cfg.telegramChatId) return;
+  await fetch(`https://api.telegram.org/bot${cfg.telegramBotToken}/editMessageText`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: cfg.telegramChatId,
+      message_id: messageId,
+      text,
+      parse_mode: "HTML",
+      disable_web_page_preview: true,
+      reply_markup: replyMarkup,
+    }),
+  }).catch(() => {});
+}
+
 export async function sendTelegramDocument(filePath: string, caption?: string): Promise<void> {
   if (!cfg.telegramBotToken || !cfg.telegramChatId) return;
   const { readFile } = await import("node:fs/promises");
@@ -84,25 +100,33 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
     summary = "(AI-саммари недоступно: " + (e as Error).message + ")";
   }
 
+  // Compact one-block format
+  const attachments = await prisma.attachment.findMany({
+    where: { messageId: message.id },
+    select: { id: true, filename: true, mime: true, storagePath: true },
+  });
+  const imgCount = attachments.filter((a) => /^image\//.test(a.mime)).length;
+  const otherCount = attachments.length - imgCount;
+  const attachLine = attachments.length
+    ? `📎 ${attachments.length}${imgCount ? ` (${imgCount} 🖼)` : ""}`
+    : "";
+
+  const subj = message.subject || "(без темы)";
   const lines = [
-    `📨 <b>${esc(mailbox.displayName)}</b> · ${esc(mailbox.email)}`,
-    `<b>От:</b> ${esc(message.fromAddr)}`,
-    `<b>Тема:</b> ${esc(message.subject || "(без темы)")}`,
-    "",
-    `<i>${esc(summary)}</i>`,
+    `<b>${esc(mailbox.displayName)}</b> · <code>${esc(message.fromAddr)}</code>${attachLine ? "  " + attachLine : ""}`,
+    `<b>${esc(subj)}</b>`,
   ];
+  if (summary) lines.push("", esc(summary));
   if (actions.length) {
-    lines.push("", "<b>Что сделать:</b>");
-    for (const a of actions) lines.push(`• ${esc(a)}`);
+    lines.push("", actions.map((a) => "• " + esc(a)).join("\n"));
   }
   const sent = await sendTelegram(lines.join("\n"), {
     inline_keyboard: [[
-      { text: "✓ прочитано", callback_data: `read:${message.id}` },
-      { text: "⭐ важное", callback_data: `star:${message.id}` },
-      { text: "🗑 удалить", callback_data: `del:${message.id}` },
-    ], [
-      { text: "🤖 AI черновик", callback_data: `aireply:${message.id}` },
-      { text: "✏️ ответить", callback_data: `reply:${message.id}` },
+      { text: "✓", callback_data: `read:${message.id}` },
+      { text: "⭐", callback_data: `star:${message.id}` },
+      { text: "🗑", callback_data: `del:${message.id}` },
+      { text: "🤖", callback_data: `aireply:${message.id}` },
+      { text: "✏️", callback_data: `reply:${message.id}` },
     ]],
   });
 
@@ -113,15 +137,15 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
       .catch(() => {});
   }
 
-  // Forward image attachments directly to Telegram
-  const attachments = await prisma.attachment.findMany({ where: { messageId: message.id } });
-  for (const a of attachments) {
-    try {
-      if (/^image\//.test(a.mime)) {
+  // Forward image attachments only if 1-3 (avoid flooding); skip if many
+  if (imgCount > 0 && imgCount <= 3) {
+    for (const a of attachments) {
+      if (!/^image\//.test(a.mime)) continue;
+      try {
         await sendTelegramPhoto(a.storagePath, a.filename);
+      } catch (e) {
+        console.error("tg attachment forward failed:", (e as Error).message);
       }
-    } catch (e) {
-      console.error("tg attachment forward failed:", (e as Error).message);
     }
   }
 }

@@ -1,7 +1,7 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
 import { generateReply } from "../services/ai.js";
-import { sendTelegram } from "../services/notifier.js";
+import { sendTelegram, editTelegramMessage } from "../services/notifier.js";
 import { sendMessage } from "../services/send.js";
 import { setKey, decrypt } from "../crypto.js";
 
@@ -9,6 +9,11 @@ const cfg = loadConfig();
 setKey(cfg.encKey);
 let offset = 0;
 const pendingReply = new Map<number, string>(); // userId → emailMessageId
+const pendingDraft = new Map<number, string>(); // userId → AI-generated draft text
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 async function tg(method: string, body: unknown): Promise<unknown> {
   const res = await fetch(`https://api.telegram.org/bot${cfg.telegramBotToken}/${method}`, {
@@ -82,15 +87,51 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>): Promis
       const m = await prisma.message.findUnique({ where: { id }, include: { mailbox: true } });
       if (!m) return;
       const text = await generateReply({ from: m.fromAddr, subject: m.subject, bodyText: m.bodyText });
-      // Don't auto-save to drafts. User can edit and confirm via reply mode.
       pendingReply.set(cb.from.id, id);
-      await sendTelegram(
-        `🤖 Сгенерированный ответ на «${m.subject}»:\n\n${text}\n\n— ответь на это сообщение своим текстом чтобы отправить (или с правками), либо «отправить как есть» чтобы отправить этот вариант. /cancel чтобы отменить.`,
-      );
+      pendingDraft.set(cb.from.id, text);
+      if (cb.message) {
+        await editTelegramMessage(
+          cb.message.message_id,
+          `🤖 <b>AI-черновик</b> для «${escapeHtml(m.subject)}»:\n\n${escapeHtml(text)}\n\n<i>Reply на это сообщение своим текстом — отправлю с правками. Или нажми «📤» чтобы отправить как есть.</i>`,
+          {
+            inline_keyboard: [[
+              { text: "📤 отправить как есть", callback_data: `senddraft:${id}` },
+              { text: "✗ отмена", callback_data: `cancel:${id}` },
+            ]],
+          },
+        );
+      }
     } else if (action === "reply") {
       pendingReply.set(cb.from.id, id);
-      await answerCallback(cb.id, "напиши ответ следующим сообщением");
-      await sendTelegram(`✏️ Жду текст ответа на «${id}». Просто пришли следующим сообщением. /cancel чтобы отменить.`);
+      await answerCallback(cb.id, "ожидаю текст ответа");
+      if (cb.message) {
+        await editTelegramMessage(
+          cb.message.message_id,
+          (cb.message as { text?: string }).text + "\n\n<i>✏️ Жду текст ответа следующим сообщением...</i>",
+          { inline_keyboard: [[{ text: "✗ отмена", callback_data: `cancel:${id}` }]] },
+        );
+      }
+    } else if (action === "senddraft") {
+      const text = pendingDraft.get(cb.from.id);
+      if (!text) return answerCallback(cb.id, "черновик утерян");
+      try {
+        await sendEmailReply(id, text);
+        pendingDraft.delete(cb.from.id);
+        pendingReply.delete(cb.from.id);
+        await answerCallback(cb.id, "отправлено ✓");
+        if (cb.message) {
+          await editTelegramMessage(cb.message.message_id, "✅ AI-черновик отправлен:\n\n" + escapeHtml(text));
+        }
+      } catch (e) {
+        await answerCallback(cb.id, "ошибка: " + (e as Error).message);
+      }
+    } else if (action === "cancel") {
+      pendingReply.delete(cb.from.id);
+      pendingDraft.delete(cb.from.id);
+      await answerCallback(cb.id, "отменено");
+      if (cb.message) {
+        await editTelegramMessage(cb.message.message_id, "↩️ операция отменена");
+      }
     } else {
       await answerCallback(cb.id, "неизвестное действие");
     }
