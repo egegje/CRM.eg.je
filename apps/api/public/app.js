@@ -15,6 +15,20 @@ const state = {
 function initTheme() {
   const saved = localStorage.getItem("theme") || "light";
   document.documentElement.setAttribute("data-theme", saved);
+  const accent = localStorage.getItem("accent");
+  if (accent) document.documentElement.style.setProperty("--accent", accent);
+}
+function setAccent(c) {
+  document.documentElement.style.setProperty("--accent", c);
+  localStorage.setItem("accent", c);
+}
+async function forgotPassword() {
+  const email = prompt("Ваш email:");
+  if (!email) return;
+  try {
+    await fetch("/auth/forgot", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+    alert("Если такой email есть, ссылка отправлена.");
+  } catch { alert("Ошибка"); }
 }
 function toggleSidebar() {
   const app = document.getElementById("app");
@@ -152,6 +166,41 @@ async function loadFolders() {
     d.onclick = () => { state.currentFolder = f.id; refreshList(); };
     list.appendChild(d);
   }
+  // Smart folders
+  try {
+    const smart = await api("/smart-folders");
+    if (smart.length) {
+      const title = document.createElement("div");
+      title.className = "folder-title";
+      title.textContent = "Умные папки";
+      title.style.marginTop = "12px";
+      list.appendChild(title);
+    }
+    for (const sf of smart) {
+      const d = document.createElement("div");
+      d.className = "folder-item" + (state.currentFolder === "smart:" + sf.id ? " active" : "");
+      d.innerHTML = `<span>🔮 ${escapeHtml(sf.name)}</span>`;
+      d.onclick = () => { state.currentFolder = "smart:" + sf.id; refreshList(); };
+      list.appendChild(d);
+    }
+    const add = document.createElement("button");
+    add.className = "link-btn";
+    add.textContent = "+ умная папка";
+    add.onclick = createSmartFolder;
+    list.appendChild(add);
+  } catch {}
+}
+
+async function createSmartFolder() {
+  const name = prompt("Название умной папки:");
+  if (!name) return;
+  const q = prompt("Поисковая фраза (FTS):") || "";
+  const from = prompt("От кого (необязательно):") || "";
+  await api("/smart-folders", {
+    method: "POST",
+    body: JSON.stringify({ name, query: { q, from: from || undefined } }),
+  });
+  loadFolders();
 }
 
 async function refreshList() {
@@ -177,7 +226,12 @@ async function refreshList() {
     params.set("folderId", state.currentFolder);
   }
   params.set("limit", "100");
-  let messages = await api("/messages?" + params.toString());
+  let messages;
+  if (state.currentFolder && state.currentFolder.startsWith("smart:")) {
+    messages = await api("/smart-folders/" + state.currentFolder.slice(6) + "/messages");
+  } else {
+    messages = await api("/messages?" + params.toString());
+  }
   if (sysKind) {
     const ids = new Set(state.folders.filter((f) => f.kind === sysKind).map((f) => f.id));
     if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
@@ -310,6 +364,7 @@ function renderPreview(m) {
         <button onclick="replyTo('${m.id}')">↩️ Ответить</button>
         <button onclick="aiReply('${m.id}')">🤖 AI ответ</button>
         <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
+        <button onclick="snoozeMsg('${m.id}')">⏰ Напомнить</button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
         <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
       </div>
@@ -359,6 +414,29 @@ async function deleteMsg(id) {
     refreshList();
   });
   refreshList();
+}
+
+async function snoozeMsg(id) {
+  const opts = [
+    { label: "Через час", offset: 60 * 60 * 1000 },
+    { label: "Завтра 9:00", offset: null },
+    { label: "Через неделю", offset: 7 * 24 * 60 * 60 * 1000 },
+    { label: "Своё время", offset: null },
+  ];
+  const choice = prompt("Когда напомнить?\n1. Через час\n2. Завтра 9:00\n3. Через неделю\n4. Своё время (введите дату YYYY-MM-DD HH:MM)");
+  if (!choice) return;
+  let until;
+  if (choice === "1") until = new Date(Date.now() + opts[0].offset);
+  else if (choice === "2") {
+    const t = new Date(); t.setDate(t.getDate() + 1); t.setHours(9, 0, 0, 0); until = t;
+  } else if (choice === "3") until = new Date(Date.now() + opts[2].offset);
+  else {
+    const d = new Date(choice.replace(" ", "T"));
+    if (isNaN(d.getTime())) return alert("неверная дата");
+    until = d;
+  }
+  await api("/messages/" + id + "/snooze", { method: "POST", body: JSON.stringify({ until: until.toISOString() }) });
+  showToast(`Напомнить ${until.toLocaleString("ru")}`, null);
 }
 
 async function aiReply(id) {

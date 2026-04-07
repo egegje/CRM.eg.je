@@ -90,6 +90,36 @@ export async function runFollowups(now = new Date()): Promise<void> {
   }
 }
 
+export async function runSnoozes(now = new Date()): Promise<void> {
+  const due = await prisma.snooze.findMany({
+    where: { notified: false, snoozeUntil: { lte: now } },
+    take: 100,
+  });
+  for (const s of due) {
+    const m = await prisma.message.findUnique({
+      where: { id: s.messageId },
+      include: { mailbox: true },
+    });
+    if (!m) {
+      await prisma.snooze.update({ where: { id: s.id }, data: { notified: true } });
+      continue;
+    }
+    const lines = [
+      `🔔 <b>Напоминание о письме</b>`,
+      `<b>${escapeHtml(m.mailbox.displayName)}</b> · ${escapeHtml(m.mailbox.email)}`,
+      `<b>От:</b> ${escapeHtml(m.fromAddr)}`,
+      `<b>Тема:</b> ${escapeHtml(m.subject || "(без темы)")}`,
+    ];
+    if (m.aiSummary) lines.push("", `<i>${escapeHtml(m.aiSummary)}</i>`);
+    try {
+      await sendTelegram(lines.join("\n"));
+      await prisma.snooze.update({ where: { id: s.id }, data: { notified: true } });
+    } catch (e) {
+      console.error("snooze send failed:", (e as Error).message);
+    }
+  }
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }

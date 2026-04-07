@@ -221,6 +221,24 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     return { draftId: draft.id, bodyText: draftText };
   });
 
+  const SnoozeBody = z.object({ until: z.coerce.date() });
+  app.post("/messages/:id/snooze", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = SnoozeBody.parse(req.body);
+    if (body.until.getTime() <= Date.now()) throw new BadRequest("until must be in the future");
+    return prisma.snooze.upsert({
+      where: { messageId: id },
+      create: { messageId: id, snoozeUntil: body.until, notified: false },
+      update: { snoozeUntil: body.until, notified: false },
+    });
+  });
+
+  app.delete("/messages/:id/snooze", { preHandler: requireUser() }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    await prisma.snooze.delete({ where: { messageId: id } }).catch(() => {});
+    return reply.status(204).send();
+  });
+
   app.post("/messages/:id/summarize", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const m = await prisma.message.findUnique({ where: { id } });

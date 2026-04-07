@@ -4,7 +4,7 @@ import { prisma } from "@crm/db";
 import { startSyncFor } from "./workers/sync.js";
 import { startScheduledSendWorker } from "./workers/scheduled-send.js";
 import { startTrashCleanupWorker } from "./workers/trash-cleanup.js";
-import { runReminders, runFollowups } from "./workers/reminders.js";
+import { runReminders, runFollowups, runSnoozes } from "./workers/reminders.js";
 import { startTelegramBot } from "./workers/telegram-bot.js";
 
 const cfg = loadConfig();
@@ -24,12 +24,18 @@ await startTrashCleanupWorker();
 
 // Hourly reminders + follow-ups
 const HOUR = 60 * 60 * 1000;
-async function tick() {
+const FIVE_MIN = 5 * 60 * 1000;
+async function hourly() {
   try { await runReminders(); } catch (e) { console.error("reminders:", (e as Error).message); }
   try { await runFollowups(); } catch (e) { console.error("followups:", (e as Error).message); }
 }
-setInterval(tick, HOUR);
-setTimeout(tick, 30 * 1000); // first tick 30s after boot
+async function snoozeTick() {
+  try { await runSnoozes(); } catch (e) { console.error("snoozes:", (e as Error).message); }
+}
+setInterval(hourly, HOUR);
+setInterval(snoozeTick, FIVE_MIN);
+setTimeout(hourly, 30 * 1000);
+setTimeout(snoozeTick, 10 * 1000);
 
 void startTelegramBot();
 

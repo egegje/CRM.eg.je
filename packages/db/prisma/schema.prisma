@@ -134,6 +134,33 @@ model Contact {
   createdAt   DateTime @default(now())
 }
 
+model Snooze {
+  id          String   @id @default(cuid())
+  messageId   String   @unique
+  snoozeUntil DateTime
+  notified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([snoozeUntil])
+}
+
+model SmartFolder {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  query     Json
+  createdAt DateTime @default(now())
+}
+
+model PasswordReset {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?
