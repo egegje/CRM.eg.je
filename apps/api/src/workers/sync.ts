@@ -59,6 +59,17 @@ async function persistMessage(
       },
     });
   }
+  // upsert contacts (auto-collected address book)
+  const addrs = new Set([parsed.from, ...parsed.to, ...parsed.cc].filter(Boolean));
+  for (const email of addrs) {
+    await prisma.contact
+      .upsert({
+        where: { email },
+        create: { email, name: "", useCount: 1, lastUsedAt: new Date() },
+        update: { useCount: { increment: 1 }, lastUsedAt: new Date() },
+      })
+      .catch(() => {});
+  }
   // fire-and-forget AI summary + telegram notification
   const mailboxRow = await prisma.mailbox.findUnique({ where: { id: mailboxId } });
   if (mailboxRow) {

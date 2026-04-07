@@ -98,6 +98,8 @@ model Message {
   receivedAt  DateTime?
   sentAt      DateTime?
   deletedAt   DateTime?
+  aiSummary   String?
+  aiActions   String[]
   attachments Attachment[]
 
   @@index([mailboxId, folderId, receivedAt])
@@ -112,6 +114,26 @@ model Attachment {
   mime        String
   size        Int
   storagePath String
+}
+
+model Contact {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  useCount    Int      @default(0)
+  lastUsedAt  DateTime?
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
 }
 
 model ScheduledSend {

@@ -1,6 +1,6 @@
 import { loadConfig } from "../config.js";
 import { summarizeEmail } from "./ai.js";
-import type { Message, Mailbox } from "@crm/db";
+import { prisma, type Message, type Mailbox } from "@crm/db";
 
 const cfg = loadConfig();
 
@@ -39,6 +39,10 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
     });
     summary = r.summary;
     actions = r.actionItems;
+    await prisma.message.update({
+      where: { id: message.id },
+      data: { aiSummary: summary, aiActions: actions },
+    });
   } catch (e) {
     summary = "(AI-саммари недоступно: " + (e as Error).message + ")";
   }

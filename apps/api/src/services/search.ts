@@ -7,10 +7,11 @@ export type Filters = {
   dateFrom?: Date;
   dateTo?: Date;
   status?: "read" | "unread" | "all";
+  trash?: boolean;
 };
 
 export function buildWhere(f: Filters): Prisma.MessageWhereInput {
-  const w: Prisma.MessageWhereInput = { deletedAt: null };
+  const w: Prisma.MessageWhereInput = f.trash ? { deletedAt: { not: null } } : { deletedAt: null };
   if (f.folderId) w.folderId = f.folderId;
   if (f.mailboxId) w.mailboxId = f.mailboxId;
   if (f.fromAddr) w.fromAddr = { contains: f.fromAddr, mode: "insensitive" };

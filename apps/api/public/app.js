@@ -150,17 +150,9 @@ async function refreshList() {
   if (state.currentFolder && state.currentFolder !== "__inbox" && state.currentFolder !== "__trash") {
     params.set("folderId", state.currentFolder);
   }
+  if (state.currentFolder === "__trash") params.set("trash", "true");
   params.set("limit", "100");
-  let messages = await api("/messages?" + params.toString());
-  // client-side filter inbox/trash by folder kind
-  if (state.currentFolder === "__trash") {
-    // Trash contains deletedAt-set rows, but our API filters them out.
-    // For trash view we need a dedicated param — omit for now.
-    messages = [];
-  } else if (state.currentFolder === "__inbox") {
-    const inboxIds = new Set(state.folders.filter((f) => f.kind === "inbox").map((f) => f.id));
-    messages = messages.filter((m) => inboxIds.has(m.folderId));
-  }
+  const messages = await api("/messages?" + params.toString());
   state.messages = messages;
   renderList();
 }
@@ -211,6 +203,16 @@ function renderPreview(m) {
     .map((a) => `<a class="attachment" href="/attachments/${a.id}" download>📎 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a>`)
     .join("");
   const body = m.bodyText || stripHtml(m.bodyHtml || "");
+  const aiActions = (m.aiActions || []).filter((a) => !a.startsWith("_"));
+  const aiHtml = m.aiSummary
+    ? `<div class="ai-block"><div class="ai-label">AI · суть</div>${escapeHtml(m.aiSummary)}${
+        aiActions.length
+          ? `<div class="ai-label" style="margin-top:8px">Что сделать</div><ul style="margin:4px 0 0 18px;padding:0">${aiActions
+              .map((a) => `<li>${escapeHtml(a)}</li>`)
+              .join("")}</ul>`
+          : ""
+      }</div>`
+    : "";
   el.className = "";
   el.innerHTML = `
     <div class="preview-header">
@@ -228,6 +230,7 @@ function renderPreview(m) {
         <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
       </div>
     </div>
+    ${aiHtml}
     <div class="preview-body">${escapeHtml(body)}</div>
     ${attachHtml ? `<div class="attachments">${attachHtml}</div>` : ""}
   `;
@@ -345,6 +348,12 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
   if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n? — эта справка");
 });
+
+/* live polling */
+setInterval(() => {
+  if (!state.user || document.hidden) return;
+  refreshList().catch(() => {});
+}, 30000);
 
 /* init */
 initTheme();

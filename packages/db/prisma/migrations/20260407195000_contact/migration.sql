@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS "Contact" (id text PRIMARY KEY, email text UNIQUE NOT NULL, name text NOT NULL DEFAULT '', "useCount" int NOT NULL DEFAULT 0, "lastUsedAt" timestamptz, "createdAt" timestamptz NOT NULL DEFAULT now());

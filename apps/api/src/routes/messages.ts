@@ -16,6 +16,7 @@ const ListQuery = z.object({
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   status: z.enum(["read", "unread", "all"]).optional(),
+  trash: z.coerce.boolean().optional(),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -72,6 +73,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       dateFrom: q.dateFrom,
       dateTo: q.dateTo,
       status: q.status,
+      trash: q.trash,
     });
     const args: Prisma.MessageFindManyArgs = {
       where,
