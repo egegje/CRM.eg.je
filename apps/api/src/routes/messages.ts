@@ -61,16 +61,27 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   app.get("/messages", { preHandler: requireUser() }, async (req) => {
     const q = ListQuery.parse(req.query);
     if (q.q) {
+      // First narrow by FTS, then apply the same buildWhere filters so search
+      // honors current folder/mailbox/trash/status context.
       const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM "Message" WHERE "fts" @@ plainto_tsquery('simple', $1) AND "deletedAt" IS NULL ORDER BY "receivedAt" DESC NULLS LAST LIMIT $2`,
+        `SELECT id FROM "Message" WHERE "fts" @@ plainto_tsquery('simple', $1) ORDER BY "receivedAt" DESC NULLS LAST LIMIT 1000`,
         q.q,
-        q.limit,
       );
       const ids = rows.map((r) => r.id);
       if (!ids.length) return [];
+      const baseWhere = buildWhere({
+        folderId: q.folderId,
+        mailboxId: q.mailboxId,
+        fromAddr: q.from,
+        dateFrom: q.dateFrom,
+        dateTo: q.dateTo,
+        status: q.status,
+        trash: q.trash,
+      });
       return prisma.message.findMany({
-        where: { id: { in: ids } },
+        where: { ...baseWhere, id: { in: ids } },
         orderBy: { receivedAt: "desc" },
+        take: q.limit,
       });
     }
     const where = buildWhere({

@@ -988,19 +988,22 @@ function playDing() {
 }
 
 /* live polling */
+let lastInboxView = null;
 setInterval(async () => {
   if (!state.user || document.hidden) return;
-  const before = state.messages.length;
-  const beforeUnread = state.messages.filter((m) => !m.isRead).length;
+  const inboxView = state.currentFolder === "__inbox" || state.currentFolder === null;
   await refreshList().catch(() => {});
+  if (!inboxView) { lastUnreadCount = -1; lastInboxView = false; return; }
   const afterUnread = state.messages.filter((m) => !m.isRead).length;
-  if (lastUnreadCount >= 0 && afterUnread > lastUnreadCount) {
+  // Only ding when staying on inbox view across two consecutive ticks
+  if (lastInboxView && lastUnreadCount >= 0 && afterUnread > lastUnreadCount) {
     playDing();
     if (Notification.permission === "granted") {
       new Notification("Новое письмо в crm.eg.je", { body: `Непрочитано: ${afterUnread}` });
     }
   }
   lastUnreadCount = afterUnread;
+  lastInboxView = true;
 }, 30000);
 
 if ("Notification" in window && Notification.permission === "default") {
