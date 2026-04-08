@@ -132,6 +132,41 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  // ---- team stats ----
+  app.get("/tasks/team-stats", { preHandler: requireUser() }, async (req) => {
+    const me = req.user!;
+    // Visibility: owner sees everyone; admin sees everyone except owners;
+    // manager sees only themselves.
+    let userWhere: Prisma.UserWhereInput = {};
+    if (me.role === "manager") userWhere = { id: me.id };
+    else if (me.role === "admin") userWhere = { role: { not: "owner" } };
+    const users = await prisma.user.findMany({
+      where: userWhere,
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: "asc" },
+    });
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const out = [];
+    for (const u of users) {
+      const [open, overdue, doneWeek] = await Promise.all([
+        prisma.task.count({ where: { assigneeId: u.id, status: { in: ["open", "in_progress"] } } }),
+        prisma.task.count({
+          where: {
+            assigneeId: u.id,
+            status: { in: ["open", "in_progress"] },
+            dueDate: { lt: now },
+          },
+        }),
+        prisma.task.count({
+          where: { assigneeId: u.id, status: "done", completedAt: { gte: weekAgo } },
+        }),
+      ]);
+      out.push({ ...u, open, overdue, doneWeek });
+    }
+    return out;
+  });
+
   // ---- tags ----
   app.get("/tags", { preHandler: requireUser() }, async () => {
     return prisma.taskTag.findMany({ orderBy: { name: "asc" } });

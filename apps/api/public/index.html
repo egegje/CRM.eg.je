@@ -38,6 +38,7 @@
       <div class="folder-item" onclick="showTasksView('unassigned')">❓ Без исполнителя</div>
       <div class="folder-item" onclick="showTasksView('overdue')">⏰ Просроченные</div>
       <div class="folder-item" onclick="showTasksView('done')">✔️ Выполненные</div>
+      <div class="folder-item" id="team-sidebar-item" style="display:none" onclick="showTeamView()">👥 Команда</div>
     </div>
     <div class="folder-group" style="margin-bottom:12px">
       <div class="folder-title">💰 Финансы</div>
@@ -84,6 +85,13 @@
 
   <div class="resizer" id="resizer-2"></div>
 
+  <section id="team-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="margin:0">👥 Команда</h2>
+    </div>
+    <div id="team-list"></div>
+  </section>
+
   <section id="finance-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
       <h2 style="margin:0">💰 Остатки на счетах</h2>
@@ -103,6 +111,7 @@
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+      <select id="tasks-assignee-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все исполнители</option></select>
       <select id="tasks-tag-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="">все теги</option></select>
     </div>
     <div id="tasks-list"></div>

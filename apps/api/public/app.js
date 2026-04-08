@@ -127,6 +127,7 @@ async function bootApp() {
   }).catch(() => {});
   if (state.user.role === "owner" || state.user.role === "admin") {
     document.getElementById("admin-btn").classList.remove("hidden");
+    document.getElementById("team-sidebar-item").style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();
@@ -1039,6 +1040,7 @@ async function showTasksView(filter) {
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -1054,12 +1056,64 @@ async function showTasksView(filter) {
   await loadTasks();
 }
 
+async function showTeamView() {
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("team-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  await loadTeamView();
+}
+
+async function loadTeamView() {
+  const team = await api("/tasks/team-stats");
+  const list = document.getElementById("team-list");
+  if (!team.length) {
+    list.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет данных</div>';
+    return;
+  }
+  list.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      ${team.map((u) => {
+        const overloaded = u.overdue >= 5 || u.open >= 30;
+        const warning = !overloaded && (u.overdue >= 1 || u.open >= 15);
+        const accent = overloaded ? "#ef4444" : warning ? "#f59e0b" : "#10b981";
+        return `
+          <div onclick="openUserKanban('${u.id}')" style="cursor:pointer;background:var(--bg-alt);border:1px solid var(--border);border-left:4px solid ${accent};border-radius:6px;padding:14px">
+            <div style="font-weight:600;font-size:15px;margin-bottom:2px">${escapeHtml(u.name)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px">${escapeHtml(u.email)} · ${escapeHtml(u.role)}</div>
+            <div style="display:flex;gap:14px;font-size:13px">
+              <div><b style="font-size:18px">${u.open}</b><div style="font-size:10px;color:var(--text-muted)">открытых</div></div>
+              <div><b style="font-size:18px;color:${u.overdue > 0 ? "#ef4444" : "var(--text)"}">${u.overdue}</b><div style="font-size:10px;color:var(--text-muted)">⏰ просроч.</div></div>
+              <div><b style="font-size:18px;color:#10b981">${u.doneWeek}</b><div style="font-size:10px;color:var(--text-muted)">✓ за нед.</div></div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+async function openUserKanban(userId) {
+  await showKanbanView();
+  const sel = document.getElementById("tasks-assignee-filter");
+  if (sel) {
+    sel.value = userId;
+    await loadTasks();
+  }
+}
+
 async function showKanbanView() {
   tasksFilter = null;
   tasksMode = "kanban";
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -1071,6 +1125,7 @@ async function showKanbanView() {
 function exitTasksView() {
   document.getElementById("tasks-view").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
   document.querySelector(".preview-pane").classList.remove("hidden");
   document.getElementById("resizer-1").style.display = "";
@@ -1096,10 +1151,24 @@ async function loadTasks() {
         _tags.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
     }
   }
+  // Populate assignee filter for owner/admin in kanban mode
+  const aSel = document.getElementById("tasks-assignee-filter");
+  if (aSel && tasksMode === "kanban" && (state.user?.role === "owner" || state.user?.role === "admin")) {
+    if (aSel.options.length <= 1) {
+      const team = await api("/tasks/team-stats").catch(() => []);
+      aSel.innerHTML = '<option value="">все исполнители</option>' +
+        team.map((u) => `<option value="${u.id}">${escapeHtml(u.name)}</option>`).join("");
+    }
+    aSel.style.display = "";
+  } else if (aSel) {
+    aSel.style.display = "none";
+  }
   const params = new URLSearchParams();
   if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
   if (tasksFilter === "createdByMe" && state.user) params.set("creatorId", state.user.id);
   if (tasksFilter === "unassigned") params.set("unassigned", "true");
+  const assigneeOverride = document.getElementById("tasks-assignee-filter")?.value;
+  if (assigneeOverride && tasksMode === "kanban") params.set("assigneeId", assigneeOverride);
   if (tasksMode !== "kanban" && tasksFilter !== "overdue" && tasksFilter !== "done") params.set("status", "open");
   if (tasksFilter === "done") params.set("status", "done");
   const search = document.getElementById("tasks-search")?.value;
