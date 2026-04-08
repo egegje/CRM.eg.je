@@ -120,4 +120,34 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       data: { taskId: id, userId: user.id, text: body.text },
     });
   });
+
+  // ---- tags ----
+  app.get("/tags", { preHandler: requireUser() }, async () => {
+    return prisma.taskTag.findMany({ orderBy: { name: "asc" } });
+  });
+  app.post("/tags", { preHandler: requireUser() }, async (req) => {
+    const body = z.object({ name: z.string().min(1), color: z.string().optional() }).parse(req.body);
+    return prisma.taskTag.create({ data: { name: body.name, color: body.color || "#6b7280" } });
+  });
+  app.delete("/tags/:id", { preHandler: requireUser() }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    await prisma.taskTag.delete({ where: { id } });
+    return reply.status(204).send();
+  });
+  app.post("/tasks/:id/tags", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ tagId: z.string() }).parse(req.body);
+    return prisma.taskTagAssignment.upsert({
+      where: { taskId_tagId: { taskId: id, tagId: body.tagId } },
+      create: { taskId: id, tagId: body.tagId },
+      update: {},
+    });
+  });
+  app.delete("/tasks/:id/tags/:tagId", { preHandler: requireUser() }, async (req, reply) => {
+    const { id, tagId } = z.object({ id: z.string(), tagId: z.string() }).parse(req.params);
+    await prisma.taskTagAssignment.delete({
+      where: { taskId_tagId: { taskId: id, tagId } },
+    });
+    return reply.status(204).send();
+  });
 }

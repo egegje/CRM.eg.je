@@ -897,7 +897,7 @@ async function showTasksView(filter) {
   document.getElementById("tasks-view").classList.remove("hidden");
   const titles = { me: "Мои задачи", overdue: "Просроченные" };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
-  await loadTasks();
+  setTasksMode(tasksMode);
 }
 
 function exitTasksView() {
@@ -905,19 +905,52 @@ function exitTasksView() {
   document.querySelector(".list-pane").classList.remove("hidden");
 }
 
+let tasksMode = localStorage.getItem("tasks-mode") || "list";
+let _tags = [];
+
+function setTasksMode(mode) {
+  tasksMode = mode;
+  localStorage.setItem("tasks-mode", mode);
+  document.getElementById("tasks-mode-list").style.background = mode === "list" ? "var(--accent)" : "var(--bg-alt)";
+  document.getElementById("tasks-mode-list").style.color = mode === "list" ? "white" : "var(--text)";
+  document.getElementById("tasks-mode-kanban").style.background = mode === "kanban" ? "var(--accent)" : "var(--bg-alt)";
+  document.getElementById("tasks-mode-kanban").style.color = mode === "kanban" ? "white" : "var(--text)";
+  loadTasks();
+}
+
 async function loadTasks() {
+  // Refresh tag dropdown lazily on first call
+  if (!_tags.length) {
+    _tags = await api("/tags").catch(() => []);
+    const sel = document.getElementById("tasks-tag-filter");
+    if (sel && _tags.length) {
+      sel.innerHTML = '<option value="">все теги</option>' +
+        _tags.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+    }
+  }
   const params = new URLSearchParams();
   if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
-  if (tasksFilter !== "overdue") params.set("status", "open");
+  if (tasksMode !== "kanban" && tasksFilter !== "overdue") params.set("status", "open");
   const search = document.getElementById("tasks-search")?.value;
   if (search) params.set("search", search);
-  params.set("limit", "200");
+  params.set("limit", "500");
   let tasks = await api("/tasks?" + params.toString());
   if (tasksFilter === "overdue") {
     const now = new Date();
     tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done");
   }
-  renderTasks(tasks);
+  const tagFilter = document.getElementById("tasks-tag-filter")?.value;
+  if (tagFilter) {
+    tasks = tasks.filter((t) => (t.tagAssignments || []).some((a) => a.tagId === tagFilter));
+  }
+  if (tasksMode === "kanban") renderKanban(tasks);
+  else renderTasks(tasks);
+}
+
+function tagPillsHtml(t) {
+  return (t.tagAssignments || [])
+    .map((a) => `<span style="display:inline-block;padding:1px 8px;border-radius:10px;font-size:10px;background:${a.tag?.color || "#6b7280"};color:white;margin-right:4px">${escapeHtml(a.tag?.name || "?")}</span>`)
+    .join("");
 }
 
 function renderTasks(tasks) {
@@ -941,9 +974,114 @@ function renderTasks(tasks) {
           ${t.dueDate ? `${overdue ? "⏰" : "📅"} ${new Date(t.dueDate).toLocaleDateString("ru")} · ` : ""}
           ${t.priority}${t.category ? ` · ${escapeHtml(t.category)}` : ""}
         </div>
+        ${tagPillsHtml(t) ? `<div style="margin-top:5px">${tagPillsHtml(t)}</div>` : ""}
       </div>
     </div>`;
   }).join("");
+}
+
+const KANBAN_COLS = [
+  { key: "open", title: "📥 Открыта", color: "#3b82f6" },
+  { key: "in_progress", title: "⚙ В работе", color: "#f59e0b" },
+  { key: "done", title: "✅ Выполнена", color: "#10b981" },
+  { key: "cancelled", title: "✕ Отменена", color: "#6b7280" },
+];
+
+function renderKanban(tasks) {
+  const el = document.getElementById("tasks-list");
+  const prioIcon = { urgent: "🔥", high: "⚠", normal: "", low: "·" };
+  const grouped = Object.fromEntries(KANBAN_COLS.map((c) => [c.key, []]));
+  for (const t of tasks) (grouped[t.status] || (grouped.open ||= [])).push(t);
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(${KANBAN_COLS.length},1fr);gap:10px;align-items:start">
+      ${KANBAN_COLS.map((c) => `
+        <div class="kanban-col" data-status="${c.key}" ondragover="event.preventDefault()" ondrop="kanbanDrop(event, '${c.key}')" style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:8px;min-height:300px">
+          <div style="font-weight:600;font-size:12px;margin-bottom:8px;color:${c.color}">${c.title} · ${grouped[c.key].length}</div>
+          ${grouped[c.key].map((t) => {
+            const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
+            return `<div draggable="true" ondragstart="kanbanDrag(event, '${t.id}')" onclick="openTaskForm('${t.id}')" style="background:var(--bg);border:1px solid var(--border);border-radius:5px;padding:8px 10px;margin-bottom:6px;cursor:grab;font-size:12px">
+              <div style="font-weight:600;word-wrap:break-word">${prioIcon[t.priority] || ""} ${escapeHtml(t.title)}</div>
+              <div style="font-size:10px;color:var(--text-muted);margin-top:3px">
+                ${t.project ? `📁 ${escapeHtml(t.project.name)}` : ""}
+                ${t.dueDate ? ` · ${overdue ? "⏰" : "📅"}${new Date(t.dueDate).toLocaleDateString("ru")}` : ""}
+              </div>
+              ${tagPillsHtml(t) ? `<div style="margin-top:4px">${tagPillsHtml(t)}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+
+function kanbanDrag(e, id) {
+  e.dataTransfer.setData("text/plain", id);
+  e.dataTransfer.effectAllowed = "move";
+}
+async function kanbanDrop(e, status) {
+  e.preventDefault();
+  const id = e.dataTransfer.getData("text/plain");
+  if (!id) return;
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status }) });
+  loadTasks();
+}
+
+async function addTaskComment() {
+  const input = document.getElementById("task-comment-input");
+  const text = input.value.trim();
+  if (!text) return;
+  const id = document.getElementById("task-form").id.value;
+  if (!id) return;
+  await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify({ text }) });
+  input.value = "";
+  // re-render comments
+  const t = await api("/tasks/" + id);
+  renderTaskComments(t.comments || []);
+}
+
+async function renderTaskTagsEditor(taskId, assignments) {
+  if (!_tags.length) _tags = await api("/tags").catch(() => []);
+  const list = document.getElementById("task-tags-list");
+  const assigned = new Set(assignments.map((a) => a.tagId));
+  const pills = _tags.map((tag) => {
+    const isOn = assigned.has(tag.id);
+    return `<span onclick="toggleTaskTag('${taskId}', '${tag.id}', ${isOn})" style="cursor:pointer;display:inline-block;padding:2px 10px;border-radius:10px;font-size:11px;background:${isOn ? tag.color : "transparent"};color:${isOn ? "white" : "var(--text-muted)"};border:1px solid ${tag.color}">${escapeHtml(tag.name)}</span>`;
+  }).join("");
+  list.innerHTML = pills + ` <button type="button" onclick="createTagInline('${taskId}')" style="padding:2px 8px;font-size:11px;background:none;border:1px dashed var(--border);border-radius:10px;cursor:pointer;color:var(--text-muted)">+ новый</button>`;
+}
+
+async function toggleTaskTag(taskId, tagId, isOn) {
+  if (isOn) {
+    await api(`/tasks/${taskId}/tags/${tagId}`, { method: "DELETE" });
+  } else {
+    await api(`/tasks/${taskId}/tags`, { method: "POST", body: JSON.stringify({ tagId }) });
+  }
+  const t = await api("/tasks/" + taskId);
+  renderTaskTagsEditor(taskId, t.tagAssignments || []);
+}
+async function createTagInline(taskId) {
+  const name = prompt("Название тега:");
+  if (!name) return;
+  const color = prompt("Цвет (hex, например #ef4444):", "#3b82f6");
+  const tag = await api("/tags", { method: "POST", body: JSON.stringify({ name, color }) });
+  _tags.push(tag);
+  await api(`/tasks/${taskId}/tags`, { method: "POST", body: JSON.stringify({ tagId: tag.id }) });
+  const t = await api("/tasks/" + taskId);
+  renderTaskTagsEditor(taskId, t.tagAssignments || []);
+}
+
+function renderTaskComments(comments) {
+  const list = document.getElementById("task-comments-list");
+  if (!comments.length) {
+    list.innerHTML = '<div style="color:var(--text-muted);font-size:11px">нет комментариев</div>';
+    return;
+  }
+  list.innerHTML = comments.map((c) => `
+    <div style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
+      <div style="font-size:10px;color:var(--text-muted)">${new Date(c.createdAt).toLocaleString("ru")}</div>
+      <div style="font-size:12px;white-space:pre-wrap;word-wrap:break-word">${escapeHtml(c.text)}</div>
+    </div>
+  `).join("");
 }
 
 async function toggleTaskDone(id, done) {
@@ -976,11 +1114,17 @@ async function openTaskForm(id) {
     f.status.value = t.status;
     document.getElementById("task-delete-btn").style.display = "inline-block";
     document.getElementById("task-delete-btn").onclick = () => deleteTask(t.id);
+    document.getElementById("task-comments-row").style.display = "flex";
+    renderTaskComments(t.comments || []);
+    document.getElementById("task-tags-row").style.display = "flex";
+    renderTaskTagsEditor(t.id, t.tagAssignments || []);
   } else {
     document.getElementById("task-form-title").textContent = "Новая задача";
     f.id.value = "";
     f.status.value = "open";
     document.getElementById("task-delete-btn").style.display = "none";
+    document.getElementById("task-comments-row").style.display = "none";
+    document.getElementById("task-tags-row").style.display = "none";
   }
   document.getElementById("task-form-modal").classList.remove("hidden");
 }
