@@ -125,13 +125,15 @@ async function handleMessage(msg: NonNullable<Update["message"]>): Promise<void>
     reaction: [{ type: "emoji", emoji: "👍" }],
   }).catch(() => {});
 
-  const lines = [
-    `✅ Задача создана: <b>${escapeHtml(task.title)}</b>`,
-    `ID: <code>${task.id}</code>`,
-  ];
-  if (!assigneeId) lines.push("⚠️ исполнитель не определён");
-  if (task.dueDate) lines.push(`Дедлайн: ${task.dueDate.toLocaleDateString("ru")}`);
-  if (projectId) lines.push(`Проект: ${parsed.projectHint}`);
+  const lines = [`✅ <b>${escapeHtml(task.title)}</b>`];
+  if (assigneeId) {
+    const u = await prisma.user.findUnique({ where: { id: assigneeId }, select: { name: true } });
+    if (u) lines.push(`👤 ${escapeHtml(u.name)}`);
+  } else {
+    lines.push("⚠️ без исполнителя");
+  }
+  if (task.dueDate) lines.push(`📅 ${task.dueDate.toLocaleDateString("ru")}`);
+  if (projectId && parsed.projectHint) lines.push(`📁 ${escapeHtml(parsed.projectHint)}`);
 
   await tg("sendMessage", {
     chat_id: msg.chat.id,
