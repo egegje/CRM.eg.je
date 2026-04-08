@@ -46,7 +46,11 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
     if (!a) throw new NotFound();
     await assertMessageAccess(req.user!, a.message);
     reply.header("content-type", a.mime);
-    reply.header("content-disposition", `attachment; filename="${a.filename}"`);
+    // PDFs and images render inline so the browser can preview them in a new
+    // tab without forcing a download. Other types still download.
+    const inline = a.mime === "application/pdf" || a.mime.startsWith("image/");
+    const disp = inline ? "inline" : "attachment";
+    reply.header("content-disposition", `${disp}; filename="${a.filename}"`);
     return reply.send(createReadStream(a.storagePath));
   });
 }

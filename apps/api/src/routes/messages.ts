@@ -88,6 +88,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         },
         orderBy: { receivedAt: "desc" },
         take: q.limit,
+        include: { _count: { select: { attachments: true } } },
       });
     }
     const where = buildWhere({
@@ -104,6 +105,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       where,
       orderBy: { receivedAt: "desc" },
       take: q.limit,
+      include: { _count: { select: { attachments: true } } },
     };
     if (q.cursor) {
       args.cursor = { id: q.cursor };

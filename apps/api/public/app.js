@@ -372,6 +372,16 @@ function dateGroup(d) {
   return "Раньше";
 }
 
+function formatListDate(d) {
+  if (!d) return "";
+  const t = new Date(d);
+  const now = new Date();
+  const sameDay = t.toDateString() === now.toDateString();
+  if (sameDay) return t.toLocaleTimeString("ru", { hour: "2-digit", minute: "2-digit" });
+  const sameYear = t.getFullYear() === now.getFullYear();
+  return t.toLocaleDateString("ru", sameYear ? { day: "2-digit", month: "short" } : { day: "2-digit", month: "2-digit", year: "2-digit" });
+}
+
 function highlight(text, q) {
   if (!q) return escapeHtml(text || "");
   const safeText = escapeHtml(text || "");
@@ -397,7 +407,9 @@ function renderList() {
       lastGroup = g;
     }
     const initial = (m.fromAddr || "?")[0].toUpperCase();
-    const date = m.receivedAt ? new Date(m.receivedAt).toLocaleDateString("ru", { day: "2-digit", month: "short" }) : "";
+    const date = formatListDate(m.receivedAt);
+    const hasAttach = (m._count?.attachments || 0) > 0;
+    const clip = hasAttach ? '<span class="msg-clip" title="есть вложения">📎</span>' : "";
     const snippet = (m.bodyText || "").replace(/\s+/g, " ").slice(0, 120);
     const d = document.createElement("div");
     d.className = "msg-item" + (!m.isRead ? " unread" : "") + (state.selectedId === m.id ? " selected" : "");
@@ -411,7 +423,7 @@ function renderList() {
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
         <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromAddr || "", q)}</div><div class="msg-date">${date}</div></div>
-        <div class="msg-subject">${star} ${highlight(m.subject || "(без темы)", q)}</div>
+        <div class="msg-subject">${star}${clip} ${highlight(m.subject || "(без темы)", q)}</div>
         <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
     `;
@@ -482,6 +494,7 @@ function renderPreview(m) {
         <button onclick="exportPdf('${m.id}')">📄 PDF</button>
         <button onclick="blockSender('${escapeHtml(m.fromAddr)}')">🚫 Блок отправителя</button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
+        <button onclick="markUnread('${m.id}')">📩 Непрочитано</button>
         <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
       </div>
     </div>
@@ -517,6 +530,12 @@ async function generateSummary(id) {
 
 async function toggleStar(id, cur) {
   await api("/messages/" + id, { method: "PATCH", body: JSON.stringify({ isStarred: !cur }) });
+  refreshList();
+}
+
+async function markUnread(id) {
+  await api("/messages/" + id, { method: "PATCH", body: JSON.stringify({ isRead: false }) });
+  closePreview();
   refreshList();
 }
 
