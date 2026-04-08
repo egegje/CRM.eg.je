@@ -685,6 +685,24 @@ async function saveAsTemplate() {
   loadTemplates();
 }
 
+async function loadSenderPersonas() {
+  const sel = document.getElementById("compose-sender");
+  if (!sel) return;
+  try {
+    const users = await api("/admin/users").catch(() => []);
+    const opts = ['<option value="">— моя подпись —</option>'];
+    for (const u of users) {
+      if (!u.signature) continue;
+      opts.push(`<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`);
+    }
+    sel.innerHTML = opts.join("");
+    // Hide the row entirely if there are no personas with a signature.
+    sel.parentElement.style.display = opts.length > 1 ? "" : "none";
+  } catch {
+    sel.parentElement.style.display = "none";
+  }
+}
+
 async function loadContactsDatalist() {
   try {
     const list = await api("/admin/contacts?limit=200").catch(() => []);
@@ -696,10 +714,12 @@ async function loadContactsDatalist() {
 function openCompose(defaults = {}) {
   loadContactsDatalist();
   loadTemplates();
+  loadSenderPersonas();
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
   if (defaults.mailboxId) form.mailboxId.value = defaults.mailboxId;
+  if (defaults.senderUserId) form.senderUserId.value = defaults.senderUserId;
   if (defaults.to) form.to.value = defaults.to;
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
@@ -740,6 +760,13 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
         bodyText: f.get("bodyText") || "",
       }),
     });
+    const senderUserId = f.get("senderUserId");
+    if (senderUserId) {
+      await api("/messages/" + draft.id, {
+        method: "PATCH",
+        body: JSON.stringify({ senderUserId }),
+      });
+    }
     // upload attachments with progress
     const files = document.getElementById("compose-files").files;
     const progress = document.getElementById("upload-progress");
@@ -1098,8 +1125,10 @@ async function renderUsersTab() {
     <td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.name)}</td>
     <td>${escapeHtml(u.role)}</td>
     <td>${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
+    <td style="font-size:11px;color:var(--text-muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.signature ? escapeHtml(u.signature.split("\n")[0]) : "<i>нет</i>"}</td>
     <td>
       <button onclick="editUser('${u.id}','${escapeHtml(u.name)}','${u.role}')">✏️</button>
+      <button onclick="editUserSignature('${u.id}')">подпись</button>
       <button onclick="manageUserAccess('${u.id}','${escapeHtml(u.email)}','${u.role}')">доступ</button>
       <button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button>
     </td>
@@ -1112,8 +1141,17 @@ async function renderUsersTab() {
       <select name="role"><option value="manager">manager</option><option value="admin">admin</option><option value="owner">owner</option></select>
       <button type="submit">+ Добавить</button>
     </form>
-    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Последний вход</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Последний вход</th><th>Подпись</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   `;
+}
+
+async function editUserSignature(userId) {
+  const users = await api("/admin/users");
+  const u = users.find((x) => x.id === userId);
+  const sig = prompt(`Подпись для ${u.name} (используется при выборе «От имени» в письме). Многострочное — ставьте \\n не нужно, перенос обычный.`, u.signature || "");
+  if (sig === null) return;
+  await api("/admin/users/" + userId, { method: "PATCH", body: JSON.stringify({ signature: sig || null }) });
+  renderAdminTab();
 }
 
 async function adminCreateUser(e) {
@@ -1175,6 +1213,7 @@ async function renderMailboxesTab() {
       <label><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"> вкл</label>
     </td>
     <td>
+      <button onclick="renameMailbox('${m.id}', ${JSON.stringify(m.displayName).replace(/"/g,'&quot;')})">✏️ имя</button>
       <button onclick="editSignature('${m.id}', ${JSON.stringify(m.signature || "").replace(/"/g,'&quot;')})">✏️ подпись</button>
       <button class="danger" onclick="adminDeleteMailbox('${m.id}')">удалить</button>
     </td>
@@ -1189,6 +1228,14 @@ async function renderMailboxesTab() {
     <table class="admin-table"><thead><tr><th>Email</th><th>Название</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   `;
 }
+async function renameMailbox(id, current) {
+  const name = prompt("Название ящика (отображается в списке слева):", current || "");
+  if (name === null || !name.trim()) return;
+  await api("/admin/mailboxes/" + id, { method: "PATCH", body: JSON.stringify({ displayName: name.trim() }) });
+  renderAdminTab();
+  loadFolders();
+}
+
 async function editSignature(id, current) {
   const sig = prompt("Подпись (добавляется ко всем исходящим письмам с этого ящика):", current || "");
   if (sig === null) return;
@@ -1256,7 +1303,13 @@ async function renderContactsTab() {
     <td>${c.lastUsedAt ? new Date(c.lastUsedAt).toLocaleString("ru") : "—"}</td>
     <td><button class="danger" onclick="adminDeleteContact('${c.id}')">удалить</button></td>
   </tr>`).join("");
-  return `<table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Использований</th><th>Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="color:var(--text-muted);font-size:12px">Топ-200 контактов по частоте использования</span>
+      <a href="/admin/contacts/export.csv" download class="link-btn" style="padding:6px 12px;background:var(--accent);color:white;border-radius:5px;text-decoration:none">⬇ Выгрузить всю книгу (CSV)</a>
+    </div>
+    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Использований</th><th>Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
 }
 async function adminDeleteContact(id) {
   if (!confirm("Удалить контакт?")) return;
@@ -1448,6 +1501,49 @@ window.addEventListener("online", () => {
   document.getElementById("offline-banner")?.remove();
   refreshList().catch(() => {});
 });
+
+/* column resizers — drag the dividers between sidebar/list/preview */
+(function setupResizers() {
+  const app = document.getElementById("app");
+  if (!app) return;
+  const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
+  let sidebarW = saved?.sidebar ?? 240;
+  let listW = saved?.list ?? 380;
+  function apply() {
+    if (window.innerWidth <= 900) return;
+    app.style.gridTemplateColumns = `${sidebarW}px 4px ${listW}px 4px 1fr`;
+  }
+  apply();
+  window.addEventListener("resize", apply);
+  function startDrag(which) {
+    return (e) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startSidebar = sidebarW;
+      const startList = listW;
+      const handle = e.target;
+      handle.classList.add("dragging");
+      document.body.style.cursor = "col-resize";
+      function onMove(ev) {
+        const dx = ev.clientX - startX;
+        if (which === 1) sidebarW = Math.max(160, Math.min(500, startSidebar + dx));
+        else listW = Math.max(240, Math.min(900, startList + dx));
+        apply();
+      }
+      function onUp() {
+        handle.classList.remove("dragging");
+        document.body.style.cursor = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+        localStorage.setItem("crm-cols", JSON.stringify({ sidebar: sidebarW, list: listW }));
+      }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    };
+  }
+  document.getElementById("resizer-1")?.addEventListener("mousedown", startDrag(1));
+  document.getElementById("resizer-2")?.addEventListener("mousedown", startDrag(2));
+})();
 
 /* sound */
 let lastUnreadCount = -1;

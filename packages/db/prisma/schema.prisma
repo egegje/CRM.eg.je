@@ -36,6 +36,7 @@ model User {
   role         Role
   createdAt    DateTime        @default(now())
   lastLoginAt  DateTime?
+  signature    String?
   folders      Folder[]
   scheduled    ScheduledSend[]
 }
@@ -113,6 +114,7 @@ model Message {
   aiSummary   String?
   aiActions   String[]
   aiPriority  String?
+  senderUserId String?
   attachments Attachment[]
 
   @@index([mailboxId, folderId, receivedAt])

@@ -42,7 +42,10 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: -apple-system, sy
 .theme-toggle { position: absolute; top: 12px; right: 12px; background: none; border: none; font-size: 18px; cursor: pointer; }
 
 /* app layout */
-#app { display: grid; grid-template-columns: 240px 380px 1fr; height: 100vh; }
+#app { display: grid; grid-template-columns: 240px 4px 380px 4px 1fr; height: 100vh; }
+.resizer { background: var(--border); cursor: col-resize; transition: background 0.15s; }
+.resizer:hover, .resizer.dragging { background: var(--accent); }
+@media (max-width: 900px) { .resizer { display: none; } }
 
 /* sidebar */
 .sidebar { background: var(--bg-alt); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 16px; overflow-y: auto; }

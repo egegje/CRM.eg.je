@@ -15,7 +15,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // ---- users ----
   app.get("/admin/users", { preHandler: requireRole("owner", "admin") }, async () => {
     return prisma.user.findMany({
-      select: { id: true, email: true, name: true, role: true, lastLoginAt: true, createdAt: true },
+      select: { id: true, email: true, name: true, role: true, lastLoginAt: true, createdAt: true, signature: true },
       orderBy: { createdAt: "desc" },
     });
   });
@@ -98,13 +98,14 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   });
 
   // PATCH user (rename, role change)
-  app.patch("/admin/users/:id", { preHandler: requireRole("owner") }, async (req) => {
+  app.patch("/admin/users/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const { id } = Params.parse(req.params);
     const body = z.object({
       name: z.string().optional(),
       role: z.enum(["owner", "admin", "manager"]).optional(),
+      signature: z.string().nullable().optional(),
     }).parse(req.body);
-    return prisma.user.update({ where: { id }, data: body, select: { id: true, name: true, role: true } });
+    return prisma.user.update({ where: { id }, data: body, select: { id: true, name: true, role: true, signature: true } });
   });
 
   app.delete("/admin/mailboxes/:id", { preHandler: requireRole("owner") }, async (req, reply) => {
@@ -123,6 +124,18 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       orderBy: [{ useCount: "desc" }, { lastUsedAt: "desc" }],
       take: q.limit,
     });
+  });
+
+  app.get("/admin/contacts/export.csv", { preHandler: requireRole("owner", "admin") }, async (_req, reply) => {
+    const all = await prisma.contact.findMany({ orderBy: [{ useCount: "desc" }, { email: "asc" }] });
+    const esc = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
+    const lines = ["email,name,useCount,lastUsedAt"];
+    for (const c of all) {
+      lines.push([esc(c.email), esc(c.name), c.useCount, c.lastUsedAt ? c.lastUsedAt.toISOString() : ""].join(","));
+    }
+    reply.header("content-type", "text/csv; charset=utf-8");
+    reply.header("content-disposition", `attachment; filename="contacts-${new Date().toISOString().slice(0,10)}.csv"`);
+    return reply.send("\uFEFF" + lines.join("\n"));
   });
 
   app.delete("/admin/contacts/:id", { preHandler: requireRole("owner", "admin") }, async (req, reply) => {

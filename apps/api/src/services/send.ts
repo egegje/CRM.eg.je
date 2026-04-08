@@ -14,12 +14,15 @@ export type SendPayload = {
   text?: string;
   html?: string;
   attachments?: { filename: string; content: Buffer; contentType: string }[];
+  signatureOverride?: string;
 };
 
 export async function sendMessage(ctx: SendCtx, p: SendPayload): Promise<{ messageId: string }> {
   const pass = ctx.decrypt(ctx.mailbox.encryptedAppPassword);
-  if (ctx.mailbox.signature && p.text) {
-    p = { ...p, text: p.text + "\n\n--\n" + ctx.mailbox.signature };
+  // Per-user signature wins over mailbox-level signature.
+  const sig = p.signatureOverride ?? ctx.mailbox.signature ?? null;
+  if (sig && p.text) {
+    p = { ...p, text: p.text + "\n\n--\n" + sig };
   }
   const result = await sendMail({
     host: ctx.mailbox.smtpHost,
