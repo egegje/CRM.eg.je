@@ -238,6 +238,7 @@ model Task {
   project              Project?     @relation(fields: [projectId], references: [id])
   comments             TaskComment[]
   tagAssignments       TaskTagAssignment[]
+  attachments          TaskAttachment[]
 
   @@index([assigneeId, status])
   @@index([dueDate, status])
@@ -251,6 +252,17 @@ model TaskComment {
   text      String
   createdAt DateTime @default(now())
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model TaskAttachment {
+  id          String   @id @default(cuid())
+  taskId      String
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  filename    String
+  mime        String
+  size        Int
+  storagePath String
+  createdAt   DateTime @default(now())
 }
 
 model TaskTag {

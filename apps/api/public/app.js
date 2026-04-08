@@ -1070,6 +1070,31 @@ async function createTagInline(taskId) {
   renderTaskTagsEditor(taskId, t.tagAssignments || []);
 }
 
+function renderTaskAttachments(taskId, attachments) {
+  const list = document.getElementById("task-attach-list");
+  list.innerHTML = attachments.map((a) =>
+    `<a href="/tasks/attachments/${a.id}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:11px;text-decoration:none;color:var(--text);background:var(--bg-alt)">📎 ${escapeHtml(a.filename)} <span style="color:var(--text-muted)">${fmtSize(a.size)}</span> <button type="button" onclick="event.preventDefault();event.stopPropagation();deleteTaskAttach('${taskId}','${a.id}')" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:0">✕</button></a>`
+  ).join("");
+  // wire upload
+  const input = document.getElementById("task-attach-file");
+  input.onchange = async () => {
+    const files = input.files;
+    if (!files || !files.length) return;
+    for (const f of files) {
+      await uploadFile(`/tasks/${taskId}/attachments`, f, () => {});
+    }
+    input.value = "";
+    const t = await api("/tasks/" + taskId);
+    renderTaskAttachments(taskId, t.attachments || []);
+  };
+}
+async function deleteTaskAttach(taskId, aid) {
+  if (!confirm("Удалить файл?")) return;
+  await api(`/tasks/${taskId}/attachments/${aid}`, { method: "DELETE" });
+  const t = await api("/tasks/" + taskId);
+  renderTaskAttachments(taskId, t.attachments || []);
+}
+
 function renderTaskComments(comments) {
   const list = document.getElementById("task-comments-list");
   if (!comments.length) {
@@ -1118,6 +1143,8 @@ async function openTaskForm(id) {
     renderTaskComments(t.comments || []);
     document.getElementById("task-tags-row").style.display = "flex";
     renderTaskTagsEditor(t.id, t.tagAssignments || []);
+    document.getElementById("task-attach-row").style.display = "flex";
+    renderTaskAttachments(t.id, t.attachments || []);
   } else {
     document.getElementById("task-form-title").textContent = "Новая задача";
     f.id.value = "";
@@ -1125,6 +1152,7 @@ async function openTaskForm(id) {
     document.getElementById("task-delete-btn").style.display = "none";
     document.getElementById("task-comments-row").style.display = "none";
     document.getElementById("task-tags-row").style.display = "none";
+    document.getElementById("task-attach-row").style.display = "none";
   }
   document.getElementById("task-form-modal").classList.remove("hidden");
 }
@@ -1663,6 +1691,10 @@ async function renderTaskSettingsTab() {
           </select>
         </label>
         <p style="font-size:11px;color:var(--text-muted);margin:0">Используется Claude Haiku. Только с уверенностью ≥60%. Кнопки в TG: создать / игнор.</p>
+        <label style="display:block;margin-top:10px">
+          <input name="ai_autoclose_enabled" type="checkbox" ${s.ai_autoclose_enabled === "true" ? "checked" : ""}>
+          Также проверять автозакрытие — если новое письмо от того же контрагента похоже на «работа сделана», AI спросит «Закрыть задачу N?»
+        </label>
       </fieldset>
 
       <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
@@ -1696,6 +1728,7 @@ async function saveTaskSettings(e) {
   const payload = {
     digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
     ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
+    ai_autoclose_enabled: e.target.ai_autoclose_enabled.checked ? "true" : "false",
     email_ai_notify_user_id: String(f.get("email_ai_notify_user_id") || ""),
     metr_deadline_enabled: e.target.metr_deadline_enabled.checked ? "true" : "false",
     metr_deadline_lead_days: String(f.get("metr_deadline_lead_days") || "3"),

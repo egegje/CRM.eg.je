@@ -6,7 +6,7 @@ import { parseRaw } from "@crm/mail";
 import { decrypt } from "../crypto.js";
 import { loadConfig } from "../config.js";
 import { notifyNewMail } from "../services/notifier.js";
-import { maybeProposeTaskFromEmail } from "../services/email-task-ai.js";
+import { maybeProposeTaskFromEmail, maybeProposeAutoClose } from "../services/email-task-ai.js";
 
 const cfg = loadConfig();
 const clients = new Map<string, ImapFlow>();
@@ -97,6 +97,9 @@ async function persistMessage(
     );
     maybeProposeTaskFromEmail(created.id).catch((e) =>
       console.error("ai task detect failed:", (e as Error).message),
+    );
+    maybeProposeAutoClose(created.id).catch((e) =>
+      console.error("ai autoclose failed:", (e as Error).message),
     );
   }
 }

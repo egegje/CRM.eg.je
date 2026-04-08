@@ -87,3 +87,96 @@ export async function maybeProposeTaskFromEmail(messageId: string): Promise<void
     ],
   });
 }
+
+const CLOSE_SYSTEM = `Ты помогаешь определить, означает ли новое письмо, что определённая задача выполнена.
+Дано: краткое описание задачи и текст нового письма от того же контрагента.
+Верни JSON: {"likelyDone": boolean, "confidence": 0..1, "reason": string}.
+likelyDone=true только если в письме явно указано, что работа сделана/документ получен/вопрос решён.
+"спасибо/жду/уточните" — likelyDone=false.
+reason — короткая фраза по-русски.
+Только JSON, без markdown.`;
+
+export type AutoCloseDetection = {
+  likelyDone: boolean;
+  confidence: number;
+  reason: string;
+};
+
+export async function detectAutoClose(taskTitle: string, taskDescription: string, emailText: string): Promise<AutoCloseDetection> {
+  const r = await getClient().messages.create({
+    model: "claude-haiku-4-5",
+    max_tokens: 200,
+    system: CLOSE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Задача: ${taskTitle}\nОписание: ${(taskDescription || "").slice(0, 500)}\n\nНовое письмо:\n${(emailText || "").slice(0, 1500)}`,
+      },
+    ],
+  });
+  const txt = r.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("");
+  try {
+    const cleaned = txt.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+    return JSON.parse(cleaned) as AutoCloseDetection;
+  } catch {
+    return { likelyDone: false, confidence: 0, reason: "parse error" };
+  }
+}
+
+/**
+ * After every persisted incoming message, look up open tasks whose
+ * sourceEmailMessageId points to a Message from the same sender. If
+ * Claude Haiku thinks the new email implies the task is done, send
+ * a TG card with «Закрыть задачу N?» buttons.
+ */
+export async function maybeProposeAutoClose(messageId: string): Promise<void> {
+  const enabled = await prisma.taskSetting.findUnique({
+    where: { key: "ai_autoclose_enabled" },
+  });
+  if (enabled?.value !== "true") return;
+  const target = await prisma.taskSetting.findUnique({
+    where: { key: "email_ai_notify_user_id" },
+  });
+  if (!target?.value) return;
+  const m = await prisma.message.findUnique({ where: { id: messageId } });
+  if (!m || m.isDraft || m.sentAt) return;
+  if (!m.fromAddr) return;
+  // Find open tasks linked to a source email from the same sender.
+  const candidates = await prisma.task.findMany({
+    where: { status: { in: ["open", "in_progress"] }, sourceEmailMessageId: { not: null } },
+    take: 50,
+  });
+  for (const t of candidates) {
+    if (!t.sourceEmailMessageId || t.sourceEmailMessageId.startsWith("metr-buyback:")) continue;
+    const src = await prisma.message.findUnique({ where: { id: t.sourceEmailMessageId } });
+    if (!src || src.fromAddr.toLowerCase() !== m.fromAddr.toLowerCase()) continue;
+    const det = await detectAutoClose(
+      t.title,
+      t.description || "",
+      `Subject: ${m.subject}\n\n${m.bodyText || ""}`,
+    ).catch(() => null);
+    if (!det || !det.likelyDone || det.confidence < 0.7) continue;
+    const lines = [
+      `🔚 <b>Похоже, задача выполнена</b> (${Math.round(det.confidence * 100)}%)`,
+      `<i>${escapeHtml(t.title)}</i>`,
+      "",
+      `от: ${escapeHtml(m.fromAddr)}`,
+      `тема: ${escapeHtml(m.subject || "(без темы)")}`,
+      "",
+      `<i>${escapeHtml(det.reason)}</i>`,
+    ];
+    await sendTaskBotToUser(target.value, lines.join("\n"), {
+      inline_keyboard: [
+        [
+          { text: "✅ Закрыть задачу", callback_data: `tcl:${t.id}` },
+          { text: "✕ Не закрывать", callback_data: "tig" },
+        ],
+      ],
+    });
+    // Only propose for the first matching task per incoming, to avoid spam.
+    return;
+  }
+}

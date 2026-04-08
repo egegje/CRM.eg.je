@@ -1,8 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { mkdir, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { join } from "node:path";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
-import { NotFound } from "../errors.js";
+import { NotFound, BadRequest } from "../errors.js";
+import { loadConfig } from "../config.js";
 import { audit } from "../services/audit.js";
 import { notifyAssignment } from "../services/task-tg.js";
 
@@ -40,6 +44,7 @@ const ListQuery = z.object({
 });
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
+  const cfg = loadConfig();
   app.get("/tasks", { preHandler: requireUser() }, async (req) => {
     const q = ListQuery.parse(req.query);
     const where: Prisma.TaskWhereInput = {};
@@ -61,6 +66,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         project: true,
         comments: { orderBy: { createdAt: "asc" } },
         tagAssignments: { include: { tag: true } },
+        attachments: true,
       },
     });
   });
@@ -73,6 +79,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         project: true,
         comments: { orderBy: { createdAt: "asc" } },
         tagAssignments: { include: { tag: true } },
+        attachments: true,
       },
     });
     if (!t) throw new NotFound();
@@ -148,6 +155,47 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     await prisma.taskTagAssignment.delete({
       where: { taskId_tagId: { taskId: id, tagId } },
     });
+    return reply.status(204).send();
+  });
+
+  // ---- task attachments ----
+  app.post("/tasks/:id/attachments", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const t = await prisma.task.findUnique({ where: { id } });
+    if (!t) throw new NotFound();
+    const file = await req.file();
+    if (!file) throw new BadRequest("no file");
+    const buf = await file.toBuffer();
+    if (buf.length > 25 * 1024 * 1024) throw new BadRequest("file > 25MB");
+    const dir = join(cfg.attachmentDir, "tasks", id);
+    await mkdir(dir, { recursive: true });
+    const safe = file.filename.replace(/[/\\]/g, "_").slice(0, 200);
+    const path = join(dir, Date.now() + "_" + safe);
+    await writeFile(path, buf);
+    return prisma.taskAttachment.create({
+      data: {
+        taskId: id,
+        filename: file.filename,
+        mime: file.mimetype,
+        size: buf.length,
+        storagePath: path,
+      },
+    });
+  });
+
+  app.get("/tasks/attachments/:aid", { preHandler: requireUser() }, async (req, reply) => {
+    const { aid } = z.object({ aid: z.string() }).parse(req.params);
+    const a = await prisma.taskAttachment.findUnique({ where: { id: aid } });
+    if (!a) throw new NotFound();
+    reply.header("content-type", a.mime);
+    const inline = a.mime === "application/pdf" || a.mime.startsWith("image/");
+    reply.header("content-disposition", `${inline ? "inline" : "attachment"}; filename="${a.filename}"`);
+    return reply.send(createReadStream(a.storagePath));
+  });
+
+  app.delete("/tasks/:id/attachments/:aid", { preHandler: requireUser() }, async (req, reply) => {
+    const { aid } = z.object({ id: z.string(), aid: z.string() }).parse(req.params);
+    await prisma.taskAttachment.delete({ where: { id: aid } });
     return reply.status(204).send();
   });
 }
