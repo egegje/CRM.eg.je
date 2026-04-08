@@ -138,6 +138,28 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send("\uFEFF" + lines.join("\n"));
   });
 
+  // ---- task settings (key/value) ----
+  app.get("/admin/task-settings", { preHandler: requireRole("owner", "admin") }, async () => {
+    const rows = await prisma.taskSetting.findMany();
+    return Object.fromEntries(rows.map((r) => [r.key, r.value]));
+  });
+
+  app.put("/admin/task-settings", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const body = z.record(z.string(), z.string().nullable()).parse(req.body);
+    for (const [key, value] of Object.entries(body)) {
+      if (value === null || value === "") {
+        await prisma.taskSetting.delete({ where: { key } }).catch(() => {});
+      } else {
+        await prisma.taskSetting.upsert({
+          where: { key },
+          create: { key, value },
+          update: { value },
+        });
+      }
+    }
+    return { ok: true };
+  });
+
   app.delete("/admin/contacts/:id", { preHandler: requireRole("owner", "admin") }, async (req, reply) => {
     const { id } = Params.parse(req.params);
     await prisma.contact.delete({ where: { id } });

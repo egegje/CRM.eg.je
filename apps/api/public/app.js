@@ -1114,6 +1114,7 @@ async function renderAdminTab() {
     else if (adminTab === "analytics") c.innerHTML = await renderAnalyticsTab();
     else if (adminTab === "tgchats") c.innerHTML = await renderTgChatsTab();
     else if (adminTab === "tgbindings") c.innerHTML = await renderTgBindingsTab();
+    else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
   }
@@ -1484,6 +1485,80 @@ async function adminDeleteTgBinding(userId) {
   if (!confirm("Удалить привязку?")) return;
   await api("/admin/tg-bindings/" + encodeURIComponent(userId), { method: "DELETE" });
   renderAdminTab();
+}
+
+async function renderTaskSettingsTab() {
+  const [s, users] = await Promise.all([api("/admin/task-settings"), api("/admin/users")]);
+  const userOptions = (selected) => users.map((u) =>
+    `<option value="${u.id}"${selected === u.id ? " selected" : ""}>${escapeHtml(u.email)} (${escapeHtml(u.name)})</option>`
+  ).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px">Хранится в TaskSetting (key/value). Изменения применяются сразу — воркеры читают свежие значения каждый раз.</p>
+    <form class="admin-form" style="display:flex;flex-direction:column;gap:14px;max-width:600px" onsubmit="saveTaskSettings(event)">
+
+      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
+        <legend>⏰ Утренний дайджест</legend>
+        <label style="display:block;margin-bottom:6px">
+          Час МСК (0-23):
+          <input name="digest_hour_msk" type="number" min="0" max="23" value="${escapeHtml(s.digest_hour_msk || "9")}" style="width:80px;margin-left:8px">
+        </label>
+        <p style="font-size:11px;color:var(--text-muted);margin:0">Каждое утро в указанный час task-бот шлёт каждому юзеру с TG-привязкой список открытых задач.</p>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
+        <legend>📧 AI: задачи из писем</legend>
+        <label style="display:block;margin-bottom:6px">
+          <input name="ai_email_detect_enabled" type="checkbox" ${s.ai_email_detect_enabled === "true" ? "checked" : ""}>
+          Включить — AI смотрит каждое incoming, и если похоже на задачу — присылает в TG предложение «Создать?»
+        </label>
+        <label style="display:block;margin-bottom:6px">
+          Кому слать предложения:
+          <select name="email_ai_notify_user_id" style="margin-left:8px">
+            <option value="">— никто —</option>
+            ${userOptions(s.email_ai_notify_user_id)}
+          </select>
+        </label>
+        <p style="font-size:11px;color:var(--text-muted);margin:0">Используется Claude Haiku. Только с уверенностью ≥60%. Кнопки в TG: создать / игнор.</p>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
+        <legend>🏗 Авто-задачи из metr (выкуп объектов)</legend>
+        <label style="display:block;margin-bottom:6px">
+          <input name="metr_deadline_enabled" type="checkbox" ${s.metr_deadline_enabled === "true" ? "checked" : ""}>
+          Включить — каждый день в 8:00 МСК создавать задачи на ближайшие выкупы
+        </label>
+        <label style="display:block;margin-bottom:6px">
+          За сколько дней до даты выкупа создавать:
+          <input name="metr_deadline_lead_days" type="number" min="1" max="30" value="${escapeHtml(s.metr_deadline_lead_days || "3")}" style="width:80px;margin-left:8px">
+        </label>
+        <label style="display:block;margin-bottom:6px">
+          Назначать на:
+          <select name="metr_default_assignee_user_id" style="margin-left:8px">
+            <option value="">— не назначать —</option>
+            ${userOptions(s.metr_default_assignee_user_id)}
+          </select>
+        </label>
+        <p style="font-size:11px;color:var(--text-muted);margin:0">Источник: <code>metr.Object.buyback_date</code>. Дубли не создаёт (помечает sourceEmailMessageId маркером).</p>
+      </fieldset>
+
+      <button type="submit" style="padding:10px 18px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;align-self:flex-start">Сохранить</button>
+    </form>
+  `;
+}
+
+async function saveTaskSettings(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const payload = {
+    digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
+    ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
+    email_ai_notify_user_id: String(f.get("email_ai_notify_user_id") || ""),
+    metr_deadline_enabled: e.target.metr_deadline_enabled.checked ? "true" : "false",
+    metr_deadline_lead_days: String(f.get("metr_deadline_lead_days") || "3"),
+    metr_default_assignee_user_id: String(f.get("metr_default_assignee_user_id") || ""),
+  };
+  await api("/admin/task-settings", { method: "PUT", body: JSON.stringify(payload) });
+  alert("Сохранено");
 }
 
 /* offline indicator */

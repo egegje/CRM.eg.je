@@ -4,6 +4,7 @@ import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound } from "../errors.js";
 import { audit } from "../services/audit.js";
+import { notifyAssignment } from "../services/task-tg.js";
 
 const Params = z.object({ id: z.string() });
 
@@ -85,17 +86,22 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       data: { ...body, creatorId: user.id },
     });
     await audit(req, "task.create", { taskId: t.id, title: t.title });
+    notifyAssignment(t.id, user.id).catch((e) => console.error("notify:", (e as Error).message));
     return t;
   });
 
   app.patch("/tasks/:id", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const body = Patch.parse(req.body);
+    const before = await prisma.task.findUnique({ where: { id }, select: { assigneeId: true } });
     const data: Prisma.TaskUpdateInput = { ...body } as Prisma.TaskUpdateInput;
     if (body.status === "done") (data as { completedAt: Date }).completedAt = new Date();
     if (body.status && body.status !== "done") (data as { completedAt: null }).completedAt = null;
     const t = await prisma.task.update({ where: { id }, data });
     await audit(req, "task.update", { taskId: id, changes: body });
+    if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== before?.assigneeId) {
+      notifyAssignment(t.id, req.user!.id).catch((e) => console.error("notify:", (e as Error).message));
+    }
     return t;
   });
 

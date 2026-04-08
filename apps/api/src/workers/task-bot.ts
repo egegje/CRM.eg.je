@@ -1,6 +1,7 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
 import { parseTaskFromText } from "../services/tasks-ai.js";
+import { notifyAssignment } from "../services/task-tg.js";
 
 const cfg = loadConfig();
 let offset = 0;
@@ -22,6 +23,12 @@ type Update = {
     from: { id: number; username?: string; first_name?: string };
     text?: string;
     entities?: Array<{ type: string; offset: number; length: number }>;
+  };
+  callback_query?: {
+    id: string;
+    from: { id: number; username?: string; first_name?: string };
+    message?: { message_id: number; chat: { id: number } };
+    data?: string;
   };
 };
 
@@ -110,6 +117,8 @@ async function handleMessage(msg: NonNullable<Update["message"]>): Promise<void>
     },
   });
 
+  notifyAssignment(task.id, creatorId).catch(() => {});
+
   await tg("setMessageReaction", {
     chat_id: msg.chat.id,
     message_id: msg.message_id,
@@ -132,6 +141,91 @@ async function handleMessage(msg: NonNullable<Update["message"]>): Promise<void>
   });
 }
 
+async function handleCallback(cb: NonNullable<Update["callback_query"]>): Promise<void> {
+  const data = cb.data || "";
+  const chatId = cb.message?.chat.id;
+  const messageId = cb.message?.message_id;
+  async function answer(text: string): Promise<void> {
+    await tg("answerCallbackQuery", { callback_query_id: cb.id, text }).catch(() => {});
+  }
+  async function editText(text: string): Promise<void> {
+    if (!chatId || !messageId) return;
+    await tg("editMessageText", {
+      chat_id: chatId,
+      message_id: messageId,
+      text,
+      parse_mode: "HTML",
+    }).catch(() => {});
+  }
+
+  // tcr:<emailMessageId> — confirm "create task from email"
+  if (data.startsWith("tcr:")) {
+    const emailId = data.slice(4);
+    const m = await prisma.message.findUnique({ where: { id: emailId } });
+    if (!m) {
+      await answer("письмо не найдено");
+      return;
+    }
+    // Find creator binding via the user who clicked
+    const creatorBinding = await prisma.tgUserBinding.findUnique({
+      where: { tgUserId: BigInt(cb.from.id) },
+    });
+    if (!creatorBinding) {
+      await answer("ваш TG не привязан к юзеру CRM");
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const text = `${m.subject || ""}\n${(m.bodyText || "").slice(0, 1000)}`;
+    let parsed;
+    try {
+      parsed = await parseTaskFromText(text, today);
+    } catch (e) {
+      await answer("ошибка AI: " + (e as Error).message);
+      return;
+    }
+    const task = await prisma.task.create({
+      data: {
+        title: parsed.title || m.subject || "(без темы)",
+        description: parsed.description || (m.bodyText || "").slice(0, 1000),
+        creatorId: creatorBinding.userId,
+        assigneeId: creatorBinding.userId,
+        dueDate: parsed.dueDate ? new Date(parsed.dueDate) : null,
+        priority: parsed.priority || "normal",
+        sourceEmailMessageId: m.id,
+      },
+    });
+    notifyAssignment(task.id, null).catch(() => {});
+    await editText(`✅ Задача создана: <b>${escapeHtml(task.title)}</b>\nID: <code>${task.id}</code>`);
+    await answer("создано");
+    return;
+  }
+
+  // tcl:<taskId> — confirm "close task"
+  if (data.startsWith("tcl:")) {
+    const taskId = data.slice(4);
+    const t = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!t) {
+      await answer("задача не найдена");
+      return;
+    }
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { status: "done", completedAt: new Date() },
+    });
+    await editText(`✅ Задача закрыта: <b>${escapeHtml(t.title)}</b>`);
+    await answer("закрыто");
+    return;
+  }
+
+  if (data === "tig") {
+    await editText("✕ проигнорировано");
+    await answer("ок");
+    return;
+  }
+
+  await answer("неизвестная команда");
+}
+
 export async function startTaskBot(): Promise<void> {
   if (!cfg.taskBotToken) {
     console.log("task bot: no token, skipping");
@@ -144,7 +238,7 @@ export async function startTaskBot(): Promise<void> {
         const res = (await tg("getUpdates", {
           offset,
           timeout: 25,
-          allowed_updates: ["message"],
+          allowed_updates: ["message", "callback_query"],
         })) as { ok: boolean; result: Update[] };
         if (res?.ok && res.result) {
           for (const u of res.result) {
@@ -152,6 +246,11 @@ export async function startTaskBot(): Promise<void> {
             if (u.message) {
               await handleMessage(u.message).catch((e) =>
                 console.error("task bot handle:", (e as Error).message),
+              );
+            }
+            if (u.callback_query) {
+              await handleCallback(u.callback_query).catch((e) =>
+                console.error("task bot callback:", (e as Error).message),
               );
             }
           }

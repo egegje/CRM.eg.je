@@ -8,6 +8,7 @@ import { runReminders, runFollowups, runSnoozes } from "./workers/reminders.js";
 import { startTelegramBot } from "./workers/telegram-bot.js";
 import { startTaskBot } from "./workers/task-bot.js";
 import { startMorningDigestCron } from "./workers/morning-digest.js";
+import { startMetrDeadlinesCron } from "./workers/metr-deadlines.js";
 
 const cfg = loadConfig();
 setKey(cfg.encKey);
@@ -42,5 +43,6 @@ setTimeout(snoozeTick, 10 * 1000);
 void startTelegramBot();
 void startTaskBot();
 startMorningDigestCron();
+startMetrDeadlinesCron();
 
 console.log(`workers up: ${mailboxes.length} mailboxes`);
