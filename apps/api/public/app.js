@@ -182,6 +182,7 @@ async function loadFolders() {
     d.className = "folder-item" + (state.currentFolder === f.key ? " active" : "");
     d.textContent = f.label;
     d.onclick = () => {
+      exitTasksView();
       state.currentFolder = f.key;
       state.selectedIds.clear();
       renderBulkBar();
@@ -476,6 +477,7 @@ function renderPreview(m) {
         <button onclick="replyTo('${m.id}')">↩️ Ответить</button>
         <button onclick="aiReply('${m.id}')">🤖 AI ответ</button>
         <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
+        <button onclick="emailToTask('${m.id}')">📋 → задача</button>
         <button onclick="snoozeMsg('${m.id}')">⏰ Напомнить</button>
         <button onclick="exportPdf('${m.id}')">📄 PDF</button>
         <button onclick="blockSender('${escapeHtml(m.fromAddr)}')">🚫 Блок отправителя</button>
@@ -835,6 +837,135 @@ async function openStats() {
   modal.innerHTML = html;
   modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
   document.body.appendChild(modal);
+}
+
+/* tasks */
+let tasksFilter = null;
+let _projects = [];
+let _users = [];
+
+async function showTasksView(filter) {
+  tasksFilter = filter || null;
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("tasks-view").classList.remove("hidden");
+  const titles = { me: "Мои задачи", overdue: "Просроченные" };
+  document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
+  await loadTasks();
+}
+
+function exitTasksView() {
+  document.getElementById("tasks-view").classList.add("hidden");
+  document.querySelector(".list-pane").classList.remove("hidden");
+}
+
+async function loadTasks() {
+  const params = new URLSearchParams();
+  if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
+  if (tasksFilter !== "overdue") params.set("status", "open");
+  const search = document.getElementById("tasks-search")?.value;
+  if (search) params.set("search", search);
+  params.set("limit", "200");
+  let tasks = await api("/tasks?" + params.toString());
+  if (tasksFilter === "overdue") {
+    const now = new Date();
+    tasks = tasks.filter((t) => t.dueDate && new Date(t.dueDate) < now && t.status !== "done");
+  }
+  renderTasks(tasks);
+}
+
+function renderTasks(tasks) {
+  const el = document.getElementById("tasks-list");
+  if (!tasks.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет задач</div>';
+    return;
+  }
+  const prioColor = { urgent: "#ef4444", high: "#f59e0b", normal: "var(--text)", low: "var(--text-muted)" };
+  el.innerHTML = tasks.map((t) => {
+    const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
+    const done = t.status === "done";
+    return `<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:10px" onclick="openTaskForm('${t.id}')">
+      <input type="checkbox" ${done ? "checked" : ""} onclick="event.stopPropagation();toggleTaskDone('${t.id}', this.checked)" style="margin-top:3px">
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word">
+          ${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
+          ${t.project ? `📁 ${escapeHtml(t.project.name)} · ` : ""}
+          ${t.dueDate ? `${overdue ? "⏰" : "📅"} ${new Date(t.dueDate).toLocaleDateString("ru")} · ` : ""}
+          ${t.priority}${t.category ? ` · ${escapeHtml(t.category)}` : ""}
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function toggleTaskDone(id, done) {
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: done ? "done" : "open" }) });
+  loadTasks();
+}
+
+async function openTaskForm(id) {
+  const f = document.getElementById("task-form");
+  f.reset();
+  if (!_projects.length) {
+    [_users, _projects] = await Promise.all([
+      api("/admin/users").catch(() => []),
+      api("/projects").catch(() => []),
+    ]);
+  }
+  f.assigneeId.innerHTML = '<option value="">—</option>' + _users.map((u) => `<option value="${u.id}">${escapeHtml(u.email)}</option>`).join("");
+  f.projectId.innerHTML = '<option value="">—</option>' + _projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  if (id) {
+    const t = await api("/tasks/" + id);
+    document.getElementById("task-form-title").textContent = "Задача";
+    f.id.value = t.id;
+    f.title.value = t.title;
+    f.description.value = t.description || "";
+    f.assigneeId.value = t.assigneeId || "";
+    f.projectId.value = t.projectId || "";
+    f.dueDate.value = t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 16) : "";
+    f.priority.value = t.priority;
+    f.category.value = t.category || "";
+    f.status.value = t.status;
+    document.getElementById("task-delete-btn").style.display = "inline-block";
+    document.getElementById("task-delete-btn").onclick = () => deleteTask(t.id);
+  } else {
+    document.getElementById("task-form-title").textContent = "Новая задача";
+    f.id.value = "";
+    f.status.value = "open";
+    document.getElementById("task-delete-btn").style.display = "none";
+  }
+  document.getElementById("task-form-modal").classList.remove("hidden");
+}
+
+async function saveTask(e) {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = {};
+  for (const [k, v] of fd) if (v !== "") body[k] = v;
+  const id = body.id;
+  delete body.id;
+  if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
+  if (id) await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify(body) });
+  else await api("/tasks", { method: "POST", body: JSON.stringify(body) });
+  closeModal("task-form-modal");
+  if (!document.getElementById("tasks-view").classList.contains("hidden")) loadTasks();
+}
+
+async function deleteTask(id) {
+  if (!confirm("Удалить задачу?")) return;
+  await api("/tasks/" + id, { method: "DELETE" });
+  closeModal("task-form-modal");
+  loadTasks();
+}
+
+async function emailToTask(messageId) {
+  const m = state.messages.find((x) => x.id === messageId) || (await api("/messages/" + messageId));
+  await openTaskForm();
+  const f = document.getElementById("task-form");
+  f.title.value = m.subject || "(без темы)";
+  f.description.value = `Из письма от ${m.fromAddr}:\n\n${(m.bodyText || "").slice(0, 1000)}`;
 }
 
 /* settings */

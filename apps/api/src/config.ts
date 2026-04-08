@@ -12,6 +12,7 @@ const Schema = z.object({
   ANTHROPIC_AUTH_TOKEN: z.string().optional(),
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
+  TASK_BOT_TOKEN: z.string().optional(),
 });
 
 export type Config = {
@@ -26,6 +27,7 @@ export type Config = {
   anthropicAuthToken?: string;
   telegramBotToken?: string;
   telegramChatId?: string;
+  taskBotToken?: string;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -46,5 +48,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     anthropicAuthToken: p.ANTHROPIC_AUTH_TOKEN,
     telegramBotToken: p.TELEGRAM_BOT_TOKEN,
     telegramChatId: p.TELEGRAM_CHAT_ID,
+    taskBotToken: p.TASK_BOT_TOKEN,
   };
 }

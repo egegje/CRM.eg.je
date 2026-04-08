@@ -14,6 +14,9 @@ import { messageRoutes } from "./routes/messages.js";
 import { attachmentRoutes } from "./routes/attachments.js";
 import { adminRoutes } from "./routes/admin.js";
 import { extraRoutes } from "./routes/extras.js";
+import { taskRoutes } from "./routes/tasks.js";
+import { projectRoutes } from "./routes/projects.js";
+import { tgBindingRoutes } from "./routes/tg-bindings.js";
 
 export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnType<typeof loadConfig> }> {
   const cfg = loadConfig();
@@ -62,6 +65,9 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
   await app.register(attachmentRoutes);
   await app.register(adminRoutes);
   await app.register(extraRoutes);
+  await app.register(taskRoutes);
+  await app.register(projectRoutes);
+  await app.register(tgBindingRoutes);
 
   return { app, cfg };
 }
