@@ -145,7 +145,7 @@ async function loadMailboxes() {
   const all = document.createElement("div");
   all.className = "folder-item" + (state.currentMailbox === null ? " active" : "");
   all.innerHTML = `<span>Все ящики</span>${totalUnread ? `<span class="count">${totalUnread}</span>` : ""}`;
-  all.onclick = () => { state.currentMailbox = null; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
+  all.onclick = () => { exitTasksView(); state.currentMailbox = null; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
   list.appendChild(all);
   for (const mb of state.mailboxes) {
     const u = unread[mb.id] || 0;
@@ -153,7 +153,7 @@ async function loadMailboxes() {
     d.className = "folder-item" + (state.currentMailbox === mb.id ? " active" : "");
     d.innerHTML = `<span>${escapeHtml(mb.displayName)}</span>${u ? `<span class="count">${u}</span>` : ""}`;
     d.title = mb.email;
-    d.onclick = () => { state.currentMailbox = mb.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
+    d.onclick = () => { exitTasksView(); state.currentMailbox = mb.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
   const sel = document.getElementById("compose-mailbox");
@@ -197,7 +197,7 @@ async function loadFolders() {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.id ? " active" : "");
     d.innerHTML = `<span>📁 ${escapeHtml(f.name)}</span>`;
-    d.onclick = () => { state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
+    d.onclick = () => { exitTasksView(); state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
   // Smart folders
@@ -214,7 +214,7 @@ async function loadFolders() {
       const d = document.createElement("div");
       d.className = "folder-item" + (state.currentFolder === "smart:" + sf.id ? " active" : "");
       d.innerHTML = `<span>🔮 ${escapeHtml(sf.name)}</span>`;
-      d.onclick = () => { state.currentFolder = "smart:" + sf.id; refreshList(); };
+      d.onclick = () => { exitTasksView(); state.currentFolder = "smart:" + sf.id; refreshList(); };
       list.appendChild(d);
     }
     const add = document.createElement("button");
@@ -894,7 +894,13 @@ async function showTasksView(filter) {
   tasksFilter = filter || null;
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
+  // collapse the 5-col mail grid down to a sidebar + tasks layout so the
+  // tasks pane stretches to the full viewport instead of sitting in the
+  // narrow 4px resizer slot.
+  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
   const titles = { me: "Мои задачи", overdue: "Просроченные" };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
   setTasksMode(tasksMode);
@@ -903,6 +909,15 @@ async function showTasksView(filter) {
 function exitTasksView() {
   document.getElementById("tasks-view").classList.add("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
+  document.querySelector(".preview-pane").classList.remove("hidden");
+  document.getElementById("resizer-1").style.display = "";
+  document.getElementById("resizer-2").style.display = "";
+  document.getElementById("app").style.gridTemplateColumns = "";
+  // re-apply persisted resizer widths
+  const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
+  if (saved && window.innerWidth > 900) {
+    document.getElementById("app").style.gridTemplateColumns = `${saved.sidebar}px 4px ${saved.list}px 4px 1fr`;
+  }
 }
 
 let tasksMode = localStorage.getItem("tasks-mode") || "list";
