@@ -123,7 +123,10 @@ async function bootApp() {
   // version footer
   fetch("/version").then((r) => r.json()).then((v) => {
     const el = document.getElementById("version-footer");
-    if (el) el.textContent = `v${v.version} · ${v.commit.slice(0, 7)}`;
+    if (el) {
+      el.textContent = `v${v.version}`;
+      el.title = v.commit;
+    }
   }).catch(() => {});
   if (state.user.role === "owner" || state.user.role === "admin") {
     document.getElementById("admin-btn").classList.remove("hidden");
