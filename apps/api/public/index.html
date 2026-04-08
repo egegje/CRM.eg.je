@@ -33,8 +33,9 @@
     <button class="compose-btn" onclick="openCompose()">✉️ Написать</button>
     <div class="folder-group" style="margin-bottom:12px">
       <div class="folder-title">✅ Задачи</div>
-      <div class="folder-item" onclick="showTasksView()">📋 Все</div>
       <div class="folder-item" onclick="showTasksView('me')">📌 Мои</div>
+      <div class="folder-item" onclick="showTasksView('createdByMe')">📤 Поставлено мной</div>
+      <div class="folder-item" onclick="showTasksView('unassigned')">❓ Без исполнителя</div>
       <div class="folder-item" onclick="showTasksView('overdue')">⏰ Просроченные</div>
       <div class="folder-item" onclick="showTasksView('done')">✔️ Выполненные</div>
     </div>

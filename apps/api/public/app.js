@@ -1045,7 +1045,13 @@ async function showTasksView(filter) {
   // tasks pane stretches to the full viewport instead of sitting in the
   // narrow 4px resizer slot.
   document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
-  const titles = { me: "Мои задачи", overdue: "Просроченные", done: "Выполненные" };
+  const titles = {
+    me: "Мои задачи",
+    createdByMe: "Поставлено мной",
+    unassigned: "Без исполнителя",
+    overdue: "Просроченные",
+    done: "Выполненные",
+  };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
   setTasksMode(tasksMode);
 }
@@ -1090,6 +1096,8 @@ async function loadTasks() {
   }
   const params = new URLSearchParams();
   if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
+  if (tasksFilter === "createdByMe" && state.user) params.set("creatorId", state.user.id);
+  if (tasksFilter === "unassigned") params.set("unassigned", "true");
   if (tasksMode !== "kanban" && tasksFilter !== "overdue" && tasksFilter !== "done") params.set("status", "open");
   if (tasksFilter === "done") params.set("status", "done");
   const search = document.getElementById("tasks-search")?.value;

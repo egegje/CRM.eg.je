@@ -36,6 +36,8 @@ const Patch = z.object({
 
 const ListQuery = z.object({
   assigneeId: z.string().optional(),
+  creatorId: z.string().optional(),
+  unassigned: z.coerce.boolean().optional(),
   projectId: z.string().optional(),
   status: z.enum(["open", "in_progress", "done", "cancelled", "all"]).optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
@@ -49,6 +51,8 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const q = ListQuery.parse(req.query);
     const where: Prisma.TaskWhereInput = {};
     if (q.assigneeId) where.assigneeId = q.assigneeId;
+    if (q.creatorId) where.creatorId = q.creatorId;
+    if (q.unassigned) where.assigneeId = null;
     if (q.projectId) where.projectId = q.projectId;
     if (q.priority) where.priority = q.priority;
     if (q.status && q.status !== "all") where.status = q.status;
