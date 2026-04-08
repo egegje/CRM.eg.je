@@ -1066,6 +1066,8 @@ async function renderAdminTab() {
     else if (adminTab === "contacts") c.innerHTML = await renderContactsTab();
     else if (adminTab === "audit") c.innerHTML = await renderAuditTab();
     else if (adminTab === "analytics") c.innerHTML = await renderAnalyticsTab();
+    else if (adminTab === "tgchats") c.innerHTML = await renderTgChatsTab();
+    else if (adminTab === "tgbindings") c.innerHTML = await renderTgBindingsTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
   }
@@ -1342,6 +1344,74 @@ async function renderAuditTab() {
     <td>${escapeHtml(a.ip || "")}</td>
   </tr>`).join("");
   return `<table class="admin-table"><thead><tr><th>Время</th><th>User</th><th>Действие</th><th>Детали</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
+async function renderTgChatsTab() {
+  const list = await api("/admin/tg-chats");
+  const rows = list.map((c) => `<tr>
+    <td><code>${escapeHtml(c.chatId)}</code></td>
+    <td>${escapeHtml(c.name)}</td>
+    <td>${new Date(c.addedAt).toLocaleString("ru")}</td>
+    <td><button class="danger" onclick="adminDeleteTgChat('${escapeHtml(c.chatId)}')">удалить</button></td>
+  </tr>`).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px">Чаты Telegram, в которых task-бот (@task_crm_bot) принимает сообщения с #task / #задача. Для группы chat_id отрицательный (вида -100…). Узнать chat_id можно через @userinfobot или forward сообщения из группы в @userinfobot.</p>
+    <form class="admin-form" onsubmit="adminCreateTgChat(event)">
+      <input name="chatId" placeholder="chat_id (например -1003861923660)" required>
+      <input name="name" placeholder="название" required>
+      <button type="submit">+ Добавить</button>
+    </form>
+    <table class="admin-table"><thead><tr><th>chat_id</th><th>Название</th><th>Добавлено</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=4 style='color:var(--text-muted)'>пусто</td></tr>"}</tbody></table>
+  `;
+}
+async function adminCreateTgChat(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api("/admin/tg-chats", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  renderAdminTab();
+}
+async function adminDeleteTgChat(chatId) {
+  if (!confirm("Удалить чат " + chatId + "?")) return;
+  await api("/admin/tg-chats/" + encodeURIComponent(chatId), { method: "DELETE" });
+  renderAdminTab();
+}
+
+async function renderTgBindingsTab() {
+  const [list, users] = await Promise.all([api("/admin/tg-bindings"), api("/admin/users")]);
+  const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+  const rows = list.map((b) => {
+    const u = userMap[b.userId];
+    return `<tr>
+      <td>${u ? escapeHtml(u.email) + " <span style='color:var(--text-muted);font-size:11px'>(" + escapeHtml(u.name) + ")</span>" : "<i>удалён</i>"}</td>
+      <td><code>${escapeHtml(b.tgUserId)}</code></td>
+      <td>${b.tgUsername ? "@" + escapeHtml(b.tgUsername) : "—"}</td>
+      <td><button class="danger" onclick="adminDeleteTgBinding('${b.userId}')">удалить</button></td>
+    </tr>`;
+  }).join("");
+  const userOptions = users.map((u) => `<option value="${u.id}">${escapeHtml(u.email)}</option>`).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px">Привязка пользователя CRM к Telegram-аккаунту. Нужна и для исполнителей (task-бот ищет по @username), и для авторов (бот определяет, кто создал задачу). Telegram user_id и username сотрудник может узнать через @userinfobot.</p>
+    <form class="admin-form" onsubmit="adminCreateTgBinding(event)">
+      <select name="userId" required><option value="">— пользователь CRM —</option>${userOptions}</select>
+      <input name="tgUserId" placeholder="tg user_id (число)" required>
+      <input name="tgUsername" placeholder="@username (без @, опционально)">
+      <button type="submit">+ Привязать</button>
+    </form>
+    <table class="admin-table"><thead><tr><th>Пользователь CRM</th><th>tg user_id</th><th>@username</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=4 style='color:var(--text-muted)'>пусто</td></tr>"}</tbody></table>
+  `;
+}
+async function adminCreateTgBinding(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const data = Object.fromEntries(f);
+  if (!data.tgUsername) delete data.tgUsername;
+  await api("/admin/tg-bindings", { method: "POST", body: JSON.stringify(data) });
+  renderAdminTab();
+}
+async function adminDeleteTgBinding(userId) {
+  if (!confirm("Удалить привязку?")) return;
+  await api("/admin/tg-bindings/" + encodeURIComponent(userId), { method: "DELETE" });
+  renderAdminTab();
 }
 
 /* offline indicator */
