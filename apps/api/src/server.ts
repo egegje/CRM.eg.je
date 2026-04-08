@@ -49,6 +49,11 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
     prefix: "/",
     decorateReply: false,
   });
+  await app.register(fastifyStatic, {
+    root: "/opt/stroy.eg.je",
+    prefix: "/stroy/",
+    decorateReply: false,
+  });
 
   await app.register(authRoutes);
   await app.register(mailboxRoutes);
