@@ -1318,6 +1318,10 @@ async function openTaskForm(id) {
   document.getElementById("task-form-modal").classList.remove("hidden");
 }
 
+function closeModal(id) {
+  document.getElementById(id).classList.add("hidden");
+}
+
 async function saveTask(e) {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -1326,8 +1330,13 @@ async function saveTask(e) {
   const id = body.id;
   delete body.id;
   if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
-  if (id) await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify(body) });
-  else await api("/tasks", { method: "POST", body: JSON.stringify(body) });
+  try {
+    if (id) await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify(body) });
+    else await api("/tasks", { method: "POST", body: JSON.stringify(body) });
+  } catch (err) {
+    alert("Не удалось сохранить: " + err.message);
+    return;
+  }
   closeModal("task-form-modal");
   if (!document.getElementById("tasks-view").classList.contains("hidden")) loadTasks();
 }
