@@ -1638,13 +1638,34 @@ async function renderContactsTab() {
     <td><button class="danger" onclick="adminDeleteContact('${c.id}')">удалить</button></td>
   </tr>`).join("");
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
       <span style="color:var(--text-muted);font-size:12px">Топ-200 контактов по частоте использования</span>
-      <a href="/admin/contacts/export.csv" download class="link-btn" style="padding:6px 12px;background:var(--accent);color:white;border-radius:5px;text-decoration:none">⬇ Выгрузить всю книгу (CSV)</a>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button onclick="scanContactsHistory()" style="padding:6px 12px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🔄 Перебрать всю историю</button>
+        <a href="/admin/contacts/export.csv" download class="link-btn" style="padding:6px 12px;background:var(--accent);color:white;border-radius:5px;text-decoration:none">⬇ Выгрузить (CSV)</a>
+      </div>
     </div>
     <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Использований</th><th>Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   `;
 }
+async function scanContactsHistory() {
+  if (!confirm("Перебрать всю историю всех ящиков? Может занять несколько минут.")) return;
+  const btn = event.target;
+  const original = btn.textContent;
+  btn.textContent = "⏳ сканирую...";
+  btn.disabled = true;
+  try {
+    const r = await api("/admin/contacts/scan-history", { method: "POST" });
+    alert(`Готово. Обработано ${r.scanned} писем, ${r.contacts} уникальных контактов.`);
+    renderAdminTab();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  } finally {
+    btn.textContent = original;
+    btn.disabled = false;
+  }
+}
+
 async function adminDeleteContact(id) {
   if (!confirm("Удалить контакт?")) return;
   await api("/admin/contacts/" + id, { method: "DELETE" });

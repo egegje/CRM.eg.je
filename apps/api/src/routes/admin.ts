@@ -126,6 +126,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     });
   });
 
+  app.post("/admin/contacts/scan-history", { preHandler: requireRole("owner", "admin") }, async () => {
+    const { scanAllContacts } = await import("../services/contacts-scan.js");
+    return scanAllContacts();
+  });
+
   app.get("/admin/contacts/export.csv", { preHandler: requireRole("owner", "admin") }, async (_req, reply) => {
     const all = await prisma.contact.findMany({ orderBy: [{ useCount: "desc" }, { email: "asc" }] });
     const esc = (s: string) => `"${(s || "").replace(/"/g, '""')}"`;
