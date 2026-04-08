@@ -115,6 +115,7 @@ model Message {
   aiActions   String[]
   aiPriority  String?
   senderUserId String?
+  personaId   String?
   attachments Attachment[]
 
   @@index([mailboxId, folderId, receivedAt])
@@ -252,6 +253,13 @@ model TaskComment {
   text      String
   createdAt DateTime @default(now())
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+}
+
+model Persona {
+  id        String   @id @default(cuid())
+  name      String
+  signature String
+  createdAt DateTime @default(now())
 }
 
 model Company {

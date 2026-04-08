@@ -686,18 +686,16 @@ async function saveAsTemplate() {
 }
 
 async function loadSenderPersonas() {
-  const sel = document.getElementById("compose-sender");
+  const sel = document.getElementById("compose-persona");
   if (!sel) return;
   try {
-    const users = await api("/admin/users").catch(() => []);
-    const opts = ['<option value="">— моя подпись —</option>'];
-    for (const u of users) {
-      if (!u.signature) continue;
-      opts.push(`<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`);
+    const personas = await api("/personas").catch(() => []);
+    const opts = ['<option value="">— без визитки —</option>'];
+    for (const p of personas) {
+      opts.push(`<option value="${p.id}">${escapeHtml(p.name)}</option>`);
     }
     sel.innerHTML = opts.join("");
-    // Hide the row entirely if there are no personas with a signature.
-    sel.parentElement.style.display = opts.length > 1 ? "" : "none";
+    sel.parentElement.style.display = personas.length ? "" : "none";
   } catch {
     sel.parentElement.style.display = "none";
   }
@@ -719,7 +717,7 @@ function openCompose(defaults = {}) {
   const form = document.getElementById("compose-form");
   form.reset();
   if (defaults.mailboxId) form.mailboxId.value = defaults.mailboxId;
-  if (defaults.senderUserId) form.senderUserId.value = defaults.senderUserId;
+  if (defaults.personaId) form.personaId.value = defaults.personaId;
   if (defaults.to) form.to.value = defaults.to;
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
@@ -760,11 +758,11 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
         bodyText: f.get("bodyText") || "",
       }),
     });
-    const senderUserId = f.get("senderUserId");
-    if (senderUserId) {
+    const personaId = f.get("personaId");
+    if (personaId) {
       await api("/messages/" + draft.id, {
         method: "PATCH",
-        body: JSON.stringify({ senderUserId }),
+        body: JSON.stringify({ personaId }),
       });
     }
     // upload attachments with progress
@@ -1449,6 +1447,7 @@ async function renderAdminTab() {
     else if (adminTab === "tgchats") c.innerHTML = await renderTgChatsTab();
     else if (adminTab === "tgbindings") c.innerHTML = await renderTgBindingsTab();
     else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
+    else if (adminTab === "personas") c.innerHTML = await renderPersonasTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
   }
@@ -1882,6 +1881,49 @@ async function renderTaskSettingsTab() {
       <button type="submit" style="padding:10px 18px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;align-self:flex-start">Сохранить</button>
     </form>
   `;
+}
+
+async function renderPersonasTab() {
+  const list = await api("/personas");
+  const rows = list.map((p) => `<tr>
+    <td style="vertical-align:top;padding:8px"><b>${escapeHtml(p.name)}</b></td>
+    <td style="vertical-align:top;padding:8px;font-size:12px;white-space:pre-wrap;color:var(--text-muted);max-width:480px">${escapeHtml(p.signature)}</td>
+    <td style="vertical-align:top;padding:8px;white-space:nowrap">
+      <button onclick="editPersona('${p.id}')">✏️</button>
+      <button class="danger" onclick="deletePersona('${p.id}')">удалить</button>
+    </td>
+  </tr>`).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px">Сотрудники-визитки. Когда автор пишет письмо, в селекте «От имени сотрудника» он выбирает кого-то из этого списка — и в конце письма автоматом подставляется его подпись (вместо подписи ящика). Это не пользователь CRM с логином, а просто справочник «персоны для подписи».</p>
+    <form class="admin-form" onsubmit="adminCreatePersona(event)" style="display:flex;flex-direction:column;gap:8px;max-width:600px;margin-bottom:14px">
+      <input name="name" placeholder="Имя (как покажется в селекте, например «Ольга Иванова»)" required>
+      <textarea name="signature" rows="6" placeholder="Текст визитки (многострочный):&#10;С уважением,&#10;Ольга Иванова&#10;менеджер по аренде&#10;+7 (xxx) xxx-xx-xx&#10;olya@example.com" required style="font-family:inherit;padding:8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"></textarea>
+      <button type="submit" style="align-self:flex-start;padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Добавить сотрудника</button>
+    </form>
+    <table class="admin-table" style="width:100%"><thead><tr><th style="text-align:left;padding:8px">Имя</th><th style="text-align:left;padding:8px">Визитка</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=3 style='color:var(--text-muted);padding:14px'>пусто</td></tr>"}</tbody></table>
+  `;
+}
+async function adminCreatePersona(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  await api("/admin/personas", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  renderAdminTab();
+}
+async function editPersona(id) {
+  const list = await api("/personas");
+  const p = list.find((x) => x.id === id);
+  if (!p) return;
+  const name = prompt("Имя сотрудника:", p.name);
+  if (name === null) return;
+  const signature = prompt("Визитка (текст подписи):", p.signature);
+  if (signature === null) return;
+  await api("/admin/personas/" + id, { method: "PATCH", body: JSON.stringify({ name, signature }) });
+  renderAdminTab();
+}
+async function deletePersona(id) {
+  if (!confirm("Удалить сотрудника?")) return;
+  await api("/admin/personas/" + id, { method: "DELETE" });
+  renderAdminTab();
 }
 
 async function saveTaskSettings(e) {

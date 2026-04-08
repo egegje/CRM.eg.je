@@ -138,6 +138,25 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send("\uFEFF" + lines.join("\n"));
   });
 
+  // ---- personas (signature cards for compose «From person») ----
+  app.get("/personas", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
+    return prisma.persona.findMany({ orderBy: { name: "asc" } });
+  });
+  app.post("/admin/personas", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const body = z.object({ name: z.string().min(1), signature: z.string().min(1) }).parse(req.body);
+    return prisma.persona.create({ data: body });
+  });
+  app.patch("/admin/personas/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ name: z.string().optional(), signature: z.string().optional() }).parse(req.body);
+    return prisma.persona.update({ where: { id }, data: body });
+  });
+  app.delete("/admin/personas/:id", { preHandler: requireRole("owner", "admin") }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    await prisma.persona.delete({ where: { id } });
+    return reply.status(204).send();
+  });
+
   // ---- task settings (key/value) ----
   app.get("/admin/task-settings", { preHandler: requireRole("owner", "admin") }, async () => {
     const rows = await prisma.taskSetting.findMany();

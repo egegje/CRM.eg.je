@@ -192,6 +192,7 @@
       <button class="tab" data-tab="tgchats" onclick="switchTab('tgchats')">TG чаты</button>
       <button class="tab" data-tab="tgbindings" onclick="switchTab('tgbindings')">TG привязки</button>
       <button class="tab" data-tab="tasksettings" onclick="switchTab('tasksettings')">Задачи: настройки</button>
+      <button class="tab" data-tab="personas" onclick="switchTab('personas')">Сотрудники</button>
     </div>
     <div id="admin-content"></div>
   </div>
@@ -212,7 +213,7 @@
     </div>
     <form id="compose-form">
       <label>От: <select name="mailboxId" id="compose-mailbox"></select></label>
-      <label>От имени: <select name="senderUserId" id="compose-sender"><option value="">— моя подпись —</option></select></label>
+      <label>От имени сотрудника: <select name="personaId" id="compose-persona"><option value="">— без визитки —</option></select></label>
       <label>Кому: <input name="to" list="contacts-list" placeholder="to@example.com, ..." required /></label>
       <label>Копия: <input name="cc" list="contacts-list" placeholder="cc@example.com, ..." /></label>
       <datalist id="contacts-list"></datalist>

@@ -42,6 +42,7 @@ const Patch = z.object({
   isStarred: z.boolean().optional(),
   folderId: z.string().optional(),
   senderUserId: z.string().nullable().optional(),
+  personaId: z.string().nullable().optional(),
 });
 
 const SendBody = z.object({ sendAt: z.coerce.date().optional() });
@@ -160,6 +161,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     if (body.isRead !== undefined) data.isRead = body.isRead;
     if (body.isStarred !== undefined) data.isStarred = body.isStarred;
     if (body.senderUserId !== undefined) data.senderUserId = body.senderUserId;
+    if (body.personaId !== undefined) data.personaId = body.personaId;
     if (body.folderId) {
       const target = await prisma.folder.findUnique({ where: { id: body.folderId } });
       if (!target) throw new NotFound("folder not found");
@@ -355,15 +357,15 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       return { scheduled: true, id: sched.id };
     }
 
-    // Per-persona signature: if the draft has senderUserId set, use that
-    // user's signature; otherwise fall back to mailbox-level signature.
+    // Per-persona signature: if the draft has personaId set, use that
+    // persona's signature; otherwise fall back to mailbox-level signature.
     let signatureOverride: string | undefined;
-    if (m.senderUserId) {
-      const u = await prisma.user.findUnique({
-        where: { id: m.senderUserId },
+    if (m.personaId) {
+      const p = await prisma.persona.findUnique({
+        where: { id: m.personaId },
         select: { signature: true },
       });
-      signatureOverride = u?.signature ?? undefined;
+      signatureOverride = p?.signature ?? undefined;
     }
     const result = await sendMessage(
       { mailbox: m.mailbox, decrypt: (b) => decrypt(b, m.mailbox.email) },
