@@ -1035,15 +1035,13 @@ async function deleteAccount(id) {
 
 async function showTasksView(filter) {
   tasksFilter = filter || null;
+  tasksMode = "list";
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
-  // collapse the 5-col mail grid down to a sidebar + tasks layout so the
-  // tasks pane stretches to the full viewport instead of sitting in the
-  // narrow 4px resizer slot.
   document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
   const titles = {
     me: "Мои задачи",
@@ -1053,7 +1051,21 @@ async function showTasksView(filter) {
     done: "Выполненные",
   };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
-  setTasksMode(tasksMode);
+  await loadTasks();
+}
+
+async function showKanbanView() {
+  tasksFilter = null;
+  tasksMode = "kanban";
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("tasks-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  document.getElementById("tasks-view-title").textContent = "🗂 Канбан";
+  await loadTasks();
 }
 
 function exitTasksView() {
@@ -1071,18 +1083,8 @@ function exitTasksView() {
   }
 }
 
-let tasksMode = localStorage.getItem("tasks-mode") || "list";
+let tasksMode = "list";
 let _tags = [];
-
-function setTasksMode(mode) {
-  tasksMode = mode;
-  localStorage.setItem("tasks-mode", mode);
-  document.getElementById("tasks-mode-list").style.background = mode === "list" ? "var(--accent)" : "var(--bg-alt)";
-  document.getElementById("tasks-mode-list").style.color = mode === "list" ? "white" : "var(--text)";
-  document.getElementById("tasks-mode-kanban").style.background = mode === "kanban" ? "var(--accent)" : "var(--bg-alt)";
-  document.getElementById("tasks-mode-kanban").style.color = mode === "kanban" ? "white" : "var(--text)";
-  loadTasks();
-}
 
 async function loadTasks() {
   // Refresh tag dropdown lazily on first call

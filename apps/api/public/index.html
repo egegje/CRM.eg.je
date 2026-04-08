@@ -40,6 +40,10 @@
       <div class="folder-item" onclick="showTasksView('done')">✔️ Выполненные</div>
     </div>
     <div class="folder-group" style="margin-bottom:12px">
+      <div class="folder-title">🗂 Канбан</div>
+      <div class="folder-item" onclick="showKanbanView()">📋 Доска</div>
+    </div>
+    <div class="folder-group" style="margin-bottom:12px">
       <div class="folder-title">💰 Финансы</div>
       <div class="folder-item" onclick="showFinanceView()">🏦 Счета</div>
     </div>
@@ -96,11 +100,7 @@
   <section id="tasks-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
       <h2 id="tasks-view-title" style="margin:0">Задачи</h2>
-      <div style="display:flex;gap:6px;align-items:center">
-        <button onclick="setTasksMode('list')" id="tasks-mode-list" style="padding:6px 10px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">📋 Список</button>
-        <button onclick="setTasksMode('kanban')" id="tasks-mode-kanban" style="padding:6px 10px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🗂 Канбан</button>
-        <button class="primary" onclick="openTaskForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Задача</button>
-      </div>
+      <button class="primary" onclick="openTaskForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Задача</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
