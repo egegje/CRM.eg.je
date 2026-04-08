@@ -254,6 +254,31 @@ model TaskComment {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 }
 
+model Company {
+  id          String        @id @default(cuid())
+  name        String
+  inn         String?
+  sberCustId  String?
+  notes       String?
+  createdAt   DateTime      @default(now())
+  accounts    BankAccount[]
+}
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  bank          String
+  accountNumber String
+  currency      String   @default("RUB")
+  balance       Decimal  @default(0) @db.Decimal(18, 2)
+  notes         String?
+  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt     DateTime @default(now())
+
+  @@index([companyId])
+}
+
 model TaskAttachment {
   id          String   @id @default(cuid())
   taskId      String

@@ -890,10 +890,156 @@ let tasksFilter = null;
 let _projects = [];
 let _users = [];
 
+async function showFinanceView() {
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("finance-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  await loadFinance();
+}
+
+function exitFinanceView() {
+  const v = document.getElementById("finance-view");
+  if (v) v.classList.add("hidden");
+}
+
+async function loadFinance() {
+  const companies = await api("/companies");
+  const list = document.getElementById("finance-list");
+  const totals = document.getElementById("finance-totals");
+  if (!companies.length) {
+    list.innerHTML = '<div style="color:var(--text-muted);padding:30px;text-align:center">пока нет компаний — нажмите «+ Компания»</div>';
+    totals.innerHTML = "";
+    return;
+  }
+  // Aggregate by currency
+  const byCcy = {};
+  for (const c of companies) {
+    for (const a of c.accounts) {
+      byCcy[a.currency] = (byCcy[a.currency] || 0) + Number(a.balance);
+    }
+  }
+  totals.innerHTML = '<div style="font-size:12px;color:var(--text-muted);margin-bottom:6px">Итого по валютам:</div>' +
+    Object.entries(byCcy).map(([c, v]) => `<span style="display:inline-block;margin-right:18px;font-size:18px;font-weight:600">${fmtMoney(v)} <span style="font-size:12px;color:var(--text-muted)">${escapeHtml(c)}</span></span>`).join("");
+
+  list.innerHTML = companies.map((c) => {
+    const compTotals = {};
+    for (const a of c.accounts) compTotals[a.currency] = (compTotals[a.currency] || 0) + Number(a.balance);
+    const totalStr = Object.entries(compTotals).map(([cc, v]) => `${fmtMoney(v)} ${cc}`).join(" · ") || "—";
+    const accs = c.accounts.map((a) => `
+      <tr>
+        <td style="padding:6px 8px">${escapeHtml(a.bank)}</td>
+        <td style="padding:6px 8px;font-family:monospace;font-size:12px">${escapeHtml(a.accountNumber)}</td>
+        <td style="padding:6px 8px;text-align:right;font-weight:600">${fmtMoney(a.balance)} ${escapeHtml(a.currency)}</td>
+        <td style="padding:6px 8px;font-size:11px;color:var(--text-muted)">${new Date(a.updatedAt).toLocaleString("ru")}</td>
+        <td style="padding:6px 8px"><button onclick="editAccount('${a.id}','${c.id}')" style="font-size:11px">✏️</button> <button class="danger" onclick="deleteAccount('${a.id}')" style="font-size:11px">✕</button></td>
+      </tr>
+    `).join("");
+    return `
+      <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap">
+          <div>
+            <div style="font-weight:600;font-size:15px">${escapeHtml(c.name)}${c.inn ? ` <span style="font-size:11px;color:var(--text-muted)">ИНН ${escapeHtml(c.inn)}</span>` : ""}</div>
+            ${c.sberCustId ? `<div style="font-size:10px;color:var(--text-muted)">Сбер custId: ${escapeHtml(c.sberCustId)}</div>` : ""}
+          </div>
+          <div style="display:flex;gap:6px;align-items:center">
+            <span style="font-size:13px;color:var(--text-muted)">Σ ${totalStr}</span>
+            <button onclick="openAccountForm('${c.id}')" style="padding:6px 10px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;font-size:11px">+ Счёт</button>
+            <button onclick="editCompany('${c.id}')" style="font-size:11px">✏️</button>
+            <button class="danger" onclick="deleteCompany('${c.id}')" style="font-size:11px">✕</button>
+          </div>
+        </div>
+        ${c.accounts.length ? `<table style="width:100%;font-size:13px;border-collapse:collapse">
+          <thead style="font-size:11px;color:var(--text-muted);text-align:left">
+            <tr><th style="padding:4px 8px">Банк</th><th style="padding:4px 8px">Счёт</th><th style="padding:4px 8px;text-align:right">Остаток</th><th style="padding:4px 8px">Обновлено</th><th></th></tr>
+          </thead>
+          <tbody>${accs}</tbody>
+        </table>` : `<div style="font-size:12px;color:var(--text-muted);padding:8px">нет счетов</div>`}
+      </div>
+    `;
+  }).join("");
+}
+
+function fmtMoney(v) {
+  const n = Number(v);
+  return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function openCompanyForm() {
+  const name = prompt("Название компании:");
+  if (!name) return;
+  const inn = prompt("ИНН (опционально):") || undefined;
+  const sberCustId = prompt("Sber custId (опционально):") || undefined;
+  await api("/companies", { method: "POST", body: JSON.stringify({ name, inn, sberCustId }) });
+  loadFinance();
+}
+
+async function editCompany(id) {
+  const c = (await api("/companies")).find((x) => x.id === id);
+  if (!c) return;
+  const name = prompt("Название:", c.name);
+  if (name === null) return;
+  const inn = prompt("ИНН:", c.inn || "");
+  const sberCustId = prompt("Sber custId:", c.sberCustId || "");
+  await api("/companies/" + id, {
+    method: "PATCH",
+    body: JSON.stringify({ name, inn: inn || null, sberCustId: sberCustId || null }),
+  });
+  loadFinance();
+}
+
+async function deleteCompany(id) {
+  if (!confirm("Удалить компанию и все её счета?")) return;
+  await api("/companies/" + id, { method: "DELETE" });
+  loadFinance();
+}
+
+async function openAccountForm(companyId) {
+  const bank = prompt("Банк (например «Сбер»):");
+  if (!bank) return;
+  const accountNumber = prompt("Номер счёта:");
+  if (!accountNumber) return;
+  const currency = prompt("Валюта:", "RUB") || "RUB";
+  const balance = parseFloat(prompt("Остаток:", "0") || "0");
+  await api("/bank-accounts", {
+    method: "POST",
+    body: JSON.stringify({ companyId, bank, accountNumber, currency, balance }),
+  });
+  loadFinance();
+}
+
+async function editAccount(id) {
+  const companies = await api("/companies");
+  const acc = companies.flatMap((c) => c.accounts).find((a) => a.id === id);
+  if (!acc) return;
+  const bank = prompt("Банк:", acc.bank);
+  if (bank === null) return;
+  const accountNumber = prompt("Счёт:", acc.accountNumber);
+  if (accountNumber === null) return;
+  const currency = prompt("Валюта:", acc.currency);
+  if (currency === null) return;
+  const balance = parseFloat(prompt("Остаток:", String(acc.balance)) || "0");
+  await api("/bank-accounts/" + id, {
+    method: "PATCH",
+    body: JSON.stringify({ bank, accountNumber, currency, balance }),
+  });
+  loadFinance();
+}
+
+async function deleteAccount(id) {
+  if (!confirm("Удалить счёт?")) return;
+  await api("/bank-accounts/" + id, { method: "DELETE" });
+  loadFinance();
+}
+
 async function showTasksView(filter) {
   tasksFilter = filter || null;
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -908,6 +1054,7 @@ async function showTasksView(filter) {
 
 function exitTasksView() {
   document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
   document.querySelector(".preview-pane").classList.remove("hidden");
   document.getElementById("resizer-1").style.display = "";

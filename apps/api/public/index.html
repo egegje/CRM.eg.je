@@ -37,6 +37,10 @@
       <div class="folder-item" onclick="showTasksView('me')">📌 Мои</div>
       <div class="folder-item" onclick="showTasksView('overdue')">⏰ Просроченные</div>
     </div>
+    <div class="folder-group" style="margin-bottom:12px">
+      <div class="folder-title">💰 Финансы</div>
+      <div class="folder-item" onclick="showFinanceView()">🏦 Счета</div>
+    </div>
     <div class="folders">
       <div class="folder-group">
         <div class="folder-title">Ящики</div>
@@ -77,6 +81,15 @@
   </main>
 
   <div class="resizer" id="resizer-2"></div>
+
+  <section id="finance-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <h2 style="margin:0">💰 Остатки на счетах</h2>
+      <button onclick="openCompanyForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Компания</button>
+    </div>
+    <div id="finance-totals" style="margin-bottom:14px;padding:12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px"></div>
+    <div id="finance-list"></div>
+  </section>
 
   <section id="tasks-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
