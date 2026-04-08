@@ -1894,11 +1894,17 @@ async function renderPersonasTab() {
     </td>
   </tr>`).join("");
   return `
-    <p style="color:var(--text-muted);font-size:12px">Сотрудники-визитки. Когда автор пишет письмо, в селекте «От имени сотрудника» он выбирает кого-то из этого списка — и в конце письма автоматом подставляется его подпись (вместо подписи ящика). Это не пользователь CRM с логином, а просто справочник «персоны для подписи».</p>
-    <form class="admin-form" onsubmit="adminCreatePersona(event)" style="display:flex;flex-direction:column;gap:8px;max-width:600px;margin-bottom:14px">
-      <input name="name" placeholder="Имя (как покажется в селекте, например «Ольга Иванова»)" required>
-      <textarea name="signature" rows="6" placeholder="Текст визитки (многострочный):&#10;С уважением,&#10;Ольга Иванова&#10;менеджер по аренде&#10;+7 (xxx) xxx-xx-xx&#10;olya@example.com" required style="font-family:inherit;padding:8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"></textarea>
-      <button type="submit" style="align-self:flex-start;padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Добавить сотрудника</button>
+    <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px">Сотрудники-визитки. Когда автор пишет письмо, в селекте «От имени сотрудника» он выбирает кого-то из этого списка — и в конце письма автоматом подставляется его подпись (вместо подписи ящика). Это не пользователь CRM с логином, а просто справочник «персоны для подписи».</p>
+    <form onsubmit="adminCreatePersona(event)" style="display:block;margin-bottom:18px">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="font-size:11px;color:var(--text-muted)">Имя сотрудника
+          <input name="name" placeholder="например «Ольга Иванова»" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-size:14px;box-sizing:border-box">
+        </label>
+        <label style="font-size:11px;color:var(--text-muted)">Текст визитки (многострочный)
+          <textarea name="signature" rows="6" placeholder="С уважением,&#10;Ольга Иванова&#10;менеджер по аренде&#10;+7 (xxx) xxx-xx-xx&#10;olya@example.com" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical"></textarea>
+        </label>
+        <button type="submit" style="align-self:flex-start;padding:9px 18px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;font-weight:600">+ Добавить сотрудника</button>
+      </div>
     </form>
     <table class="admin-table" style="width:100%"><thead><tr><th style="text-align:left;padding:8px">Имя</th><th style="text-align:left;padding:8px">Визитка</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=3 style='color:var(--text-muted);padding:14px'>пусто</td></tr>"}</tbody></table>
   `;
