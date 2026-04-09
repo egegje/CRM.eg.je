@@ -2,45 +2,169 @@ import SwiftUI
 
 struct MailListView: View {
     @State private var messages: [MailMessage] = []
+    @State private var mailboxes: [Mailbox] = []
     @State private var isLoading = false
-    @State private var selectedMessage: MailMessage?
     @State private var searchText = ""
+    @State private var selectedMailbox = ""
+    @State private var selectedFolder = "inbox" // inbox, sent, drafts, trash, starred
+    @State private var showCompose = false
+    @State private var replyMessage: MailMessage?
+
+    private let folders = [
+        ("inbox", "Входящие", "tray.fill"),
+        ("sent", "Отправленные", "paperplane.fill"),
+        ("drafts", "Черновики", "doc.text"),
+        ("starred", "Важные", "star.fill"),
+        ("trash", "Корзина", "trash"),
+    ]
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(messages) { msg in
-                    NavigationLink(value: msg) {
-                        MailRow(message: msg)
+            VStack(spacing: 0) {
+                // Folder tabs
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 4) {
+                        ForEach(folders, id: \.0) { f in
+                            Button {
+                                selectedFolder = f.0
+                                Task { await loadMessages() }
+                            } label: {
+                                Label(f.1, systemImage: f.2)
+                                    .font(.caption)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(selectedFolder == f.0 ? Color.accentColor : Color(.tertiarySystemBackground))
+                                    .foregroundStyle(selectedFolder == f.0 ? .white : .primary)
+                                    .cornerRadius(16)
+                            }
+                        }
+                    }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                }
+                .background(Color(.secondarySystemBackground))
+
+                List {
+                    ForEach(messages) { msg in
+                        NavigationLink(value: msg) {
+                            MailRow(message: msg)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task { await deleteMessage(msg.id) }
+                            } label: { Label("Удалить", systemImage: "trash") }
+                        }
+                        .swipeActions(edge: .leading) {
+                            Button {
+                                Task { await toggleStar(msg) }
+                            } label: {
+                                Label(msg.isStarred ? "Снять" : "Важное", systemImage: msg.isStarred ? "star.slash" : "star.fill")
+                            }
+                            .tint(.yellow)
+                            Button {
+                                Task { await toggleRead(msg) }
+                            } label: {
+                                Label(msg.isRead ? "Непрочитано" : "Прочитано", systemImage: msg.isRead ? "envelope.badge" : "envelope.open")
+                            }
+                            .tint(.blue)
+                        }
+                    }
+                    if messages.isEmpty && !isLoading {
+                        ContentUnavailableView(
+                            "Нет писем",
+                            systemImage: "envelope",
+                            description: Text("Потяните вниз чтобы обновить")
+                        )
+                        .listRowBackground(Color.clear)
                     }
                 }
-                if messages.isEmpty && !isLoading {
-                    ContentUnavailableView(
-                        "Нет писем",
-                        systemImage: "envelope",
-                        description: Text("Потяните вниз чтобы обновить")
-                    )
-                    .listRowBackground(Color.clear)
+                .overlay {
+                    if isLoading && messages.isEmpty { ProgressView() }
                 }
-            }
-            .overlay {
-                if isLoading && messages.isEmpty { ProgressView() }
             }
             .refreshable { await loadMessages() }
             .searchable(text: $searchText, prompt: "Поиск...")
             .onSubmit(of: .search) { Task { await loadMessages() } }
-            .navigationDestination(for: MailMessage.self) { MailDetailView(message: $0) }
+            .navigationDestination(for: MailMessage.self) { msg in
+                MailDetailView(message: msg, onReply: { replyMessage = msg })
+            }
             .navigationTitle("Почта")
-            .task { await loadMessages() }
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    if mailboxes.count > 1 {
+                        Menu {
+                            Button("Все ящики") {
+                                selectedMailbox = ""
+                                Task { await loadMessages() }
+                            }
+                            ForEach(mailboxes) { mb in
+                                Button(mb.displayName) {
+                                    selectedMailbox = mb.id
+                                    Task { await loadMessages() }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "tray.2")
+                        }
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showCompose = true } label: {
+                        Image(systemName: "square.and.pencil")
+                    }
+                }
+            }
+            .sheet(isPresented: $showCompose) {
+                ComposeView()
+                    .onDisappear { Task { await loadMessages() } }
+            }
+            .sheet(item: $replyMessage) { msg in
+                ComposeView(replyTo: msg)
+                    .onDisappear { Task { await loadMessages() } }
+            }
+            .task {
+                mailboxes = (try? await APIClient.shared.request("GET", "/mailboxes", as: [Mailbox].self)) ?? []
+                await loadMessages()
+            }
         }
     }
 
     private func loadMessages() async {
         isLoading = true
         defer { isLoading = false }
-        var path = "/messages?limit=50"
-        if !searchText.isEmpty { path += "&q=\(searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")" }
-        messages = (try? await APIClient.shared.request("GET", path, as: [MailMessage].self)) ?? []
+        var params: [String] = ["limit=50"]
+        if !searchText.isEmpty { params.append("q=\(searchText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") }
+        if !selectedMailbox.isEmpty { params.append("mailboxId=\(selectedMailbox)") }
+
+        switch selectedFolder {
+        case "sent": params.append("folderId=__sent")
+        case "drafts": params.append("folderId=__drafts")
+        case "trash": params.append("trash=true")
+        case "starred": params.append("folderId=__starred")
+        default: break
+        }
+
+        let path = "/messages?\(params.joined(separator: "&"))"
+        var list = (try? await APIClient.shared.request("GET", path, as: [MailMessage].self)) ?? []
+        if selectedFolder == "starred" { list = list.filter { $0.isStarred } }
+        messages = list
+    }
+
+    private func deleteMessage(_ id: String) async {
+        _ = try? await APIClient.shared.requestVoid("DELETE", "/messages/\(id)")
+        messages.removeAll { $0.id == id }
+    }
+
+    private func toggleStar(_ msg: MailMessage) async {
+        _ = try? await APIClient.shared.request("PATCH", "/messages/\(msg.id)",
+            body: ["isStarred": !msg.isStarred] as [String: Bool], as: MailMessage.self)
+        await loadMessages()
+    }
+
+    private func toggleRead(_ msg: MailMessage) async {
+        _ = try? await APIClient.shared.request("PATCH", "/messages/\(msg.id)",
+            body: ["isRead": !msg.isRead] as [String: Bool], as: MailMessage.self)
+        await loadMessages()
     }
 }
 
@@ -95,6 +219,7 @@ struct MailRow: View {
 
 struct MailDetailView: View {
     let message: MailMessage
+    var onReply: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -112,6 +237,10 @@ struct MailDetailView: View {
                 }
                 if !message.toAddrs.isEmpty {
                     Text("Кому: \(message.toAddrs.joined(separator: ", "))")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if !message.ccAddrs.isEmpty {
+                    Text("Копия: \(message.ccAddrs.joined(separator: ", "))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Divider()
@@ -133,6 +262,17 @@ struct MailDetailView: View {
         }
         .navigationTitle("Письмо")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                HStack(spacing: 12) {
+                    if let onReply {
+                        Button { onReply() } label: {
+                            Image(systemName: "arrowshape.turn.up.left.fill")
+                        }
+                    }
+                }
+            }
+        }
         .task { await markRead() }
     }
 
