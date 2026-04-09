@@ -22,10 +22,10 @@ struct MainTabs: View {
             TaskListView()
                 .tabItem { Label("Задачи", systemImage: "checkmark.circle") }
 
-            ComingSoonView(title: "Почта")
+            MailListView()
                 .tabItem { Label("Почта", systemImage: "envelope") }
 
-            ComingSoonView(title: "Финансы")
+            FinanceView()
                 .tabItem { Label("Финансы", systemImage: "rublesign.circle") }
 
             MoreView()
