@@ -11,11 +11,11 @@ struct MailListView: View {
     @State private var replyMessage: MailMessage?
 
     private let folders = [
-        ("inbox", "Входящие", "tray.fill"),
-        ("sent", "Отправленные", "paperplane.fill"),
-        ("drafts", "Черновики", "doc.text"),
-        ("starred", "Важные", "star.fill"),
-        ("trash", "Корзина", "trash"),
+        ("inbox", "Вход", "tray.fill"),
+        ("sent", "Отпр", "paperplane.fill"),
+        ("drafts", "Черн", "doc.text"),
+        ("starred", "⭐", "star.fill"),
+        ("trash", "🗑", "trash"),
     ]
 
     var body: some View {
@@ -302,24 +302,58 @@ struct MailDetailView: View {
             }
             .padding()
         }
-        .navigationTitle("Письмо")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    if let onReply {
-                        Button { onReply() } label: {
-                            Label("Ответить", systemImage: "arrowshape.turn.up.left")
+        .safeAreaInset(edge: .bottom) {
+            // Gmail-style action bar at bottom
+            HStack(spacing: 0) {
+                if let onReply {
+                    Button { onReply() } label: {
+                        VStack(spacing: 2) {
+                            Image(systemName: "arrowshape.turn.up.left.fill")
+                            Text("Ответить").font(.caption2)
                         }
+                        .frame(maxWidth: .infinity)
                     }
-                    ShareLink(item: "От: \(msg.fromAddr)\nТема: \(msg.subject)\n\n\(msg.bodyText ?? "")") {
-                        Label("Поделиться", systemImage: "square.and.arrow.up")
+                }
+                ShareLink(item: "От: \(msg.fromAddr)\nТема: \(msg.subject)\n\n\(msg.bodyText ?? "")") {
+                    VStack(spacing: 2) {
+                        Image(systemName: "arrowshape.turn.up.right.fill")
+                        Text("Переслать").font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                Button {
+                    Task {
+                        _ = try? await APIClient.shared.requestVoid("DELETE", "/messages/\(msg.id)")
                     }
                 } label: {
-                    Image(systemName: "ellipsis.circle")
+                    VStack(spacing: 2) {
+                        Image(systemName: "trash.fill")
+                        Text("Удалить").font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                Menu {
+                    Button { Task {
+                        _ = try? await APIClient.shared.request("PATCH", "/messages/\(msg.id)", body: ["isStarred": !msg.isStarred] as [String: Bool], as: MailMessage.self)
+                    } } label: { Label(msg.isStarred ? "Снять звезду" : "Важное", systemImage: "star") }
+                    Button { Task {
+                        _ = try? await APIClient.shared.request("PATCH", "/messages/\(msg.id)", body: ["isRead": false] as [String: Bool], as: MailMessage.self)
+                    } } label: { Label("Непрочитанное", systemImage: "envelope.badge") }
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: "ellipsis")
+                        Text("Ещё").font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity)
                 }
             }
+            .font(.system(size: 16))
+            .foregroundStyle(.secondary)
+            .padding(.vertical, 10)
+            .background(.ultraThinMaterial)
         }
+        .navigationTitle("Письмо")
+        .navigationBarTitleDisplayMode(.inline)
         .task { await loadFull() }
     }
 
