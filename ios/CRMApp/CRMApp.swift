@@ -28,6 +28,12 @@ struct CRMApp: App {
     }
 
     private func authenticate() {
+        // Skip Face ID if user never logged in (no saved credentials)
+        let hasSavedCreds = UserDefaults.standard.string(forKey: "saved_email") != nil
+        guard hasSavedCreds else {
+            unlocked = true
+            return
+        }
         let ctx = LAContext()
         var err: NSError?
         guard ctx.canEvaluatePolicy(.deviceOwnerAuthentication, error: &err) else {
