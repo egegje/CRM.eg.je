@@ -31,7 +31,7 @@
     <div class="ib-item" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
     <div class="ib-item" id="ib-team" style="display:none" data-section="team" onclick="switchSection('team')" title="Команда">👥</div>
     <div style="flex:1"></div>
-    <div class="ib-item" data-section="admin" onclick="openAdmin()" title="Админка">⚙</div>
+    <div class="ib-item" id="ib-admin" style="display:none" data-section="admin" onclick="switchSection('admin')" title="Админка">⚙</div>
   </nav>
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar">
@@ -80,6 +80,23 @@
   </main>
 
   <div class="resizer" id="resizer-2"></div>
+
+  <section id="admin-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
+    <h2 style="margin:0 0 14px">⚙ Админка</h2>
+    <div class="admin-tabs" id="admin-view-tabs">
+      <button class="tab active" data-tab="users" onclick="switchTab('users')">Пользователи</button>
+      <button class="tab" data-tab="mailboxes" onclick="switchTab('mailboxes')">Ящики</button>
+      <button class="tab" data-tab="rules" onclick="switchTab('rules')">Правила</button>
+      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Контакты</button>
+      <button class="tab" data-tab="audit" onclick="switchTab('audit')">Журнал</button>
+      <button class="tab" data-tab="analytics" onclick="switchTab('analytics')">Аналитика</button>
+      <button class="tab" data-tab="tgchats" onclick="switchTab('tgchats')">TG чаты</button>
+      <button class="tab" data-tab="tgbindings" onclick="switchTab('tgbindings')">TG привязки</button>
+      <button class="tab" data-tab="tasksettings" onclick="switchTab('tasksettings')">Задачи: настройки</button>
+      <button class="tab" data-tab="personas" onclick="switchTab('personas')">Сотрудники</button>
+    </div>
+    <div id="admin-view-content" style="padding:16px 0"></div>
+  </section>
 
   <section id="team-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">

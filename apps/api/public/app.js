@@ -132,6 +132,8 @@ async function bootApp() {
     document.getElementById("admin-btn").classList.remove("hidden");
     const ibTeam = document.getElementById("ib-team");
     if (ibTeam) ibTeam.style.display = "";
+    const ibAdmin = document.getElementById("ib-admin");
+    if (ibAdmin) ibAdmin.style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();
@@ -906,7 +908,24 @@ function switchSection(section) {
     showFinanceView();
   } else if (section === "team") {
     showTeamView();
+  } else if (section === "admin") {
+    showAdminView();
   }
+}
+
+async function showAdminView() {
+  document.querySelector(".sidebar").classList.add("hidden");
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("admin-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  renderAdminTab();
 }
 
 async function showFinanceView() {
@@ -1233,6 +1252,7 @@ async function showTasksView(filter) {
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -1255,6 +1275,7 @@ async function showTeamView() {
   document.getElementById("tasks-view").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("team-view").classList.remove("hidden");
@@ -1308,6 +1329,7 @@ async function showKanbanView() {
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -1320,6 +1342,8 @@ function exitTasksView() {
   document.getElementById("tasks-view").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
   document.querySelector(".sidebar").classList.remove("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
   document.querySelector(".preview-pane").classList.remove("hidden");
@@ -1796,11 +1820,10 @@ function addSwipe(el, m) {
 /* admin */
 let adminTab = "users";
 function openAdmin() {
-  document.getElementById("admin-modal").classList.remove("hidden");
-  switchTab("users");
+  switchSection("admin");
 }
 function closeAdmin() {
-  document.getElementById("admin-modal").classList.add("hidden");
+  switchSection("mail");
 }
 function switchTab(tab) {
   adminTab = tab;
@@ -1811,7 +1834,7 @@ function switchTab(tab) {
 }
 
 async function renderAdminTab() {
-  const c = document.getElementById("admin-content");
+  const c = document.getElementById("admin-view-content") || document.getElementById("admin-content");
   c.innerHTML = "<div style='color:var(--text-muted)'>загрузка...</div>";
   try {
     if (adminTab === "users") c.innerHTML = await renderUsersTab();
