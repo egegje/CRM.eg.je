@@ -900,12 +900,96 @@ async function showFinanceView() {
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("finance-view").classList.remove("hidden");
   document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  await checkSberStatus();
   await loadFinance();
 }
 
 function exitFinanceView() {
   const v = document.getElementById("finance-view");
   if (v) v.classList.add("hidden");
+}
+
+async function checkSberStatus() {
+  try {
+    const s = await api("/api/sber/status");
+    const connectBtn = document.getElementById("sber-connect-btn");
+    const loadBtn = document.getElementById("sber-load-btn");
+    const statusEl = document.getElementById("sber-status");
+    if (!s.connected) {
+      connectBtn.style.display = "";
+      loadBtn.style.display = "none";
+      statusEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px">🏦 Сбер не подключён. Нажмите «Подключить Сбер» → авторизуйтесь в СберБизнес.</span>';
+    } else if (s.expired && !s.hasRefresh) {
+      connectBtn.style.display = "";
+      loadBtn.style.display = "none";
+      statusEl.innerHTML = '<span style="color:var(--danger);font-size:12px">🔴 Токен Сбера истёк. Переавторизуйтесь.</span>';
+    } else {
+      connectBtn.style.display = "none";
+      loadBtn.style.display = "";
+      statusEl.innerHTML = `<span style="color:#21a038;font-size:12px">🟢 Сбер подключён (токен до ${new Date(s.expiresAt).toLocaleString("ru")})</span>`;
+    }
+  } catch {
+    document.getElementById("sber-connect-btn").style.display = "none";
+    document.getElementById("sber-load-btn").style.display = "none";
+  }
+}
+
+function connectSber() {
+  window.location.href = "/api/sber/connect";
+}
+
+async function loadSberData() {
+  const el = document.getElementById("sber-data");
+  el.innerHTML = '<div style="color:var(--text-muted)">⏳ загружаю данные из Сбера...</div>';
+  try {
+    const info = await api("/api/sber/accounts");
+    const today = new Date().toISOString().slice(0, 10);
+    let html = `<div style="font-weight:600;margin-bottom:8px">${escapeHtml(info.shortName || info.fullName)} · ИНН ${escapeHtml(info.inn || "—")}</div>`;
+    for (const acc of (info.accounts || [])) {
+      if (acc.state !== "OPEN") continue;
+      let summary = null;
+      let transactions = [];
+      try {
+        summary = await api(`/api/sber/statement/summary?accountNumber=${acc.number}&statementDate=${today}`);
+      } catch {}
+      try {
+        const txResp = await api(`/api/sber/statement/transactions?accountNumber=${acc.number}&statementDate=${today}`);
+        transactions = txResp.transactions || [];
+      } catch {}
+      const bal = summary ? fmtMoney(summary.closingBalance) : "—";
+      html += `
+        <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div>
+              <span style="font-family:monospace;font-size:13px">${escapeHtml(acc.number)}</span>
+              <span style="color:var(--text-muted);font-size:11px;margin-left:8px">БИК ${escapeHtml(acc.bic)}</span>
+            </div>
+            <div style="font-size:18px;font-weight:700">${bal} ₽</div>
+          </div>
+          ${summary ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
+            Входящий: ${fmtMoney(summary.openingBalance)} · Дебет: ${fmtMoney(summary.debitTurnover)} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(summary.creditTurnover)} (${summary.creditTransactionsNumber})
+          </div>` : ""}
+          ${transactions.length ? `
+            <table style="width:100%;font-size:12px;border-collapse:collapse">
+              <thead style="color:var(--text-muted)"><tr><th style="text-align:left;padding:4px">Дата</th><th style="text-align:left;padding:4px">Контрагент</th><th style="text-align:left;padding:4px">Назначение</th><th style="text-align:right;padding:4px">Сумма</th></tr></thead>
+              <tbody>${transactions.slice(0, 50).map((t) => {
+                const isDebit = (t.direction || "").toUpperCase() === "DEBIT";
+                return `<tr>
+                  <td style="padding:4px;white-space:nowrap">${(t.date || "").slice(0, 10)}</td>
+                  <td style="padding:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.counterpartyName || "—")}</td>
+                  <td style="padding:4px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)">${escapeHtml((t.purpose || "").slice(0, 100))}</td>
+                  <td style="padding:4px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(Math.abs(t.amount))}</td>
+                </tr>`;
+              }).join("")}</tbody>
+            </table>
+          ` : "<div style='font-size:12px;color:var(--text-muted)'>нет транзакций за сегодня</div>"}
+        </div>
+      `;
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--danger)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
 }
 
 async function loadFinance() {

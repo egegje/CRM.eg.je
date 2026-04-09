@@ -262,6 +262,15 @@ model Persona {
   createdAt DateTime @default(now())
 }
 
+model SberToken {
+  id           String   @id @default("singleton")
+  accessToken  String
+  refreshToken String?
+  expiresAt    DateTime
+  scope        String?
+  updatedAt    DateTime @default(now()) @updatedAt
+}
+
 model Company {
   id          String        @id @default(cuid())
   name        String

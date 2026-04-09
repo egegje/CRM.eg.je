@@ -13,6 +13,9 @@ const Schema = z.object({
   TELEGRAM_BOT_TOKEN: z.string().optional(),
   TELEGRAM_CHAT_ID: z.string().optional(),
   TASK_BOT_TOKEN: z.string().optional(),
+  SBER_CLIENT_ID: z.string().optional(),
+  SBER_CLIENT_SECRET: z.string().optional(),
+  SBER_REDIRECT_URI: z.string().optional(),
 });
 
 export type Config = {
@@ -28,6 +31,9 @@ export type Config = {
   telegramBotToken?: string;
   telegramChatId?: string;
   taskBotToken?: string;
+  sberClientId?: string;
+  sberClientSecret?: string;
+  sberRedirectUri?: string;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -49,5 +55,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     telegramBotToken: p.TELEGRAM_BOT_TOKEN,
     telegramChatId: p.TELEGRAM_CHAT_ID,
     taskBotToken: p.TASK_BOT_TOKEN,
+    sberClientId: p.SBER_CLIENT_ID,
+    sberClientSecret: p.SBER_CLIENT_SECRET,
+    sberRedirectUri: p.SBER_REDIRECT_URI,
   };
 }
