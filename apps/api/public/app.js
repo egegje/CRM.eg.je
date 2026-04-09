@@ -2201,6 +2201,23 @@ async function renderTaskSettingsTab() {
     <form class="admin-form" style="display:flex;flex-direction:column;gap:14px;max-width:600px" onsubmit="saveTaskSettings(event)">
 
       <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
+        <legend>🏦 ВТБ Host-to-Host</legend>
+        <label style="display:block;margin-bottom:6px">
+          CustID:
+          <input name="vtb_cust_id" value="${escapeHtml(s.vtb_cust_id || "")}" placeholder="662875628" style="width:200px;margin-left:8px">
+        </label>
+        <label style="display:block;margin-bottom:6px">
+          Логин ВТБ Бизнес:
+          <input name="vtb_login" value="${escapeHtml(s.vtb_login || "")}" placeholder="логин" style="width:200px;margin-left:8px">
+        </label>
+        <label style="display:block;margin-bottom:6px">
+          Пароль ВТБ Бизнес:
+          <input name="vtb_password" type="password" value="${escapeHtml(s.vtb_password || "")}" placeholder="пароль" style="width:200px;margin-left:8px">
+        </label>
+        <p style="font-size:11px;color:var(--text-muted);margin:0">Логин и пароль от ВТБ Бизнес Онлайн для ИП Семенов. Используются сервером для H2H авторизации вместе с сертификатом КЭП.</p>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
         <legend>🏷 Метки задач</legend>
         <label style="display:block;margin-bottom:6px">
           Список меток (через запятую):
@@ -2316,6 +2333,9 @@ async function saveTaskSettings(e) {
   e.preventDefault();
   const f = new FormData(e.target);
   const payload = {
+    vtb_cust_id: String(f.get("vtb_cust_id") || ""),
+    vtb_login: String(f.get("vtb_login") || ""),
+    vtb_password: String(f.get("vtb_password") || ""),
     task_labels: String(f.get("task_labels") || ""),
     digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
     ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
