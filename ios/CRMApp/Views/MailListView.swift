@@ -200,10 +200,17 @@ struct MailRow: View {
                         .lineLimit(2)
                 }
             }
-            if message.isStarred {
-                Image(systemName: "star.fill")
-                    .foregroundStyle(.yellow)
-                    .font(.caption)
+            VStack(spacing: 4) {
+                if message.isStarred {
+                    Image(systemName: "star.fill")
+                        .foregroundStyle(.yellow)
+                        .font(.caption)
+                }
+                if (message._count?.attachments ?? 0) > 0 {
+                    Image(systemName: "paperclip")
+                        .foregroundStyle(.secondary)
+                        .font(.caption2)
+                }
             }
         }
         .padding(.vertical, 2)

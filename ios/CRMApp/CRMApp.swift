@@ -12,7 +12,13 @@ struct CRMApp: App {
                 if unlocked {
                     RootView()
                         .environmentObject(auth)
-                        .task { await auth.checkSession() }
+                        .task {
+                            await auth.checkSession()
+                            // If no session, try auto-login with saved creds
+                            if auth.user == nil {
+                                _ = await auth.autoLogin()
+                            }
+                        }
                 } else {
                     LockScreen(onUnlock: { unlocked = true })
                 }

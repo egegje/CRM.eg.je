@@ -33,6 +33,11 @@ final class TasksStore: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
+        // Show cached data immediately
+        let cacheKey = "tasks-\(filter.rawValue)-\(currentUserId ?? "nil")"
+        if tasks.isEmpty, let cached = CacheService.shared.load(for: cacheKey, as: [CRMTask].self) {
+            tasks = cached
+        }
         var params: [String: String] = ["limit": "500"]
         switch filter {
         case .mine:
@@ -59,9 +64,10 @@ final class TasksStore: ObservableObject {
                 list = list.filter { ($0.dueDate ?? .distantFuture) < now && $0.status != "done" }
             }
             tasks = list
+            CacheService.shared.save(list, for: cacheKey)
         } catch {
             errorMessage = (error as? APIError)?.errorDescription ?? error.localizedDescription
-            tasks = []
+            if tasks.isEmpty { tasks = [] }
         }
     }
 

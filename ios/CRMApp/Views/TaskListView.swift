@@ -151,6 +151,7 @@ struct TaskRow: View {
                     .strikethrough(task.status == "done")
                     .foregroundStyle(task.status == "done" ? .secondary : .primary)
                 HStack(spacing: 6) {
+                    statusBadge
                     if let p = task.project?.name {
                         Label(p, systemImage: "folder").labelStyle(.titleAndIcon)
                     }
@@ -158,6 +159,15 @@ struct TaskRow: View {
                         Label(d.formatted(date: .abbreviated, time: .omitted),
                               systemImage: overdue ? "clock.badge.exclamationmark" : "calendar")
                             .foregroundStyle(overdue ? .red : .secondary)
+                    }
+                    if let cat = task.category, !cat.isEmpty {
+                        Text(cat)
+                            .font(.system(size: 9))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(.accentColor)
+                            .cornerRadius(4)
                     }
                 }
                 .font(.caption)
@@ -172,7 +182,30 @@ struct TaskRow: View {
         switch task.priority {
         case "urgent": Image(systemName: "flame.fill").foregroundStyle(.red)
         case "high": Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        default: Image(systemName: "circle").foregroundStyle(.secondary)
+        case "low": Image(systemName: "arrow.down.circle").foregroundStyle(.secondary)
+        default: Image(systemName: "circle").foregroundStyle(.tertiary)
+        }
+    }
+
+    private var statusBadge: some View {
+        let (text, color): (String, Color) = {
+            switch task.status {
+            case "in_progress": return ("в работе", .orange)
+            case "done": return ("готово", .green)
+            case "cancelled": return ("отменена", .gray)
+            default: return ("", .clear)
+            }
+        }()
+        return Group {
+            if !text.isEmpty {
+                Text(text)
+                    .font(.system(size: 9, weight: .medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(color.opacity(0.15))
+                    .foregroundStyle(color)
+                    .cornerRadius(4)
+            }
         }
     }
 }

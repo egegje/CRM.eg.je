@@ -27,8 +27,30 @@ final class AuthStore: ObservableObject {
                 as: User.self
             )
             user = u
+            // Save credentials for auto-login after Face ID
+            UserDefaults.standard.set(email, forKey: "saved_email")
+            UserDefaults.standard.set(password, forKey: "saved_password")
         } catch {
             loginError = (error as? APIError)?.errorDescription ?? error.localizedDescription
+        }
+    }
+
+    /// Auto-login using saved credentials (after Face ID)
+    func autoLogin() async -> Bool {
+        guard let email = UserDefaults.standard.string(forKey: "saved_email"),
+              let password = UserDefaults.standard.string(forKey: "saved_password"),
+              !email.isEmpty else { return false }
+        struct Body: Encodable { let email: String; let password: String }
+        do {
+            let u = try await APIClient.shared.request(
+                "POST", "/auth/login",
+                body: Body(email: email, password: password),
+                as: User.self
+            )
+            user = u
+            return true
+        } catch {
+            return false
         }
     }
 
