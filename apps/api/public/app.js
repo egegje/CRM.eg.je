@@ -130,7 +130,8 @@ async function bootApp() {
   }).catch(() => {});
   if (state.user.role === "owner" || state.user.role === "admin") {
     document.getElementById("admin-btn").classList.remove("hidden");
-    document.getElementById("team-sidebar-item").style.display = "";
+    const ibTeam = document.getElementById("ib-team");
+    if (ibTeam) ibTeam.style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();
@@ -892,14 +893,31 @@ let tasksFilter = null;
 let _projects = [];
 let _users = [];
 
+function switchSection(section) {
+  // Update icon bar active state
+  document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.section === section);
+  });
+  if (section === "mail") {
+    exitTasksView();
+  } else if (section === "tasks") {
+    showTasksView(tasksFilter || "me");
+  } else if (section === "finance") {
+    showFinanceView();
+  } else if (section === "team") {
+    showTeamView();
+  }
+}
+
 async function showFinanceView() {
+  document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("tasks-view").classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("finance-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
   await checkSberStatus();
   await loadFinance();
 }
@@ -1210,6 +1228,7 @@ async function deleteAccount(id) {
 async function showTasksView(filter) {
   tasksFilter = filter || null;
   tasksMode = "list";
+  document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
@@ -1217,7 +1236,7 @@ async function showTasksView(filter) {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
   const titles = {
     me: "Мои задачи",
     createdByMe: "Поставлено мной",
@@ -1230,6 +1249,7 @@ async function showTasksView(filter) {
 }
 
 async function showTeamView() {
+  document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("tasks-view").classList.add("hidden");
@@ -1238,7 +1258,7 @@ async function showTeamView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("team-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
   await loadTeamView();
 }
 
@@ -1283,6 +1303,7 @@ async function openUserKanban(userId) {
 async function showKanbanView() {
   tasksFilter = null;
   tasksMode = "kanban";
+  document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
@@ -1290,7 +1311,7 @@ async function showKanbanView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "240px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
   document.getElementById("tasks-view-title").textContent = "🗂 Канбан";
   await loadTasks();
 }
@@ -1299,6 +1320,7 @@ function exitTasksView() {
   document.getElementById("tasks-view").classList.add("hidden");
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
+  document.querySelector(".sidebar").classList.remove("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
   document.querySelector(".preview-pane").classList.remove("hidden");
   document.getElementById("resizer-1").style.display = "";
@@ -1307,8 +1329,12 @@ function exitTasksView() {
   // re-apply persisted resizer widths
   const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
   if (saved && window.innerWidth > 900) {
-    document.getElementById("app").style.gridTemplateColumns = `${saved.sidebar}px 4px ${saved.list}px 4px 1fr`;
+    document.getElementById("app").style.gridTemplateColumns = `56px ${saved.sidebar}px 4px ${saved.list}px 4px 1fr`;
   }
+  // Update icon bar
+  document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.section === "mail");
+  });
 }
 
 let tasksMode = "list";
@@ -2374,7 +2400,7 @@ window.addEventListener("online", () => {
   let listW = saved?.list ?? 380;
   function apply() {
     if (window.innerWidth <= 900) return;
-    app.style.gridTemplateColumns = `${sidebarW}px 4px ${listW}px 4px 1fr`;
+    app.style.gridTemplateColumns = `56px ${sidebarW}px 4px ${listW}px 4px 1fr`;
   }
   apply();
   window.addEventListener("resize", apply);

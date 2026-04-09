@@ -24,6 +24,15 @@
 </div>
 
 <div id="app" class="hidden">
+  <nav class="icon-bar" id="icon-bar">
+    <div class="ib-logo">C</div>
+    <div class="ib-item active" data-section="mail" onclick="switchSection('mail')" title="Почта">📧</div>
+    <div class="ib-item" data-section="tasks" onclick="switchSection('tasks')" title="Задачи">✅</div>
+    <div class="ib-item" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
+    <div class="ib-item" id="ib-team" style="display:none" data-section="team" onclick="switchSection('team')" title="Команда">👥</div>
+    <div style="flex:1"></div>
+    <div class="ib-item" data-section="admin" onclick="openAdmin()" title="Админка">⚙</div>
+  </nav>
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar">
     <div class="brand">
@@ -31,19 +40,6 @@
       <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
     </div>
     <button class="compose-btn" onclick="openCompose()">✉️ Написать</button>
-    <div class="folder-group" style="margin-bottom:12px">
-      <div class="folder-title">✅ Задачи</div>
-      <div class="folder-item" onclick="showTasksView('me')">📌 Мои</div>
-      <div class="folder-item" onclick="showTasksView('createdByMe')">📤 Поставлено мной</div>
-      <div class="folder-item" onclick="showTasksView('unassigned')">❓ Без исполнителя</div>
-      <div class="folder-item" onclick="showTasksView('overdue')">⏰ Просроченные</div>
-      <div class="folder-item" onclick="showTasksView('done')">✔️ Выполненные</div>
-      <div class="folder-item" id="team-sidebar-item" style="display:none" onclick="showTeamView()">👥 Команда</div>
-    </div>
-    <div class="folder-group" style="margin-bottom:12px">
-      <div class="folder-title">💰 Финансы</div>
-      <div class="folder-item" onclick="showFinanceView()">🏦 Счета</div>
-    </div>
     <div class="folders">
       <div class="folder-group">
         <div class="folder-title">Ящики</div>
@@ -115,6 +111,13 @@
         <button onclick="showKanbanView()" style="padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🗂 Канбан</button>
         <button class="primary" onclick="openTaskForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Задача</button>
       </div>
+    </div>
+    <div id="tasks-subnav" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+      <button onclick="showTasksView('me')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📌 Мои</button>
+      <button onclick="showTasksView('createdByMe')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📤 Поставлено мной</button>
+      <button onclick="showTasksView('unassigned')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">❓ Без исполнителя</button>
+      <button onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">⏰ Просроченные</button>
+      <button onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">✔️ Выполненные</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
