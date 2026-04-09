@@ -4,6 +4,8 @@ struct TaskListView: View {
     @EnvironmentObject var auth: AuthStore
     @StateObject private var store = TasksStore()
     @State private var filter: TasksStore.Filter = .mine
+    @State private var showCreateForm = false
+    @State private var editingTask: CRMTask?
 
     var body: some View {
         NavigationStack {
@@ -28,10 +30,12 @@ struct TaskListView: View {
                 }
             }
             .refreshable { await load() }
-            .navigationDestination(for: CRMTask.self) { TaskDetailView(task: $0) }
+            .navigationDestination(for: CRMTask.self) { task in
+                TaskDetailView(task: task, onEdit: { editingTask = task })
+            }
             .navigationTitle(filter.title)
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
+                ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         ForEach(TasksStore.Filter.allCases) { f in
                             Button {
@@ -45,6 +49,23 @@ struct TaskListView: View {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showCreateForm = true
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+            .sheet(isPresented: $showCreateForm) {
+                TaskFormView()
+                    .environmentObject(auth)
+                    .onDisappear { Task { await load() } }
+            }
+            .sheet(item: $editingTask) { task in
+                TaskFormView(editTask: task)
+                    .environmentObject(auth)
+                    .onDisappear { Task { await load() } }
             }
             .task(id: filter) { await load() }
             .alert("Ошибка", isPresented: .constant(store.errorMessage != nil), actions: {
