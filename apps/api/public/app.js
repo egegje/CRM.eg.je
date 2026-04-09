@@ -1376,7 +1376,7 @@ async function loadTasks() {
     labelSel.style.display = "none";
   }
   if (tasksMode === "kanban") renderKanban(tasks);
-  else if (tasksFilter === "createdByMe") renderTasksGrouped(tasks);
+  else if (tasksFilter === "createdByMe") await renderTasksGrouped(tasks);
   else renderTasks(tasks);
 }
 
@@ -1413,11 +1413,15 @@ function renderTasks(tasks) {
   }).join("");
 }
 
-function renderTasksGrouped(tasks) {
+async function renderTasksGrouped(tasks) {
   const el = document.getElementById("tasks-list");
   if (!tasks.length) {
     el.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет задач</div>';
     return;
+  }
+  // Ensure users are loaded
+  if (!_users.length) {
+    _users = await api("/admin/users").catch(() => []);
   }
   // Group by assigneeId
   const groups = {};
@@ -1427,10 +1431,7 @@ function renderTasksGrouped(tasks) {
     if (!groups[key]) groups[key] = [];
     groups[key].push(t);
   }
-  // Load user names from _users cache
-  if (_users.length) {
-    for (const u of _users) userNames[u.id] = u.name || u.email;
-  }
+  for (const u of _users) userNames[u.id] = u.name || u.email;
   const prioColor = { urgent: "#ef4444", high: "#f59e0b", normal: "var(--text)", low: "var(--text-muted)" };
   const statusIcon = { open: "⬚", in_progress: "⚙", done: "✅", cancelled: "✕" };
   let html = "";
