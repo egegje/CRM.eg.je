@@ -94,15 +94,16 @@
 
   <section id="finance-view" class="hidden" style="padding:18px;overflow-y:auto;border-right:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">💰 Финансы</h2>
+      <h2 style="margin:0" id="finance-title">💰 Финансы</h2>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
         <button onclick="openCompanyForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Компания</button>
         <button id="sber-connect-btn" onclick="connectSber()" style="padding:8px 14px;background:#21a038;color:white;border:none;border-radius:5px;cursor:pointer;display:none">🏦 Подключить Сбер</button>
-        <button id="sber-load-btn" onclick="loadSberData()" style="padding:8px 14px;background:#21a038;color:white;border:none;border-radius:5px;cursor:pointer;display:none">🔄 Загрузить из Сбера</button>
+        <button id="sber-load-btn" onclick="loadSberData()" style="padding:8px 14px;background:#21a038;color:white;border:none;border-radius:5px;cursor:pointer;display:none">🔄 Обновить остатки</button>
       </div>
     </div>
     <div id="sber-status" style="margin-bottom:12px"></div>
     <div id="sber-data" style="margin-bottom:18px"></div>
+    <div id="sber-statement" style="display:none;margin-bottom:18px"></div>
     <div id="finance-totals" style="margin-bottom:14px;padding:12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px"></div>
     <div id="finance-list"></div>
   </section>

@@ -938,64 +938,129 @@ function connectSber() {
   window.location.href = "/api/sber/connect";
 }
 
+const sberAmt = (v) => typeof v === "object" && v ? parseFloat(v.amount) : parseFloat(v) || 0;
+
 async function loadSberData() {
   const el = document.getElementById("sber-data");
-  el.innerHTML = '<div style="color:var(--text-muted)">⏳ загружаю данные из Сбера...</div>';
+  document.getElementById("sber-statement").style.display = "none";
+  document.getElementById("finance-title").textContent = "💰 Финансы";
+  el.innerHTML = '<div style="color:var(--text-muted)">⏳ загружаю остатки...</div>';
   try {
     const info = await api("/api/sber/accounts");
     const today = new Date().toISOString().slice(0, 10);
-    let html = `<div style="font-weight:600;margin-bottom:8px">${escapeHtml(info.shortName || info.fullName)} · ИНН ${escapeHtml(info.inn || "—")}</div>`;
+    let totalBalance = 0;
+    let html = `<div style="font-weight:600;margin-bottom:12px">${escapeHtml(info.fullName || info.shortName || "")} · ИНН ${escapeHtml(info.inn || "—")}</div>`;
     for (const acc of (info.accounts || [])) {
       if (acc.state !== "OPEN") continue;
       let summary = null;
-      let transactions = [];
       try {
         summary = await api(`/api/sber/statement/summary?accountNumber=${acc.number}&statementDate=${today}`);
       } catch {}
-      try {
-        const txResp = await api(`/api/sber/statement/transactions?accountNumber=${acc.number}&statementDate=${today}`);
-        transactions = txResp.transactions || [];
-      } catch {}
-      // Sber returns amounts as {amount:"123.45", currencyName:"RUR"}
-      const sberAmt = (v) => typeof v === "object" && v ? parseFloat(v.amount) : parseFloat(v) || 0;
-      const bal = summary ? fmtMoney(sberAmt(summary.closingBalance)) : "—";
+      const bal = summary ? sberAmt(summary.closingBalance) : 0;
+      totalBalance += bal;
       html += `
-        <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-            <div>
-              <span style="font-family:monospace;font-size:13px">${escapeHtml(acc.number)}</span>
-              <span style="color:var(--text-muted);font-size:11px;margin-left:8px">БИК ${escapeHtml(acc.bic)}</span>
-            </div>
-            <div style="font-size:18px;font-weight:700">${bal} ₽</div>
+        <div onclick="openStatement('${acc.number}')" style="cursor:pointer;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div>
+            <div style="font-family:monospace;font-size:13px">${escapeHtml(acc.number)}</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-top:2px">БИК ${escapeHtml(acc.bic)} · ${escapeHtml(acc.name || acc.type || "")}</div>
+            ${summary ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Дебет: ${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})</div>` : ""}
           </div>
-          ${summary ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
-            Входящий: ${fmtMoney(sberAmt(summary.openingBalance))} · Дебет: ${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})
-          </div>` : ""}
-          ${transactions.length ? `
-            <table style="width:100%;font-size:12px;border-collapse:collapse">
-              <thead style="color:var(--text-muted)"><tr><th style="text-align:left;padding:4px">Дата</th><th style="text-align:left;padding:4px">Контрагент</th><th style="text-align:left;padding:4px">Назначение</th><th style="text-align:right;padding:4px">Сумма</th></tr></thead>
-              <tbody>${transactions.slice(0, 50).map((t) => {
-                const isDebit = (t.direction || "").toUpperCase() === "DEBIT";
-                const amt = sberAmt(t.amount);
-                const rur = t.rurTransfer || {};
-                const counterparty = isDebit ? (rur.payeeName || "—") : (rur.payerName || "—");
-                const purpose = t.paymentPurpose || "";
-                const dt = (t.operationDate || t.documentDate || "").slice(0, 10);
-                return `<tr>
-                  <td style="padding:4px;white-space:nowrap">${dt}</td>
-                  <td style="padding:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(counterparty)}</td>
-                  <td style="padding:4px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)">${escapeHtml(purpose.slice(0, 100))}</td>
-                  <td style="padding:4px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(amt)}</td>
-                </tr>`;
-              }).join("")}</tbody>
-            </table>
-          ` : "<div style='font-size:12px;color:var(--text-muted)'>нет транзакций за сегодня</div>"}
+          <div style="text-align:right">
+            <div style="font-size:22px;font-weight:700">${fmtMoney(bal)} ₽</div>
+            ${summary ? `<div style="font-size:10px;color:var(--text-muted)">входящий: ${fmtMoney(sberAmt(summary.openingBalance))}</div>` : ""}
+          </div>
         </div>
       `;
+    }
+    if (totalBalance > 0) {
+      html = `<div style="font-size:28px;font-weight:700;margin-bottom:14px">${fmtMoney(totalBalance)} ₽</div>` + html;
     }
     el.innerHTML = html;
   } catch (e) {
     el.innerHTML = `<div style="color:var(--danger)">Ошибка: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function openStatement(accountNumber) {
+  const el = document.getElementById("sber-statement");
+  document.getElementById("sber-data").style.display = "none";
+  el.style.display = "block";
+  document.getElementById("finance-title").textContent = "📄 Выписка: " + accountNumber;
+  const today = new Date().toISOString().slice(0, 10);
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <button onclick="loadSberData();document.getElementById('sber-data').style.display=''" style="padding:6px 12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;cursor:pointer">← Назад к сводке</button>
+      <input type="date" id="stmt-date" value="${today}" onchange="loadStatementForDate('${accountNumber}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+      <span id="stmt-loading" style="color:var(--text-muted);font-size:12px">загружаю...</span>
+    </div>
+    <div id="stmt-transactions"></div>
+  `;
+  await loadStatementForDate(accountNumber);
+}
+
+async function loadStatementForDate(accountNumber) {
+  const dateVal = document.getElementById("stmt-date")?.value || new Date().toISOString().slice(0, 10);
+  const loadingEl = document.getElementById("stmt-loading");
+  const el = document.getElementById("stmt-transactions");
+  if (loadingEl) loadingEl.textContent = "загружаю...";
+  try {
+    const [summary, txResp] = await Promise.all([
+      api(`/api/sber/statement/summary?accountNumber=${accountNumber}&statementDate=${dateVal}`).catch(() => null),
+      api(`/api/sber/statement/transactions?accountNumber=${accountNumber}&statementDate=${dateVal}`).catch(() => ({transactions:[]})),
+    ]);
+    const transactions = txResp.transactions || [];
+    let html = "";
+    if (summary) {
+      html += `<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
+        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">Входящий</div>
+          <div style="font-size:16px;font-weight:600">${fmtMoney(sberAmt(summary.openingBalance))} ₽</div>
+        </div>
+        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">Исходящий</div>
+          <div style="font-size:16px;font-weight:600">${fmtMoney(sberAmt(summary.closingBalance))} ₽</div>
+        </div>
+        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">Расход</div>
+          <div style="font-size:16px;font-weight:600;color:var(--danger)">−${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber})</div>
+        </div>
+        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+          <div style="font-size:10px;color:var(--text-muted)">Приход</div>
+          <div style="font-size:16px;font-weight:600;color:#21a038">+${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})</div>
+        </div>
+      </div>`;
+    }
+    if (transactions.length) {
+      html += `<table style="width:100%;font-size:12px;border-collapse:collapse">
+        <thead style="color:var(--text-muted);font-size:11px"><tr>
+          <th style="text-align:left;padding:6px">Дата</th>
+          <th style="text-align:left;padding:6px">Контрагент</th>
+          <th style="text-align:left;padding:6px">Назначение</th>
+          <th style="text-align:right;padding:6px">Сумма</th>
+        </tr></thead>
+        <tbody>${transactions.map((t) => {
+          const isDebit = (t.direction || "").toUpperCase() === "DEBIT";
+          const amt = sberAmt(t.amount);
+          const rur = t.rurTransfer || {};
+          const counterparty = isDebit ? (rur.payeeName || "—") : (rur.payerName || "—");
+          const purpose = t.paymentPurpose || "";
+          const dt = (t.operationDate || t.documentDate || "").slice(0, 10);
+          return `<tr style="border-bottom:1px solid var(--border)">
+            <td style="padding:6px;white-space:nowrap">${dt}</td>
+            <td style="padding:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(counterparty)}">${escapeHtml(counterparty)}</td>
+            <td style="padding:6px;color:var(--text-muted);max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(purpose)}">${escapeHtml(purpose.slice(0, 120))}</td>
+            <td style="padding:6px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(amt)}</td>
+          </tr>`;
+        }).join("")}</tbody>
+      </table>`;
+    } else {
+      html += '<div style="color:var(--text-muted);padding:20px;text-align:center">Нет операций за эту дату</div>';
+    }
+    el.innerHTML = html;
+    if (loadingEl) loadingEl.textContent = `${transactions.length} операций`;
+  } catch (e) {
+    el.innerHTML = `<div style="color:var(--danger)">Ошибка: ${escapeHtml(e.message)}</div>`;
+    if (loadingEl) loadingEl.textContent = "";
   }
 }
 
