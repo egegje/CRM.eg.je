@@ -1125,7 +1125,7 @@ async function loadFinance() {
   const list = document.getElementById("finance-list");
   const totals = document.getElementById("finance-totals");
   if (!companies.length) {
-    list.innerHTML = '<div style="color:var(--text-muted);padding:30px;text-align:center">пока нет компаний — нажмите «+ Компания»</div>';
+    list.innerHTML = '';
     totals.innerHTML = "";
     return;
   }
