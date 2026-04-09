@@ -32,6 +32,8 @@
     <div class="ib-item" id="ib-team" style="display:none" data-section="team" onclick="switchSection('team')" title="Команда">👥</div>
     <div style="flex:1"></div>
     <div class="ib-item" id="ib-admin" style="display:none" data-section="admin" onclick="switchSection('admin')" title="Админка">⚙</div>
+    <div class="ib-item" onclick="toggleTheme()" title="Тема">🌓</div>
+    <div class="ib-item" onclick="logout()" title="Выйти">🚪</div>
   </nav>
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar">
@@ -51,13 +53,10 @@
         <button class="link-btn" onclick="createFolder()">+ новая папка</button>
       </div>
     </div>
-    <div class="user-box">
+    <div class="user-box" style="font-size:11px;color:var(--text-muted)">
       <span id="user-email"></span>
-      <span id="version-footer" style="font-size:9px;color:var(--text-muted);font-family:monospace;opacity:0.4"></span>
-      <button class="link-btn" onclick="openSettings()">🔧 Настройки</button>
-      <button id="admin-btn" class="link-btn hidden" onclick="openAdmin()">⚙ Админка</button>
-      <button class="link-btn" onclick="logout()">выйти</button>
-      <button class="link-btn" onclick="toggleTheme()">🌓</button>
+      <span id="version-footer" style="font-size:8px;opacity:0.2"></span>
+      <span id="admin-btn" class="hidden"></span>
     </div>
   </aside>
 
