@@ -854,7 +854,7 @@ document.addEventListener("keydown", (e) => {
     }
   }
   if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-  if (e.key === "Escape") { closeCompose(); closeSettings(); closeAdmin(); }
+  if (e.key === "Escape") { closeCompose(); }
   if (e.key === "r" && state.selectedId) replyTo(state.selectedId);
   if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
   if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n⌘/Ctrl+Enter — отправить письмо\n? — эта справка");
@@ -1182,14 +1182,6 @@ function fmtMoney(v) {
   return n.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-async function openCompanyForm() {
-  const name = prompt("Название компании:");
-  if (!name) return;
-  const inn = prompt("ИНН (опционально):") || undefined;
-  const sberCustId = prompt("Sber custId (опционально):") || undefined;
-  await api("/companies", { method: "POST", body: JSON.stringify({ name, inn, sberCustId }) });
-  loadFinance();
-}
 
 async function editCompany(id) {
   const c = (await api("/companies")).find((x) => x.id === id);
@@ -1751,31 +1743,6 @@ async function emailToTask(messageId) {
   f.description.value = `Из письма от ${m.fromAddr}:\n\n${(m.bodyText || "").slice(0, 1000)}`;
 }
 
-/* settings */
-function openSettings() {
-  document.getElementById("settings-modal").classList.remove("hidden");
-}
-function closeSettings() {
-  document.getElementById("settings-modal").classList.add("hidden");
-  document.getElementById("settings-msg").textContent = "";
-}
-document.getElementById("settings-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  const msg = document.getElementById("settings-msg");
-  try {
-    await api("/me/password", {
-      method: "POST",
-      body: JSON.stringify({ oldPassword: f.get("oldPassword"), newPassword: f.get("newPassword") }),
-    });
-    msg.style.color = "var(--accent)";
-    msg.textContent = "пароль обновлён";
-    setTimeout(closeSettings, 1500);
-  } catch (err) {
-    msg.style.color = "var(--danger)";
-    msg.textContent = "ошибка: " + err.message;
-  }
-});
 
 /* drag-drop on compose */
 const composeBox = () => document.getElementById("compose-modal");
@@ -1824,12 +1791,6 @@ function addSwipe(el, m) {
 
 /* admin */
 let adminTab = "users";
-function openAdmin() {
-  switchSection("admin");
-}
-function closeAdmin() {
-  switchSection("mail");
-}
 function switchTab(tab) {
   adminTab = tab;
   document.querySelectorAll(".admin-tabs .tab").forEach((el) => {
@@ -1839,7 +1800,7 @@ function switchTab(tab) {
 }
 
 async function renderAdminTab() {
-  const c = document.getElementById("admin-view-content") || document.getElementById("admin-content");
+  const c = document.getElementById("admin-view-content");
   c.innerHTML = "<div style='color:var(--text-muted)'>загрузка...</div>";
   try {
     if (adminTab === "users") c.innerHTML = await renderUsersTab();
@@ -1919,7 +1880,7 @@ async function manageUserAccess(userId, email, role) {
   const list = allMailboxes
     .map((mb) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-mb="${mb.id}" ${assignedSet.has(mb.id) ? "checked" : ""}> ${escapeHtml(mb.displayName)} (${escapeHtml(mb.email)})</label>`)
     .join("");
-  const c = document.getElementById("admin-content");
+  const c = document.getElementById("admin-view-content");
   const html = `
     <h4 style="margin-top:0">Доступ к ящикам: ${escapeHtml(email)}</h4>
     <div id="access-list">${list}</div>

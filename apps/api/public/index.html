@@ -194,45 +194,7 @@
   </div>
 </div>
 
-<div id="settings-modal" class="modal hidden">
-  <div class="modal-box" style="width:420px">
-    <div class="modal-header"><h3>Настройки</h3><button onclick="closeSettings()">✕</button></div>
-    <form id="settings-form" style="padding:20px;display:flex;flex-direction:column;gap:12px">
-      <label>Текущий пароль <input name="oldPassword" type="password" required></label>
-      <label>Новый пароль <input name="newPassword" type="password" minlength="4" required></label>
-      <button type="submit" style="padding:10px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">Сменить пароль</button>
-      <div id="settings-msg" class="error"></div>
-    </form>
-    <div style="padding:0 20px 20px">
-      <label style="display:flex;align-items:center;gap:10px;font-size:13px">
-        Акцентный цвет:
-        <input type="color" id="accent-picker" onchange="setAccent(this.value)">
-      </label>
-    </div>
-  </div>
-</div>
 
-<div id="admin-modal" class="modal hidden">
-  <div class="modal-box admin-box">
-    <div class="modal-header">
-      <h3>Админка</h3>
-      <button onclick="closeAdmin()">✕</button>
-    </div>
-    <div class="admin-tabs">
-      <button class="tab active" data-tab="users" onclick="switchTab('users')">Пользователи</button>
-      <button class="tab" data-tab="mailboxes" onclick="switchTab('mailboxes')">Ящики</button>
-      <button class="tab" data-tab="rules" onclick="switchTab('rules')">Правила</button>
-      <button class="tab" data-tab="contacts" onclick="switchTab('contacts')">Контакты</button>
-      <button class="tab" data-tab="audit" onclick="switchTab('audit')">Журнал</button>
-      <button class="tab" data-tab="analytics" onclick="switchTab('analytics')">Аналитика</button>
-      <button class="tab" data-tab="tgchats" onclick="switchTab('tgchats')">TG чаты</button>
-      <button class="tab" data-tab="tgbindings" onclick="switchTab('tgbindings')">TG привязки</button>
-      <button class="tab" data-tab="tasksettings" onclick="switchTab('tasksettings')">Задачи: настройки</button>
-      <button class="tab" data-tab="personas" onclick="switchTab('personas')">Сотрудники</button>
-    </div>
-    <div id="admin-content"></div>
-  </div>
-</div>
 
 <nav class="tabbar" id="tabbar">
   <button onclick="switchSection('mail')" id="mtab-mail" class="mtab-active">📧</button>
