@@ -92,4 +92,43 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
     }).parse(req.query);
     return getStatementTransactions(q.accountNumber, q.statementDate);
   });
+
+  // ---- sync + local queries ----
+
+  /** Trigger sync: pull transactions from Sber into local DB. */
+  app.post("/api/sber/sync", { preHandler: requireRole("owner", "admin") }, async () => {
+    const { syncSberTransactions } = await import("../services/sber-sync.js");
+    return syncSberTransactions();
+  });
+
+  /** Query local transactions (any date range, instant). */
+  app.get("/api/sber/local/transactions", { preHandler: requireRole("owner", "admin", "manager") }, async (req) => {
+    const q = z.object({
+      accountNumber: z.string().optional(),
+      dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+      limit: z.coerce.number().int().min(1).max(1000).default(500),
+    }).parse(req.query);
+    const where: Record<string, unknown> = {};
+    if (q.accountNumber) where.accountNumber = q.accountNumber;
+    if (q.dateFrom || q.dateTo) {
+      where.operationDate = {};
+      if (q.dateFrom) (where.operationDate as Record<string, Date>).gte = new Date(q.dateFrom);
+      if (q.dateTo) {
+        const to = new Date(q.dateTo);
+        to.setDate(to.getDate() + 1);
+        (where.operationDate as Record<string, Date>).lt = to;
+      }
+    }
+    return prisma.bankTransaction.findMany({
+      where,
+      orderBy: { operationDate: "desc" },
+      take: q.limit,
+    });
+  });
+
+  /** Sync state — when was each account last synced. */
+  app.get("/api/sber/sync-state", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
+    return prisma.bankSyncState.findMany();
+  });
 }

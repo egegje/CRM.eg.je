@@ -987,51 +987,70 @@ async function openStatement(accountNumber) {
   el.style.display = "block";
   document.getElementById("finance-title").textContent = "📄 Выписка: " + accountNumber;
   const today = new Date().toISOString().slice(0, 10);
+  const monthAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
       <button onclick="loadSberData();document.getElementById('sber-data').style.display=''" style="padding:6px 12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:5px;cursor:pointer">← Назад к сводке</button>
-      <input type="date" id="stmt-date" value="${today}" onchange="loadStatementForDate('${accountNumber}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
-      <span id="stmt-loading" style="color:var(--text-muted);font-size:12px">загружаю...</span>
+      <span style="font-size:12px;color:var(--text-muted)">с</span>
+      <input type="date" id="stmt-from" value="${monthAgo}" onchange="loadLocalStatement('${accountNumber}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+      <span style="font-size:12px;color:var(--text-muted)">по</span>
+      <input type="date" id="stmt-to" value="${today}" onchange="loadLocalStatement('${accountNumber}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+      <button onclick="syncAndReload('${accountNumber}')" style="padding:6px 12px;background:#21a038;color:white;border:none;border-radius:5px;cursor:pointer">🔄 Синхронизировать</button>
+      <span id="stmt-loading" style="color:var(--text-muted);font-size:12px"></span>
     </div>
+    <div id="stmt-summary" style="margin-bottom:12px"></div>
     <div id="stmt-transactions"></div>
   `;
-  await loadStatementForDate(accountNumber);
+  await loadLocalStatement(accountNumber);
 }
 
-async function loadStatementForDate(accountNumber) {
-  const dateVal = document.getElementById("stmt-date")?.value || new Date().toISOString().slice(0, 10);
+async function syncAndReload(accountNumber) {
+  const loadingEl = document.getElementById("stmt-loading");
+  if (loadingEl) loadingEl.textContent = "⏳ синхронизация с банком...";
+  try {
+    const r = await api("/api/sber/sync", { method: "POST" });
+    if (loadingEl) loadingEl.textContent = `синхронизировано ${r.synced} операций`;
+  } catch (e) {
+    if (loadingEl) loadingEl.textContent = "ошибка: " + e.message;
+  }
+  await loadLocalStatement(accountNumber);
+}
+
+async function loadLocalStatement(accountNumber) {
+  const dateFrom = document.getElementById("stmt-from")?.value;
+  const dateTo = document.getElementById("stmt-to")?.value;
   const loadingEl = document.getElementById("stmt-loading");
   const el = document.getElementById("stmt-transactions");
-  if (loadingEl) loadingEl.textContent = "загружаю...";
+  const sumEl = document.getElementById("stmt-summary");
+  if (!el) return;
   try {
-    const [summary, txResp] = await Promise.all([
-      api(`/api/sber/statement/summary?accountNumber=${accountNumber}&statementDate=${dateVal}`).catch(() => null),
-      api(`/api/sber/statement/transactions?accountNumber=${accountNumber}&statementDate=${dateVal}`).catch(() => ({transactions:[]})),
-    ]);
-    const transactions = txResp.transactions || [];
-    let html = "";
-    if (summary) {
-      html += `<div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
-        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--text-muted)">Входящий</div>
-          <div style="font-size:16px;font-weight:600">${fmtMoney(sberAmt(summary.openingBalance))} ₽</div>
-        </div>
-        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--text-muted)">Исходящий</div>
-          <div style="font-size:16px;font-weight:600">${fmtMoney(sberAmt(summary.closingBalance))} ₽</div>
-        </div>
-        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--text-muted)">Расход</div>
-          <div style="font-size:16px;font-weight:600;color:var(--danger)">−${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber})</div>
-        </div>
-        <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
-          <div style="font-size:10px;color:var(--text-muted)">Приход</div>
-          <div style="font-size:16px;font-weight:600;color:#21a038">+${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})</div>
-        </div>
-      </div>`;
+    const params = new URLSearchParams({ accountNumber, limit: "1000" });
+    if (dateFrom) params.set("dateFrom", dateFrom);
+    if (dateTo) params.set("dateTo", dateTo);
+    const transactions = await api("/api/sber/local/transactions?" + params);
+    // Compute summary from local data
+    let debitSum = 0, creditSum = 0, debitCount = 0, creditCount = 0;
+    for (const t of transactions) {
+      const amt = parseFloat(t.amount) || 0;
+      if (t.direction === "DEBIT") { debitSum += amt; debitCount++; }
+      else { creditSum += amt; creditCount++; }
     }
+    sumEl.innerHTML = `<div style="display:flex;gap:16px;flex-wrap:wrap">
+      <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text-muted)">Расход за период</div>
+        <div style="font-size:16px;font-weight:600;color:var(--danger)">-${fmtMoney(debitSum)} (${debitCount})</div>
+      </div>
+      <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text-muted)">Приход за период</div>
+        <div style="font-size:16px;font-weight:600;color:#21a038">+${fmtMoney(creditSum)} (${creditCount})</div>
+      </div>
+      <div style="background:var(--bg-alt);padding:10px 16px;border-radius:6px;border:1px solid var(--border)">
+        <div style="font-size:10px;color:var(--text-muted)">Итого</div>
+        <div style="font-size:16px;font-weight:600">${fmtMoney(creditSum - debitSum)} (${transactions.length} оп.)</div>
+      </div>
+    </div>`;
     if (transactions.length) {
-      html += `<table style="width:100%;font-size:12px;border-collapse:collapse">
+      el.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse">
         <thead style="color:var(--text-muted);font-size:11px"><tr>
           <th style="text-align:left;padding:6px">Дата</th>
           <th style="text-align:left;padding:6px">Контрагент</th>
@@ -1039,28 +1058,23 @@ async function loadStatementForDate(accountNumber) {
           <th style="text-align:right;padding:6px">Сумма</th>
         </tr></thead>
         <tbody>${transactions.map((t) => {
-          const isDebit = (t.direction || "").toUpperCase() === "DEBIT";
-          const amt = sberAmt(t.amount);
-          const rur = t.rurTransfer || {};
-          const counterparty = isDebit ? (rur.payeeName || "—") : (rur.payerName || "—");
-          const purpose = t.paymentPurpose || "";
-          const dt = (t.operationDate || t.documentDate || "").slice(0, 10);
+          const isDebit = t.direction === "DEBIT";
+          const amt = parseFloat(t.amount) || 0;
+          const dt = (t.operationDate || "").slice(0, 10);
           return `<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:6px;white-space:nowrap">${dt}</td>
-            <td style="padding:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(counterparty)}">${escapeHtml(counterparty)}</td>
-            <td style="padding:6px;color:var(--text-muted);max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(purpose)}">${escapeHtml(purpose.slice(0, 120))}</td>
+            <td style="padding:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(t.counterpartyName || "")}">${escapeHtml(t.counterpartyName || "—")}</td>
+            <td style="padding:6px;color:var(--text-muted);max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(t.paymentPurpose || "")}">${escapeHtml((t.paymentPurpose || "").slice(0, 120))}</td>
             <td style="padding:6px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(amt)}</td>
           </tr>`;
         }).join("")}</tbody>
       </table>`;
     } else {
-      html += '<div style="color:var(--text-muted);padding:20px;text-align:center">Нет операций за эту дату</div>';
+      el.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">Нет операций за этот период. Нажмите «Синхронизировать» чтобы подтянуть данные из банка.</div>';
     }
-    el.innerHTML = html;
-    if (loadingEl) loadingEl.textContent = `${transactions.length} операций`;
+    if (loadingEl && !loadingEl.textContent.includes("синхрон")) loadingEl.textContent = `${transactions.length} операций`;
   } catch (e) {
     el.innerHTML = `<div style="color:var(--danger)">Ошибка: ${escapeHtml(e.message)}</div>`;
-    if (loadingEl) loadingEl.textContent = "";
   }
 }
 

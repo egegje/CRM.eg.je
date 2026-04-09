@@ -281,6 +281,32 @@ model Company {
   accounts    BankAccount[]
 }
 
+model BankTransaction {
+  id               String   @id @default(cuid())
+  accountNumber    String
+  operationDate    DateTime
+  documentDate     DateTime?
+  amount           Decimal  @db.Decimal(18, 2)
+  direction        String   // DEBIT | CREDIT
+  counterpartyName String?
+  counterpartyInn  String?
+  counterpartyAccount String?
+  counterpartyBankBic String?
+  paymentPurpose   String?
+  paymentNumber    String?
+  sberUuid         String?  @unique
+  createdAt        DateTime @default(now())
+
+  @@index([accountNumber, operationDate])
+  @@index([operationDate])
+}
+
+model BankSyncState {
+  accountNumber String   @id
+  lastSyncDate  String   // YYYY-MM-DD
+  updatedAt     DateTime @default(now()) @updatedAt
+}
+
 model BankAccount {
   id            String   @id @default(cuid())
   companyId     String
