@@ -1,0 +1,5 @@
+CRMApp.xcodeproj/
+DerivedData/
+*.xcworkspace/
+xcuserdata/
+.DS_Store
