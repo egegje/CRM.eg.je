@@ -50,6 +50,8 @@ struct ComingSoonView: View {
 
 struct MoreView: View {
     @EnvironmentObject var auth: AuthStore
+    @State private var showTeam = false
+
     var body: some View {
         NavigationStack {
             List {
@@ -58,6 +60,20 @@ struct MoreView: View {
                         LabeledContent("Имя", value: u.name)
                         LabeledContent("Email", value: u.email)
                         LabeledContent("Роль", value: u.role)
+                    }
+                }
+                if auth.user?.role == "owner" || auth.user?.role == "admin" {
+                    Section("Управление") {
+                        Button {
+                            showTeam = true
+                        } label: {
+                            Label("Команда", systemImage: "person.3")
+                        }
+                    }
+                }
+                Section {
+                    Link(destination: URL(string: "https://crm.eg.je")!) {
+                        Label("Открыть веб-версию", systemImage: "safari")
                     }
                 }
                 Section {
@@ -69,6 +85,17 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("Ещё")
+            .sheet(isPresented: $showTeam) {
+                NavigationStack {
+                    TeamView()
+                        .navigationTitle("Команда")
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Закрыть") { showTeam = false }
+                            }
+                        }
+                }
+            }
         }
     }
 }

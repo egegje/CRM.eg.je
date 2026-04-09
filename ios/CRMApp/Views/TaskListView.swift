@@ -6,6 +6,7 @@ struct TaskListView: View {
     @State private var filter: TasksStore.Filter = .mine
     @State private var showCreateForm = false
     @State private var editingTask: CRMTask?
+    @State private var showKanban = false
 
     var body: some View {
         NavigationStack {
@@ -50,10 +51,17 @@ struct TaskListView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showCreateForm = true
-                    } label: {
-                        Image(systemName: "plus")
+                    HStack(spacing: 12) {
+                        Button {
+                            showKanban = true
+                        } label: {
+                            Image(systemName: "rectangle.split.3x1")
+                        }
+                        Button {
+                            showCreateForm = true
+                        } label: {
+                            Image(systemName: "plus")
+                        }
                     }
                 }
             }
@@ -66,6 +74,18 @@ struct TaskListView: View {
                 TaskFormView(editTask: task)
                     .environmentObject(auth)
                     .onDisappear { Task { await load() } }
+            }
+            .sheet(isPresented: $showKanban) {
+                NavigationStack {
+                    KanbanView()
+                        .navigationTitle("Канбан")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                Button("Закрыть") { showKanban = false }
+                            }
+                        }
+                }
             }
             .task(id: filter) { await load() }
             .alert("Ошибка", isPresented: .constant(store.errorMessage != nil), actions: {
