@@ -15,6 +15,29 @@ struct TaskListView: View {
                     NavigationLink(value: task) {
                         TaskRow(task: task)
                     }
+                    .swipeActions(edge: .trailing) {
+                        if task.status != "done" {
+                            Button {
+                                Task { await complete(task) }
+                            } label: {
+                                Label("Завершить", systemImage: "checkmark.circle")
+                            }
+                            .tint(.green)
+                        }
+                        Button(role: .destructive) {
+                            Task { await delete(task) }
+                        } label: {
+                            Label("Удалить", systemImage: "trash")
+                        }
+                    }
+                    .swipeActions(edge: .leading) {
+                        Button {
+                            editingTask = task
+                        } label: {
+                            Label("Изменить", systemImage: "pencil")
+                        }
+                        .tint(.blue)
+                    }
                 }
                 if store.tasks.isEmpty && !store.isLoading {
                     ContentUnavailableView(
@@ -98,6 +121,16 @@ struct TaskListView: View {
 
     private func load() async {
         await store.load(filter: filter, currentUserId: auth.user?.id)
+    }
+
+    private func complete(_ task: CRMTask) async {
+        await store.patch(task.id, body: ["status": "done"])
+        await load()
+    }
+
+    private func delete(_ task: CRMTask) async {
+        _ = try? await APIClient.shared.requestVoid("DELETE", "/tasks/\(task.id)")
+        await load()
     }
 }
 

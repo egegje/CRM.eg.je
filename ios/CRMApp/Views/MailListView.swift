@@ -220,32 +220,34 @@ struct MailRow: View {
 struct MailDetailView: View {
     let message: MailMessage
     var onReply: (() -> Void)?
+    @State private var fullMessage: MailMessage?
 
     var body: some View {
+        let msg = fullMessage ?? message
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text(message.subject.isEmpty ? "(без темы)" : message.subject)
+                Text(msg.subject.isEmpty ? "(без темы)" : msg.subject)
                     .font(.title2).bold()
                 HStack {
-                    Text("От: \(message.fromAddr)")
+                    Text("От: \(msg.fromAddr)")
                         .font(.subheadline).foregroundStyle(.secondary)
                     Spacer()
-                    if let d = message.receivedAt {
+                    if let d = msg.receivedAt {
                         Text(d.formatted(date: .abbreviated, time: .shortened))
                             .font(.caption).foregroundStyle(.secondary)
                     }
                 }
-                if !message.toAddrs.isEmpty {
-                    Text("Кому: \(message.toAddrs.joined(separator: ", "))")
+                if !msg.toAddrs.isEmpty {
+                    Text("Кому: \(msg.toAddrs.joined(separator: ", "))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
-                if !message.ccAddrs.isEmpty {
-                    Text("Копия: \(message.ccAddrs.joined(separator: ", "))")
+                if !msg.ccAddrs.isEmpty {
+                    Text("Копия: \(msg.ccAddrs.joined(separator: ", "))")
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Divider()
-                if let ai = message.aiSummary, !ai.isEmpty {
-                    HStack {
+                if let ai = msg.aiSummary, !ai.isEmpty {
+                    HStack(alignment: .top) {
                         Image(systemName: "sparkles")
                         Text(ai)
                     }
@@ -254,7 +256,29 @@ struct MailDetailView: View {
                     .background(Color.accentColor.opacity(0.1))
                     .cornerRadius(8)
                 }
-                Text(message.bodyText ?? "")
+                // Attachments
+                if let atts = fullMessage?.attachments, !atts.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Вложения (\(atts.count))").font(.caption).foregroundStyle(.secondary)
+                        ForEach(atts) { att in
+                            Link(destination: URL(string: "https://crm.eg.je/attachments/\(att.id)")!) {
+                                HStack {
+                                    Image(systemName: att.mime.contains("pdf") ? "doc.fill" : att.mime.contains("image") ? "photo" : "paperclip")
+                                    Text(att.filename).lineLimit(1)
+                                    Spacer()
+                                    Text(formatSize(att.size))
+                                        .foregroundStyle(.secondary)
+                                }
+                                .font(.caption)
+                                .padding(8)
+                                .background(Color(.tertiarySystemBackground))
+                                .cornerRadius(6)
+                            }
+                        }
+                    }
+                }
+
+                Text(msg.bodyText ?? "")
                     .font(.body)
                     .textSelection(.enabled)
             }
@@ -264,24 +288,31 @@ struct MailDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                HStack(spacing: 12) {
+                Menu {
                     if let onReply {
                         Button { onReply() } label: {
-                            Image(systemName: "arrowshape.turn.up.left.fill")
+                            Label("Ответить", systemImage: "arrowshape.turn.up.left")
                         }
                     }
+                    ShareLink(item: "От: \(msg.fromAddr)\nТема: \(msg.subject)\n\n\(msg.bodyText ?? "")") {
+                        Label("Поделиться", systemImage: "square.and.arrow.up")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
                 }
             }
         }
-        .task { await markRead() }
+        .task { await loadFull() }
     }
 
-    private func markRead() async {
-        if message.isRead { return }
-        _ = try? await APIClient.shared.request(
-            "PATCH", "/messages/\(message.id)",
-            body: ["isRead": true] as [String: Bool],
-            as: MailMessage.self
-        )
+    private func loadFull() async {
+        // Load full message with attachments
+        fullMessage = try? await APIClient.shared.request("GET", "/messages/\(message.id)", as: MailMessage.self)
+    }
+
+    private func formatSize(_ bytes: Int) -> String {
+        if bytes < 1024 { return "\(bytes) Б" }
+        if bytes < 1024 * 1024 { return "\(bytes / 1024) КБ" }
+        return String(format: "%.1f МБ", Double(bytes) / 1024 / 1024)
     }
 }

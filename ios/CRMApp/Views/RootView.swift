@@ -71,6 +71,13 @@ struct MoreView: View {
                         }
                     }
                 }
+                Section("Безопасность") {
+                    NavigationLink {
+                        ChangePasswordView()
+                    } label: {
+                        Label("Сменить пароль", systemImage: "key")
+                    }
+                }
                 Section {
                     Link(destination: URL(string: "https://crm.eg.je")!) {
                         Label("Открыть веб-версию", systemImage: "safari")
@@ -82,6 +89,10 @@ struct MoreView: View {
                     } label: {
                         Label("Выйти", systemImage: "rectangle.portrait.and.arrow.right")
                     }
+                }
+                Section {
+                    LabeledContent("Версия", value: "0.1.0")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Ещё")

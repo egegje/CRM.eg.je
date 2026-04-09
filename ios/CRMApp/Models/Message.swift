@@ -17,6 +17,19 @@ struct MailMessage: Codable, Identifiable, Hashable {
     var sentAt: Date?
     var aiSummary: String?
     var aiPriority: String?
+    var attachments: [MailAttachment]?
+
+    struct Count: Codable, Hashable {
+        let attachments: Int?
+    }
+    var _count: Count?
+}
+
+struct MailAttachment: Codable, Identifiable, Hashable {
+    let id: String
+    let filename: String
+    let mime: String
+    let size: Int
 }
 
 struct Mailbox: Codable, Identifiable, Hashable {
