@@ -119,6 +119,7 @@
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
       <select id="tasks-assignee-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все исполнители</option></select>
+      <select id="tasks-label-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все метки</option></select>
       <select id="tasks-tag-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="">все теги</option></select>
     </div>
     <div id="tasks-list"></div>
@@ -144,7 +145,7 @@
         <label style="font-size:11px;color:var(--text-muted)">Проект<select name="projectId" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="">—</option></select></label>
         <label style="font-size:11px;color:var(--text-muted)">Дедлайн<input name="dueDate" type="datetime-local" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"></label>
         <label style="font-size:11px;color:var(--text-muted)">Приоритет<select name="priority" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="low">низкий</option><option value="normal" selected>обычный</option><option value="high">высокий</option><option value="urgent">срочный</option></select></label>
-        <label style="font-size:11px;color:var(--text-muted)">Категория<input name="category" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"></label>
+        <label style="font-size:11px;color:var(--text-muted)">Метка<select name="category" id="task-category-select" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="">—</option></select></label>
         <label style="font-size:11px;color:var(--text-muted)">Статус<select name="status" style="width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="open">открыта</option><option value="in_progress">в работе</option><option value="done">выполнена</option><option value="cancelled">отменена</option></select></label>
       </div>
       <div id="task-tags-row" style="display:none;flex-direction:column;gap:6px">

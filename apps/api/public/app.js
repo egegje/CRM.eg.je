@@ -1338,7 +1338,10 @@ async function loadTasks() {
   }
   const params = new URLSearchParams();
   if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
-  if (tasksFilter === "createdByMe" && state.user) params.set("creatorId", state.user.id);
+  if (tasksFilter === "createdByMe" && state.user) {
+    params.set("creatorId", state.user.id);
+    params.set("status", "all");
+  }
   if (tasksFilter === "unassigned") params.set("unassigned", "true");
   const assigneeOverride = document.getElementById("tasks-assignee-filter")?.value;
   if (assigneeOverride && tasksMode === "kanban") params.set("assigneeId", assigneeOverride);
@@ -1356,7 +1359,24 @@ async function loadTasks() {
   if (tagFilter) {
     tasks = tasks.filter((t) => (t.tagAssignments || []).some((a) => a.tagId === tagFilter));
   }
+  // Label filter (uses category field)
+  const labelSel = document.getElementById("tasks-label-filter");
+  if (labelSel && tasksFilter === "createdByMe") {
+    labelSel.style.display = "";
+    if (labelSel.options.length <= 1) {
+      try {
+        const s = await api("/admin/task-settings");
+        const labels = (s.task_labels || "").split(",").map((l) => l.trim()).filter(Boolean);
+        labelSel.innerHTML = '<option value="">все метки</option>' + labels.map((l) => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
+      } catch {}
+    }
+    const labelVal = labelSel.value;
+    if (labelVal) tasks = tasks.filter((t) => t.category === labelVal);
+  } else if (labelSel) {
+    labelSel.style.display = "none";
+  }
   if (tasksMode === "kanban") renderKanban(tasks);
+  else if (tasksFilter === "createdByMe") renderTasksGrouped(tasks);
   else renderTasks(tasks);
 }
 
@@ -1377,7 +1397,10 @@ function renderTasks(tasks) {
     const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
     const done = t.status === "done";
     return `<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:10px" onclick="openTaskForm('${t.id}')">
-      <input type="checkbox" ${done ? "checked" : ""} onclick="event.stopPropagation();toggleTaskDone('${t.id}', this.checked)" style="margin-top:3px">
+      ${done
+        ? `<span style="color:#10b981;font-size:16px;margin-top:2px" title="выполнена">✅</span>`
+        : `<button onclick="event.stopPropagation();if(confirm('Завершить задачу?'))toggleTaskDone('${t.id}',true)" style="background:none;border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;padding:0;margin-top:1px;flex-shrink:0" title="завершить"></button>`
+      }
       <div style="flex:1;min-width:0">
         <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word">
           ${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
@@ -1391,6 +1414,66 @@ function renderTasks(tasks) {
       </div>
     </div>`;
   }).join("");
+}
+
+function renderTasksGrouped(tasks) {
+  const el = document.getElementById("tasks-list");
+  if (!tasks.length) {
+    el.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет задач</div>';
+    return;
+  }
+  // Group by assigneeId
+  const groups = {};
+  const userNames = {};
+  for (const t of tasks) {
+    const key = t.assigneeId || "__none";
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(t);
+  }
+  // Load user names from _users cache
+  if (_users.length) {
+    for (const u of _users) userNames[u.id] = u.name || u.email;
+  }
+  const prioColor = { urgent: "#ef4444", high: "#f59e0b", normal: "var(--text)", low: "var(--text-muted)" };
+  const statusIcon = { open: "⬚", in_progress: "⚙", done: "✅", cancelled: "✕" };
+  let html = "";
+  // Sort: assigned users first, then unassigned
+  const keys = Object.keys(groups).sort((a, b) => {
+    if (a === "__none") return 1;
+    if (b === "__none") return -1;
+    return (userNames[a] || a).localeCompare(userNames[b] || b);
+  });
+  for (const key of keys) {
+    const name = key === "__none" ? "Без исполнителя" : (userNames[key] || key);
+    const list = groups[key];
+    const openCount = list.filter((t) => t.status === "open" || t.status === "in_progress").length;
+    html += `
+      <div style="margin-bottom:18px">
+        <div style="font-weight:600;font-size:14px;padding:8px 0;border-bottom:2px solid var(--accent);margin-bottom:6px">
+          ${escapeHtml(name)} <span style="color:var(--text-muted);font-weight:400;font-size:12px">(${openCount} активных из ${list.length})</span>
+        </div>
+        ${list.map((t) => {
+          const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
+          const done = t.status === "done" || t.status === "cancelled";
+          return `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:8px;opacity:${done ? 0.5 : 1}" onclick="openTaskForm('${t.id}')">
+            <span style="font-size:12px">${statusIcon[t.status] || "⬚"}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};font-size:13px">
+                ${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+                ${t.category ? `<span style="background:var(--accent);color:white;padding:1px 6px;border-radius:8px;font-size:10px;margin-right:4px">${escapeHtml(t.category)}</span>` : ""}
+                ${t.project ? `📁 ${escapeHtml(t.project.name)} · ` : ""}
+                ${t.dueDate ? `${overdue ? "⏰" : "📅"} ${new Date(t.dueDate).toLocaleDateString("ru")} · ` : ""}
+                ${t.status}
+              </div>
+            </div>
+          </div>`;
+        }).join("")}
+      </div>
+    `;
+  }
+  el.innerHTML = html;
 }
 
 const KANBAN_COLS = [
@@ -1536,8 +1619,15 @@ async function openTaskForm(id) {
       api("/projects").catch(() => []),
     ]);
   }
-  f.assigneeId.innerHTML = '<option value="">—</option>' + _users.map((u) => `<option value="${u.id}">${escapeHtml(u.email)}</option>`).join("");
+  f.assigneeId.innerHTML = '<option value="">—</option>' + _users.map((u) => `<option value="${u.id}">${escapeHtml(u.name || u.email)}</option>`).join("");
   f.projectId.innerHTML = '<option value="">—</option>' + _projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
+  // Populate labels
+  try {
+    const s = await api("/admin/task-settings").catch(() => ({}));
+    const labels = (s.task_labels || "").split(",").map((l) => l.trim()).filter(Boolean);
+    const catSel = document.getElementById("task-category-select");
+    if (catSel) catSel.innerHTML = '<option value="">—</option>' + labels.map((l) => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
+  } catch {}
   if (id) {
     const t = await api("/tasks/" + id);
     document.getElementById("task-form-title").textContent = "Задача";
@@ -2113,6 +2203,15 @@ async function renderTaskSettingsTab() {
     <form class="admin-form" style="display:flex;flex-direction:column;gap:14px;max-width:600px" onsubmit="saveTaskSettings(event)">
 
       <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
+        <legend>🏷 Метки задач</legend>
+        <label style="display:block;margin-bottom:6px">
+          Список меток (через запятую):
+          <input name="task_labels" value="${escapeHtml(s.task_labels || "")}" placeholder="электричество, планировки, арендаторы, документы, ремонт" style="display:block;width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);box-sizing:border-box">
+        </label>
+        <p style="font-size:11px;color:var(--text-muted);margin:0">Эти метки появятся в выпадающем списке при создании/редактировании задачи, и как фильтр в «Поставлено мной».</p>
+      </fieldset>
+
+      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
         <legend>⏰ Утренний дайджест</legend>
         <label style="display:block;margin-bottom:6px">
           Час МСК (0-23):
@@ -2219,6 +2318,7 @@ async function saveTaskSettings(e) {
   e.preventDefault();
   const f = new FormData(e.target);
   const payload = {
+    task_labels: String(f.get("task_labels") || ""),
     digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
     ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
     ai_autoclose_enabled: e.target.ai_autoclose_enabled.checked ? "true" : "false",
