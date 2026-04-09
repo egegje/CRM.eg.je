@@ -938,6 +938,7 @@ async function showFinanceView() {
   document.getElementById("finance-view").classList.remove("hidden");
   document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
   await checkSberStatus();
+  await loadSberData();
   await loadFinance();
 }
 
