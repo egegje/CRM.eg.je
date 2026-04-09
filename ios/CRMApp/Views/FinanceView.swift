@@ -24,18 +24,27 @@ struct FinanceView: View {
                         let total = summaries.values.compactMap { s in
                             Double(s.closingBalance?.amount ?? "0")
                         }.reduce(0, +)
-                        Text(formatMoney(total) + " ₽")
-                            .font(.system(size: 34, weight: .bold))
-                            .padding(.horizontal)
 
-                        Text(info.fullName ?? info.shortName ?? "")
-                            .font(.subheadline).foregroundStyle(.secondary)
-                            .padding(.horizontal)
-                        if let inn = info.inn {
-                            Text("ИНН \(inn)")
-                                .font(.caption).foregroundStyle(.secondary)
-                                .padding(.horizontal)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Баланс")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Text(fmtMoney(total) + " ₽")
+                                .font(.system(size: 32, weight: .bold, design: .rounded))
+                                .minimumScaleFactor(0.6)
+                                .lineLimit(1)
                         }
+                        .padding(.horizontal)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(info.shortName ?? info.fullName ?? "")
+                                .font(.subheadline).lineLimit(2)
+                            if let inn = info.inn {
+                                Text("ИНН \(inn)")
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.horizontal)
 
                         // Account cards
                         ForEach(info.accounts ?? [], id: \.number) { acc in
@@ -68,40 +77,48 @@ struct FinanceView: View {
     private func accountCard(_ acc: SberAccount) -> some View {
         let summary = summaries[acc.number]
         let balance = Double(summary?.closingBalance?.amount ?? "0") ?? 0
-        let opening = Double(summary?.openingBalance?.amount ?? "0") ?? 0
         let debit = Double(summary?.debitTurnover?.amount ?? "0") ?? 0
         let credit = Double(summary?.creditTurnover?.amount ?? "0") ?? 0
 
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(acc.number)
-                        .font(.system(.subheadline, design: .monospaced))
-                    Text("БИК \(acc.bic ?? "") · \(acc.name ?? acc.type ?? "")")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text(formatMoney(balance) + " ₽")
-                        .font(.title3).bold()
-                    Text("вход: \(formatMoney(opening))")
-                        .font(.caption2).foregroundStyle(.secondary)
-                }
-            }
+        return VStack(alignment: .leading, spacing: 10) {
+            // Balance
+            Text(fmtMoney(balance) + " ₽")
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+
+            // Account number
+            Text(acc.number)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(.secondary)
+
+            // Turnovers
             if summary != nil {
                 HStack(spacing: 16) {
-                    Label("−\(formatMoney(debit)) (\(summary?.debitTransactionsNumber ?? 0))", systemImage: "arrow.up.right")
-                        .font(.caption).foregroundStyle(.red)
-                    Label("+\(formatMoney(credit)) (\(summary?.creditTransactionsNumber ?? 0))", systemImage: "arrow.down.left")
-                        .font(.caption).foregroundStyle(.green)
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.up.right").font(.caption2)
+                        Text(fmtMoney(debit))
+                            .font(.caption).minimumScaleFactor(0.7)
+                    }
+                    .foregroundStyle(.red)
+
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.down.left").font(.caption2)
+                        Text(fmtMoney(credit))
+                            .font(.caption).minimumScaleFactor(0.7)
+                    }
+                    .foregroundStyle(.green)
                 }
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
     }
+
+    private func fmtMoney(_ v: Double) -> String { formatMoney(v) }
 
     private func loadData() async {
         isLoading = true

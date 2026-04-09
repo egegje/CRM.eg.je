@@ -11,38 +11,33 @@ struct MailListView: View {
     @State private var replyMessage: MailMessage?
 
     private let folders = [
-        ("inbox", "Вход", "tray.fill"),
-        ("sent", "Отпр", "paperplane.fill"),
-        ("drafts", "Черн", "doc.text"),
-        ("starred", "⭐", "star.fill"),
-        ("trash", "🗑", "trash"),
+        ("inbox", "tray.fill"),
+        ("sent", "paperplane.fill"),
+        ("drafts", "doc.text"),
+        ("starred", "star.fill"),
+        ("trash", "trash"),
     ]
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
                 // Folder tabs
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(folders, id: \.0) { f in
-                            Button {
-                                selectedFolder = f.0
-                                Task { await loadMessages() }
-                            } label: {
-                                Label(f.1, systemImage: f.2)
-                                    .font(.caption)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(selectedFolder == f.0 ? Color.accentColor : Color(.tertiarySystemBackground))
-                                    .foregroundStyle(selectedFolder == f.0 ? .white : .primary)
-                                    .cornerRadius(16)
-                            }
+                HStack(spacing: 0) {
+                    ForEach(folders, id: \.0) { f in
+                        Button {
+                            selectedFolder = f.0
+                            Task { await loadMessages() }
+                        } label: {
+                            Image(systemName: f.1)
+                                .font(.system(size: 18))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundStyle(selectedFolder == f.0 ? .accentColor : .secondary)
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
                 }
                 .background(Color(.secondarySystemBackground))
+                .overlay(alignment: .bottom) { Divider() }
 
                 List {
                     ForEach(messages) { msg in
