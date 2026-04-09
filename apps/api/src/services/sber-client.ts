@@ -1,5 +1,7 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
+import { readFileSync } from "node:fs";
+import { Agent, request as httpsRequest } from "node:https";
 
 const cfg = loadConfig();
 
@@ -7,7 +9,55 @@ const AUTH_HOST = "https://sbi.sberbank.ru:9443";
 const TOKEN_HOST = "https://fintech.sberbank.ru:9443";
 const API_HOST = "https://fintech.sberbank.ru:9443";
 
-const SCOPE_V1 = `openid ${cfg.sberClientId ? `di-20c769e4-4af8-4192-8e38-e35435c433f6` : ""}`.trim();
+/** mTLS agent — loaded once, reused for all server-to-server calls. */
+let _agent: Agent | undefined;
+function sberAgent(): Agent {
+  if (_agent) return _agent;
+  try {
+    _agent = new Agent({
+      cert: readFileSync("/etc/crm/sber-client-cert.pem"),
+      key: readFileSync("/etc/crm/sber-client-key.pem"),
+      ca: readFileSync("/etc/crm/sber-ca-bundle.pem"),
+      rejectUnauthorized: true,
+    });
+  } catch (e) {
+    console.error("sber-client: failed to load certs, mTLS disabled:", (e as Error).message);
+    _agent = new Agent({ rejectUnauthorized: false });
+  }
+  return _agent;
+}
+
+/** Low-level HTTPS request with mTLS agent — returns {status, body}. */
+function sberHttp(
+  method: string,
+  rawUrl: string,
+  headers: Record<string, string>,
+  bodyStr?: string,
+): Promise<{ status: number; body: string }> {
+  return new Promise((resolve, reject) => {
+    const url = new URL(rawUrl);
+    const req = httpsRequest(
+      {
+        hostname: url.hostname,
+        port: url.port || 443,
+        path: url.pathname + url.search,
+        method,
+        headers,
+        agent: sberAgent(),
+      },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (c: Buffer) => chunks.push(c));
+        res.on("end", () =>
+          resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf-8") }),
+        );
+      },
+    );
+    req.on("error", reject);
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
 
 const SCOPE_V2 = [
   "openid",
@@ -42,22 +92,14 @@ export async function exchangeCode(code: string): Promise<{
     redirect_uri: cfg.sberRedirectUri || "",
     client_id: cfg.sberClientId || "",
     client_secret: cfg.sberClientSecret || "",
-  });
-  const r = await fetch(`${TOKEN_HOST}/ic/sso/api/v2/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`sber token ${r.status}: ${txt}`);
+  }).toString();
+  const r = await sberHttp("POST", `${TOKEN_HOST}/ic/sso/api/v2/oauth/token`, {
+    "Content-Type": "application/x-www-form-urlencoded",
+  }, body);
+  if (r.status < 200 || r.status >= 300) {
+    throw new Error(`sber token ${r.status}: ${r.body.slice(0, 500)}`);
   }
-  return r.json() as Promise<{
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-    scope?: string;
-  }>;
+  return JSON.parse(r.body);
 }
 
 /** Refresh access token using refresh_token. */
@@ -71,21 +113,14 @@ export async function refreshAccessToken(refreshToken: string): Promise<{
     refresh_token: refreshToken,
     client_id: cfg.sberClientId || "",
     client_secret: cfg.sberClientSecret || "",
-  });
-  const r = await fetch(`${TOKEN_HOST}/ic/sso/api/v2/oauth/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: body.toString(),
-  });
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`sber refresh ${r.status}: ${txt}`);
+  }).toString();
+  const r = await sberHttp("POST", `${TOKEN_HOST}/ic/sso/api/v2/oauth/token`, {
+    "Content-Type": "application/x-www-form-urlencoded",
+  }, body);
+  if (r.status < 200 || r.status >= 300) {
+    throw new Error(`sber refresh ${r.status}: ${r.body.slice(0, 500)}`);
   }
-  return r.json() as Promise<{
-    access_token: string;
-    refresh_token?: string;
-    expires_in: number;
-  }>;
+  return JSON.parse(r.body);
 }
 
 /** Get a valid access token — auto-refreshes if expired. */
@@ -107,22 +142,19 @@ export async function getAccessToken(): Promise<string> {
   return fresh.access_token;
 }
 
-/** Generic Sber API GET request with auto-auth. */
+/** Generic Sber API GET request with auto-auth + mTLS. */
 async function sberGet<T>(path: string, params?: Record<string, string>): Promise<T> {
   const token = await getAccessToken();
   const url = new URL(path, API_HOST);
   if (params) for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-  const r = await fetch(url.toString(), {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
+  const r = await sberHttp("GET", url.toString(), {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/json",
   });
-  if (!r.ok) {
-    const txt = await r.text();
-    throw new Error(`sber api ${r.status}: ${txt.slice(0, 500)}`);
+  if (r.status < 200 || r.status >= 300) {
+    throw new Error(`sber api ${r.status}: ${r.body.slice(0, 500)}`);
   }
-  return r.json() as Promise<T>;
+  return JSON.parse(r.body) as T;
 }
 
 // ---- Business endpoints ----
