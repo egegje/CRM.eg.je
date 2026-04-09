@@ -956,7 +956,9 @@ async function loadSberData() {
         const txResp = await api(`/api/sber/statement/transactions?accountNumber=${acc.number}&statementDate=${today}`);
         transactions = txResp.transactions || [];
       } catch {}
-      const bal = summary ? fmtMoney(summary.closingBalance) : "—";
+      // Sber returns amounts as {amount:"123.45", currencyName:"RUR"}
+      const sberAmt = (v) => typeof v === "object" && v ? parseFloat(v.amount) : parseFloat(v) || 0;
+      const bal = summary ? fmtMoney(sberAmt(summary.closingBalance)) : "—";
       html += `
         <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
@@ -967,18 +969,23 @@ async function loadSberData() {
             <div style="font-size:18px;font-weight:700">${bal} ₽</div>
           </div>
           ${summary ? `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">
-            Входящий: ${fmtMoney(summary.openingBalance)} · Дебет: ${fmtMoney(summary.debitTurnover)} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(summary.creditTurnover)} (${summary.creditTransactionsNumber})
+            Входящий: ${fmtMoney(sberAmt(summary.openingBalance))} · Дебет: ${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})
           </div>` : ""}
           ${transactions.length ? `
             <table style="width:100%;font-size:12px;border-collapse:collapse">
               <thead style="color:var(--text-muted)"><tr><th style="text-align:left;padding:4px">Дата</th><th style="text-align:left;padding:4px">Контрагент</th><th style="text-align:left;padding:4px">Назначение</th><th style="text-align:right;padding:4px">Сумма</th></tr></thead>
               <tbody>${transactions.slice(0, 50).map((t) => {
                 const isDebit = (t.direction || "").toUpperCase() === "DEBIT";
+                const amt = sberAmt(t.amount);
+                const rur = t.rurTransfer || {};
+                const counterparty = isDebit ? (rur.payeeName || "—") : (rur.payerName || "—");
+                const purpose = t.paymentPurpose || "";
+                const dt = (t.operationDate || t.documentDate || "").slice(0, 10);
                 return `<tr>
-                  <td style="padding:4px;white-space:nowrap">${(t.date || "").slice(0, 10)}</td>
-                  <td style="padding:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(t.counterpartyName || "—")}</td>
-                  <td style="padding:4px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)">${escapeHtml((t.purpose || "").slice(0, 100))}</td>
-                  <td style="padding:4px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(Math.abs(t.amount))}</td>
+                  <td style="padding:4px;white-space:nowrap">${dt}</td>
+                  <td style="padding:4px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(counterparty)}</td>
+                  <td style="padding:4px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-muted)">${escapeHtml(purpose.slice(0, 100))}</td>
+                  <td style="padding:4px;text-align:right;font-weight:600;color:${isDebit ? "var(--danger)" : "#21a038"};white-space:nowrap">${isDebit ? "−" : "+"}${fmtMoney(amt)}</td>
                 </tr>`;
               }).join("")}</tbody>
             </table>

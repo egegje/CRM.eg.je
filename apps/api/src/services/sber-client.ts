@@ -64,6 +64,12 @@ const SCOPE_V2 = [
   "GET_CLIENT_ACCOUNTS",
   "GET_STATEMENT_ACCOUNT",
   "GET_STATEMENT_TRANSACTION",
+  "accounts",
+  "inn",
+  "name",
+  "orgFullName",
+  "orgKpp",
+  "orgOgrn",
 ].join(" ");
 
 /** Build the Sber Business ID authorization URL that the user opens in their browser. */
