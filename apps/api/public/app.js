@@ -911,6 +911,10 @@ function switchSection(section) {
   } else if (section === "admin") {
     showAdminView();
   }
+  // Update mobile tabbar active state
+  document.querySelectorAll(".tabbar button[id^='mtab-']").forEach((el) => {
+    el.classList.toggle("mtab-active", el.id === "mtab-" + section);
+  });
 }
 
 async function showAdminView() {

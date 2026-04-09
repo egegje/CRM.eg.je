@@ -174,11 +174,12 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   #app.show-preview .list-pane { display: none; }
   #app.show-preview .preview-pane { display: block; }
   #app.show-preview .burger { left: auto; right: 10px; }
-  .messages-list, .preview-pane { padding-bottom: 60px; }
+  .messages-list, .preview-pane, #tasks-view, #finance-view, #team-view, #admin-view { padding-bottom: 60px; }
   .tabbar {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0; height: 56px;
     background: var(--bg); border-top: 1px solid var(--border); z-index: 40;
   }
-  .tabbar button { flex: 1; background: none; border: none; font-size: 22px; color: var(--text); cursor: pointer; }
+  .tabbar button { flex: 1; background: none; border: none; font-size: 22px; color: var(--text-muted); cursor: pointer; padding: 0; line-height: 56px; }
   .tabbar button:active { background: var(--bg-hover); }
+  .tabbar button.mtab-active { color: var(--accent); }
 }

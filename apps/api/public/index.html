@@ -235,9 +235,10 @@
 </div>
 
 <nav class="tabbar" id="tabbar">
-  <button onclick="state.currentFolder='__inbox';refreshList()">📥</button>
-  <button onclick="openCompose()">✉️</button>
-  <button onclick="document.getElementById('search-input').focus()">🔍</button>
+  <button onclick="switchSection('mail')" id="mtab-mail" class="mtab-active">📧</button>
+  <button onclick="switchSection('tasks')" id="mtab-tasks">✅</button>
+  <button onclick="switchSection('finance')" id="mtab-finance">💰</button>
+  <button onclick="switchSection('admin')" id="mtab-admin">⚙</button>
   <button onclick="toggleSidebar()">☰</button>
 </nav>
 
