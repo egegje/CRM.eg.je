@@ -143,69 +143,35 @@ struct TaskRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
-            priorityIcon
-            VStack(alignment: .leading, spacing: 2) {
+        HStack(spacing: 12) {
+            PriorityDot(priority: task.priority)
+                .frame(width: 16)
+            VStack(alignment: .leading, spacing: 5) {
                 Text(task.title)
                     .font(.body)
                     .strikethrough(task.status == "done")
                     .foregroundStyle(task.status == "done" ? .secondary : .primary)
+                    .lineLimit(2)
                 HStack(spacing: 6) {
-                    statusBadge
+                    StatusPill(status: task.status)
                     if let p = task.project?.name {
-                        Label(p, systemImage: "folder").labelStyle(.titleAndIcon)
+                        Label(p, systemImage: "folder")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
                     }
                     if let d = task.dueDate {
                         Label(d.formatted(date: .abbreviated, time: .omitted),
                               systemImage: overdue ? "clock.badge.exclamationmark" : "calendar")
+                            .font(.caption2)
                             .foregroundStyle(overdue ? .red : .secondary)
                     }
                     if let cat = task.category, !cat.isEmpty {
-                        Text(cat)
-                            .font(.system(size: 9))
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 1)
-                            .background(Color.accentColor.opacity(0.12))
-                            .foregroundStyle(.accentColor)
-                            .cornerRadius(4)
+                        LabelPill(text: cat)
                     }
                 }
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
-    @ViewBuilder
-    private var priorityIcon: some View {
-        switch task.priority {
-        case "urgent": Image(systemName: "flame.fill").foregroundStyle(.red)
-        case "high": Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-        case "low": Image(systemName: "arrow.down.circle").foregroundStyle(.secondary)
-        default: Image(systemName: "circle").foregroundStyle(.tertiary)
-        }
-    }
-
-    private var statusBadge: some View {
-        let (text, color): (String, Color) = {
-            switch task.status {
-            case "in_progress": return ("в работе", .orange)
-            case "done": return ("готово", .green)
-            case "cancelled": return ("отменена", .gray)
-            default: return ("", .clear)
-            }
-        }()
-        return Group {
-            if !text.isEmpty {
-                Text(text)
-                    .font(.system(size: 9, weight: .medium))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(color.opacity(0.15))
-                    .foregroundStyle(color)
-                    .cornerRadius(4)
-            }
-        }
-    }
 }

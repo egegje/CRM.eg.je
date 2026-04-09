@@ -171,22 +171,45 @@ struct MailListView: View {
 struct MailRow: View {
     let message: MailMessage
 
+    private var senderName: String {
+        let addr = message.fromAddr
+        if let atIdx = addr.firstIndex(of: "@") {
+            return String(addr[addr.startIndex..<atIdx])
+        }
+        return addr
+    }
+
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(message.isRead ? Color.clear : Color.accentColor)
-                .frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 3) {
+        HStack(spacing: 12) {
+            ZStack(alignment: .topTrailing) {
+                AvatarView(name: senderName, size: 44)
+                if !message.isRead {
+                    Circle().fill(.blue)
+                        .frame(width: 10, height: 10)
+                        .offset(x: 2, y: -2)
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
                 HStack {
                     Text(message.fromAddr)
                         .font(.subheadline)
                         .fontWeight(message.isRead ? .regular : .bold)
                         .lineLimit(1)
                     Spacer()
-                    if let d = message.receivedAt {
-                        Text(formatDate(d))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                    HStack(spacing: 4) {
+                        if (message._count?.attachments ?? 0) > 0 {
+                            Image(systemName: "paperclip")
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        if message.isStarred {
+                            Image(systemName: "star.fill")
+                                .font(.caption2).foregroundStyle(.yellow)
+                        }
+                        if let d = message.receivedAt {
+                            Text(formatDate(d))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 Text(message.subject.isEmpty ? "(без темы)" : message.subject)
@@ -200,20 +223,8 @@ struct MailRow: View {
                         .lineLimit(2)
                 }
             }
-            VStack(spacing: 4) {
-                if message.isStarred {
-                    Image(systemName: "star.fill")
-                        .foregroundStyle(.yellow)
-                        .font(.caption)
-                }
-                if (message._count?.attachments ?? 0) > 0 {
-                    Image(systemName: "paperclip")
-                        .foregroundStyle(.secondary)
-                        .font(.caption2)
-                }
-            }
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
     }
 
     private func formatDate(_ d: Date) -> String {
