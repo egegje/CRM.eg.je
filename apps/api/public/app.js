@@ -928,7 +928,7 @@ async function showAdminView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("admin-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   renderAdminTab();
 }
 
@@ -940,7 +940,7 @@ async function showFinanceView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("finance-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   await checkSberStatus();
   await loadSberData();
   await loadFinance();
@@ -1261,7 +1261,7 @@ async function showTasksView(filter) {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   const titles = {
     me: "Мои задачи",
     createdByMe: "Поставлено мной",
@@ -1284,7 +1284,7 @@ async function showTeamView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("team-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   await loadTeamView();
 }
 
@@ -1338,7 +1338,7 @@ async function showKanbanView() {
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
-  document.getElementById("app").style.gridTemplateColumns = "56px 1fr";
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   document.getElementById("tasks-view-title").textContent = "🗂 Канбан";
   await loadTasks();
 }
