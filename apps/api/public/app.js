@@ -1396,14 +1396,10 @@ function renderTasks(tasks) {
   el.innerHTML = tasks.map((t) => {
     const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
     const done = t.status === "done";
-    return `<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:10px" onclick="openTaskForm('${t.id}')">
-      ${done
-        ? `<span style="color:#10b981;font-size:16px;margin-top:2px" title="выполнена">✅</span>`
-        : `<button onclick="event.stopPropagation();if(confirm('Завершить задачу?'))toggleTaskDone('${t.id}',true)" style="background:none;border:1px solid var(--border);border-radius:4px;width:22px;height:22px;cursor:pointer;padding:0;margin-top:1px;flex-shrink:0" title="завершить"></button>`
-      }
+    return `<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px" onclick="openTaskForm('${t.id}')">
       <div style="flex:1;min-width:0">
         <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word">
-          ${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
+          ${t.priority === "urgent" ? "🔥 " : ""}${done ? "✅ " : ""}${escapeHtml(t.title)}
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
           ${t.project ? `📁 ${escapeHtml(t.project.name)} · ` : ""}
@@ -1412,6 +1408,7 @@ function renderTasks(tasks) {
         </div>
         ${tagPillsHtml(t) ? `<div style="margin-top:5px">${tagPillsHtml(t)}</div>` : ""}
       </div>
+      ${done ? "" : `<button onclick="event.stopPropagation();if(confirm('Завершить задачу?'))toggleTaskDone('${t.id}',true)" style="padding:4px 10px;background:#10b981;color:white;border:none;border-radius:5px;cursor:pointer;font-size:11px;white-space:nowrap;flex-shrink:0">Завершить</button>`}
     </div>`;
   }).join("");
 }
