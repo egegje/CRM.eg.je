@@ -84,7 +84,7 @@ struct TaskFormView: View {
                         Task { await save() }
                     }
                     .disabled(title.isEmpty || busy)
-                    .bold()
+                    .fontWeight(.semibold)
                 }
             }
             .task { await loadOptions() }

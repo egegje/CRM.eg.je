@@ -108,7 +108,7 @@ struct StatCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.system(size: 20, weight: .bold, design: .rounded))
+                .font(.system(size: 20, weight: .semibold, design: .rounded))
                 .foregroundStyle(color)
             if let sub = subtitle {
                 Text(sub)

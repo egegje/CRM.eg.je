@@ -11,9 +11,9 @@ struct LoginView: View {
             VStack(spacing: 18) {
                 Spacer()
                 Image(systemName: "checkmark.seal.fill")
-                    .resizable().scaledToFit().frame(width: 72, height: 72)
+                    .resizable().scaledToFit().frame(width: 52, height: 52)
                     .foregroundStyle(.tint)
-                Text("crm.eg.je").font(.largeTitle).bold()
+                Text("crm.eg.je").font(.title).fontWeight(.semibold)
                 Text("Войдите под своим аккаунтом")
                     .foregroundStyle(.secondary)
 

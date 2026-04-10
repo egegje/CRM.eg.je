@@ -75,7 +75,7 @@ struct FinanceView: View {
         return VStack(alignment: .leading, spacing: 10) {
             // Balance
             Text(fmtMoney(balance) + " ₽")
-                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .font(.system(size: 22, weight: .semibold, design: .rounded))
                 .minimumScaleFactor(0.7)
                 .lineLimit(1)
 

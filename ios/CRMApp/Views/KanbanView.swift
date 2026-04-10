@@ -6,10 +6,10 @@ struct KanbanView: View {
     @State private var selectedColumn = 0
 
     private let columns: [(key: String, title: String, icon: String, color: Color)] = [
-        ("open", "Открыта", "tray.fill", .blue),
-        ("in_progress", "В работе", "gearshape.fill", .orange),
-        ("done", "Выполнена", "checkmark.circle.fill", .green),
-        ("cancelled", "Отменена", "xmark.circle.fill", .gray),
+        ("open", "Открыта", "tray", .blue),
+        ("in_progress", "В работе", "gearshape", .orange),
+        ("done", "Выполнена", "checkmark.circle", .green),
+        ("cancelled", "Отменена", "xmark.circle", .gray),
     ]
 
     var body: some View {
@@ -27,7 +27,7 @@ struct KanbanView: View {
                                     .font(.system(size: 14))
                                 if count > 0 {
                                     Text("\(count)")
-                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                        .font(.system(size: 12, weight: .medium, design: .rounded))
                                 }
                             }
                             .foregroundStyle(selectedColumn == idx ? col.color : .secondary)
@@ -87,7 +87,7 @@ struct KanbanView: View {
                 PriorityDot(priority: task.priority)
                     .frame(width: 16)
                 Text(task.title)
-                    .font(.body).fontWeight(.semibold)
+                    .font(.subheadline).fontWeight(.medium)
                 Spacer()
             }
 

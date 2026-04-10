@@ -13,9 +13,9 @@ struct MailListView: View {
     private let folders = [
         ("inbox", "tray.fill"),
         ("sent", "paperplane.fill"),
-        ("drafts", "doc.text"),
+        ("drafts", "doc.text.fill"),
         ("starred", "star.fill"),
-        ("trash", "trash"),
+        ("trash", "trash.fill"),
     ]
 
     var body: some View {
@@ -242,7 +242,7 @@ struct MailDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 Text(msg.subject.isEmpty ? "(без темы)" : msg.subject)
-                    .font(.title2).bold()
+                    .font(.headline).fontWeight(.semibold)
                 HStack {
                     Text("От: \(msg.fromAddr)")
                         .font(.subheadline).foregroundStyle(.secondary)
@@ -305,7 +305,7 @@ struct MailDetailView: View {
                 if let onReply {
                     Button { onReply() } label: {
                         VStack(spacing: 2) {
-                            Image(systemName: "arrowshape.turn.up.left.fill")
+                            Image(systemName: "arrowshape.turn.up.left")
                             Text("Ответить").font(.caption2)
                         }
                         .frame(maxWidth: .infinity)
@@ -313,7 +313,7 @@ struct MailDetailView: View {
                 }
                 ShareLink(item: "От: \(msg.fromAddr)\nТема: \(msg.subject)\n\n\(msg.bodyText ?? "")") {
                     VStack(spacing: 2) {
-                        Image(systemName: "arrowshape.turn.up.right.fill")
+                        Image(systemName: "arrowshape.turn.up.right")
                         Text("Переслать").font(.caption2)
                     }
                     .frame(maxWidth: .infinity)
@@ -324,7 +324,7 @@ struct MailDetailView: View {
                     }
                 } label: {
                     VStack(spacing: 2) {
-                        Image(systemName: "trash.fill")
+                        Image(systemName: "trash")
                         Text("Удалить").font(.caption2)
                     }
                     .frame(maxWidth: .infinity)

@@ -68,7 +68,7 @@ struct ComposeView: View {
                         Task { await send() }
                     }
                     .disabled(busy || to.isEmpty || mailboxId.isEmpty)
-                    .bold()
+                    .fontWeight(.semibold)
                 }
             }
             .task { await loadOptions() }

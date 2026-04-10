@@ -18,7 +18,7 @@ struct TaskDetailView: View {
     var body: some View {
         Form {
             Section {
-                Text(task.title).font(.title3).bold()
+                Text(task.title).font(.body).fontWeight(.medium)
                 if let d = task.description, !d.isEmpty {
                     Text(d).foregroundStyle(.secondary)
                 }
@@ -67,7 +67,7 @@ struct TaskDetailView: View {
                     Button {
                         Task { await sendComment() }
                     } label: {
-                        Image(systemName: "paperplane.fill")
+                        Image(systemName: "paperplane").font(.system(size: 16, weight: .light))
                     }
                     .disabled(newComment.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
@@ -78,7 +78,7 @@ struct TaskDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if let onEdit {
-                    Button("Изменить") { onEdit() }
+                    Button { onEdit() } label: { Image(systemName: "pencil").font(.system(size: 16, weight: .light)) }
                 }
             }
         }

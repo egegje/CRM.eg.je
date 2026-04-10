@@ -57,10 +57,10 @@ struct LockScreen: View {
     var body: some View {
         VStack(spacing: 20) {
             Spacer()
-            Image(systemName: "lock.shield.fill")
-                .resizable().scaledToFit().frame(width: 64, height: 64)
+            Image(systemName: "lock.shield")
+                .resizable().scaledToFit().frame(width: 48, height: 48)
                 .foregroundStyle(.tint)
-            Text("CRM").font(.largeTitle).bold()
+            Text("CRM").font(.title).fontWeight(.semibold)
             Text("Разблокируйте для входа")
                 .foregroundStyle(.secondary)
             Button("Разблокировать") {

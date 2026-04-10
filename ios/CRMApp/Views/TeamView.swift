@@ -32,7 +32,7 @@ struct TeamView: View {
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text(m.name).font(.headline).lineLimit(1)
+                Text(m.name).font(.subheadline).fontWeight(.medium).lineLimit(1)
                 Spacer()
                 Circle().fill(accent).frame(width: 10, height: 10)
             }
@@ -55,7 +55,7 @@ struct TeamView: View {
     private func statBlock(value: Int, label: String, color: Color) -> some View {
         VStack(spacing: 1) {
             Text("\(value)")
-                .font(.title2).bold()
+                .font(.title3).fontWeight(.semibold)
                 .foregroundStyle(color)
             Text(label)
                 .font(.caption2)
