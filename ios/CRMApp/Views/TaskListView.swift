@@ -27,7 +27,7 @@ struct TaskListView: View {
                             Task { await load() }
                         } label: {
                             Image(systemName: filter == f.0 ? f.1 : f.1.replacingOccurrences(of: ".fill", with: ""))
-                                .font(.system(size: 20))
+                                .font(.system(size: 16, weight: .light))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .foregroundStyle(filter == f.0 ? Color.accentColor : .secondary)

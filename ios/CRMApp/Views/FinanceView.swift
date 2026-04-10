@@ -56,6 +56,7 @@ struct FinanceView: View {
             }
             .refreshable { await loadData() }
             .navigationTitle("Финансы")
+            .navigationBarTitleDisplayMode(.inline)
             .task { await loadData() }
             .sheet(item: $selectedAccount) { acc in
                 NavigationStack {

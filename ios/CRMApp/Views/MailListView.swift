@@ -29,7 +29,7 @@ struct MailListView: View {
                             Task { await loadMessages() }
                         } label: {
                             Image(systemName: selectedFolder == f.0 ? f.1 : f.1.replacingOccurrences(of: ".fill", with: ""))
-                                .font(.system(size: 20))
+                                .font(.system(size: 16, weight: .light))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .foregroundStyle(selectedFolder == f.0 ? Color.accentColor : .secondary)
@@ -101,13 +101,13 @@ struct MailListView: View {
                                 }
                             }
                         } label: {
-                            Image(systemName: "tray.2")
+                            Image(systemName: "tray.2").font(.system(size: 16))
                         }
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showCompose = true } label: {
-                        Image(systemName: "square.and.pencil")
+                        Image(systemName: "square.and.pencil").font(.system(size: 16))
                     }
                 }
             }

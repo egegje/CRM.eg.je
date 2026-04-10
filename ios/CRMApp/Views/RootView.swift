@@ -17,20 +17,39 @@ struct RootView: View {
 }
 
 struct MainTabs: View {
+    @State private var tab = 0
+
     var body: some View {
-        TabView {
+        TabView(selection: $tab) {
             TaskListView()
-                .tabItem { Label("Задачи", systemImage: "checkmark.circle") }
+                .tag(0)
+                .tabItem {
+                    Image(systemName: tab == 0 ? "checkmark.circle.fill" : "checkmark.circle")
+                    Text("Задачи")
+                }
 
             MailListView()
-                .tabItem { Label("Почта", systemImage: "envelope") }
+                .tag(1)
+                .tabItem {
+                    Image(systemName: tab == 1 ? "envelope.fill" : "envelope")
+                    Text("Почта")
+                }
 
             FinanceView()
-                .tabItem { Label("Финансы", systemImage: "rublesign.circle") }
+                .tag(2)
+                .tabItem {
+                    Image(systemName: tab == 2 ? "banknote.fill" : "banknote")
+                    Text("Финансы")
+                }
 
             MoreView()
-                .tabItem { Label("Ещё", systemImage: "ellipsis.circle") }
+                .tag(3)
+                .tabItem {
+                    Image(systemName: "ellipsis")
+                    Text("Ещё")
+                }
         }
+        .tint(.accentColor)
     }
 }
 
@@ -83,6 +102,7 @@ struct MoreView: View {
                 }
             }
             .navigationTitle("Ещё")
+            .navigationBarTitleDisplayMode(.inline)
             .sheet(isPresented: $showTeam) {
                 NavigationStack {
                     TeamView()
