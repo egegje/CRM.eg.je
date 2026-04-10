@@ -134,6 +134,10 @@ async function bootApp() {
     if (ibTeam) ibTeam.style.display = "";
     const ibAdmin = document.getElementById("ib-admin");
     if (ibAdmin) ibAdmin.style.display = "";
+    const ibFinance = document.getElementById("ib-finance");
+    if (ibFinance) ibFinance.style.display = "";
+    const mtabFinance = document.getElementById("mtab-finance");
+    if (mtabFinance) mtabFinance.style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();

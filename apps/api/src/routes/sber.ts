@@ -57,7 +57,7 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Check if Sber is connected. */
-  app.get("/api/sber/status", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
+  app.get("/api/sber/status", { preHandler: requireRole("owner", "admin") }, async () => {
     const row = await prisma.sberToken.findUnique({ where: { id: "singleton" } });
     if (!row) return { connected: false };
     return {
@@ -71,12 +71,12 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
   // ---- Data endpoints (proxy to Sber API) ----
 
   /** Get org info + list of accounts. */
-  app.get("/api/sber/accounts", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
+  app.get("/api/sber/accounts", { preHandler: requireRole("owner", "admin") }, async () => {
     return getClientInfo();
   });
 
   /** Get statement summary for a given account + date. */
-  app.get("/api/sber/statement/summary", { preHandler: requireRole("owner", "admin", "manager") }, async (req) => {
+  app.get("/api/sber/statement/summary", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const q = z.object({
       accountNumber: z.string(),
       statementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -85,7 +85,7 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Get transactions for a given account + date. */
-  app.get("/api/sber/statement/transactions", { preHandler: requireRole("owner", "admin", "manager") }, async (req) => {
+  app.get("/api/sber/statement/transactions", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const q = z.object({
       accountNumber: z.string(),
       statementDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -102,7 +102,7 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Query local transactions (any date range, instant). */
-  app.get("/api/sber/local/transactions", { preHandler: requireRole("owner", "admin", "manager") }, async (req) => {
+  app.get("/api/sber/local/transactions", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const q = z.object({
       accountNumber: z.string().optional(),
       dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -128,7 +128,7 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Sync state — when was each account last synced. */
-  app.get("/api/sber/sync-state", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
+  app.get("/api/sber/sync-state", { preHandler: requireRole("owner", "admin") }, async () => {
     return prisma.bankSyncState.findMany();
   });
 }

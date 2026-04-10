@@ -28,7 +28,7 @@
     <div class="ib-logo">C</div>
     <div class="ib-item active" data-section="mail" onclick="switchSection('mail')" title="Почта">📧</div>
     <div class="ib-item" data-section="tasks" onclick="switchSection('tasks')" title="Задачи">✅</div>
-    <div class="ib-item" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
+    <div class="ib-item" id="ib-finance" style="display:none" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
     <div class="ib-item" id="ib-team" style="display:none" data-section="team" onclick="switchSection('team')" title="Команда">👥</div>
     <div style="flex:1"></div>
     <div class="ib-item" id="ib-admin" style="display:none" data-section="admin" onclick="switchSection('admin')" title="Админка">⚙</div>
@@ -199,7 +199,7 @@
 <nav class="tabbar" id="tabbar">
   <button onclick="switchSection('mail')" id="mtab-mail" class="mtab-active">📧</button>
   <button onclick="switchSection('tasks')" id="mtab-tasks">✅</button>
-  <button onclick="switchSection('finance')" id="mtab-finance">💰</button>
+  <button onclick="switchSection('finance')" id="mtab-finance" style="display:none">💰</button>
   <button onclick="switchSection('admin')" id="mtab-admin">⚙</button>
   <button onclick="toggleSidebar()">☰</button>
 </nav>
