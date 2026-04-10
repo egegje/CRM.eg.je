@@ -83,9 +83,9 @@ struct TaskListView: View {
             .navigationDestination(for: CRMTask.self) { task in
                 TaskDetailView(task: task, onEdit: { editingTask = task })
             }
+            }
             .navigationTitle(filter.title)
             .navigationBarTitleDisplayMode(.inline)
-            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 16) {
