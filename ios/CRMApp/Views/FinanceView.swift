@@ -30,6 +30,8 @@ struct FinanceView: View {
                             let short = name
                                 .replacingOccurrences(of: "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ", with: "ИП ")
                                 .replacingOccurrences(of: "Индивидуальный предприниматель ", with: "ИП ")
+                                .replacingOccurrences(of: "ГНАТЮК ", with: "")
+                                .replacingOccurrences(of: "Гнатюк ", with: "")
                             Text(short)
                                 .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
