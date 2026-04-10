@@ -31,14 +31,14 @@ struct MainTabs: View {
             MailListView()
                 .tag(1)
                 .tabItem {
-                    Image(systemName: tab == 1 ? "envelope.fill" : "envelope")
+                    Image(systemName: tab == 1 ? "paperplane.fill" : "paperplane")
                     Text("Почта")
                 }
 
             FinanceView()
                 .tag(2)
                 .tabItem {
-                    Image(systemName: tab == 2 ? "banknote.fill" : "banknote")
+                    Image(systemName: tab == 2 ? "dollarsign.circle.fill" : "dollarsign.circle")
                     Text("Финансы")
                 }
 
