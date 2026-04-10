@@ -28,15 +28,14 @@ struct MailListView: View {
                             selectedFolder = f.0
                             Task { await loadMessages() }
                         } label: {
-                            Image(systemName: f.1)
-                                .font(.system(size: 18))
+                            Image(systemName: selectedFolder == f.0 ? f.1 : f.1.replacingOccurrences(of: ".fill", with: ""))
+                                .font(.system(size: 20))
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
+                                .padding(.vertical, 12)
                                 .foregroundStyle(selectedFolder == f.0 ? .accentColor : .secondary)
                         }
                     }
                 }
-                .background(Color(.secondarySystemBackground))
                 .overlay(alignment: .bottom) { Divider() }
 
                 List {
