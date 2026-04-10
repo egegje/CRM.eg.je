@@ -2299,28 +2299,34 @@ async function renderTaskSettingsTab() {
 
 async function renderPersonasTab() {
   const list = await api("/personas");
-  const rows = list.map((p) => `<tr>
-    <td style="vertical-align:top;padding:8px"><b>${escapeHtml(p.name)}</b></td>
-    <td style="vertical-align:top;padding:8px;font-size:12px;white-space:pre-wrap;color:var(--text-muted);max-width:480px">${escapeHtml(p.signature)}</td>
-    <td style="vertical-align:top;padding:8px;white-space:nowrap">
-      <button onclick="editPersona('${p.id}')">✏️</button>
-      <button class="danger" onclick="deletePersona('${p.id}')">удалить</button>
-    </td>
-  </tr>`).join("");
-  return `
-    <p style="color:var(--text-muted);font-size:12px;margin:0 0 12px">Сотрудники-визитки. Когда автор пишет письмо, в селекте «От имени сотрудника» он выбирает кого-то из этого списка — и в конце письма автоматом подставляется его подпись (вместо подписи ящика). Это не пользователь CRM с логином, а просто справочник «персоны для подписи».</p>
-    <form onsubmit="adminCreatePersona(event)" style="display:block;margin-bottom:18px">
-      <div style="display:flex;flex-direction:column;gap:8px">
-        <label style="font-size:11px;color:var(--text-muted)">Имя сотрудника
-          <input name="name" placeholder="например «Ольга Иванова»" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-size:14px;box-sizing:border-box">
-        </label>
-        <label style="font-size:11px;color:var(--text-muted)">Текст визитки (многострочный)
-          <textarea name="signature" rows="6" placeholder="С уважением,&#10;Ольга Иванова&#10;менеджер по аренде&#10;+7 (xxx) xxx-xx-xx&#10;olya@example.com" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical"></textarea>
-        </label>
-        <button type="submit" style="align-self:flex-start;padding:9px 18px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;font-weight:600">+ Добавить сотрудника</button>
+  const cards = list.map((p) => `
+    <div class="settings-card" style="display:flex;gap:16px;align-items:start">
+      <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:16px;flex-shrink:0">${escapeHtml((p.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase())}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(p.name)}</div>
+        <div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;line-height:1.5">${escapeHtml(p.signature)}</div>
       </div>
-    </form>
-    <table class="admin-table" style="width:100%"><thead><tr><th style="text-align:left;padding:8px">Имя</th><th style="text-align:left;padding:8px">Визитка</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=3 style='color:var(--text-muted);padding:14px'>пусто</td></tr>"}</tbody></table>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button onclick="editPersona('${p.id}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12px">✏️</button>
+        <button onclick="deletePersona('${p.id}')" style="padding:6px 10px;border:1px solid var(--danger);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12px;color:var(--danger)">✕</button>
+      </div>
+    </div>
+  `).join("");
+  return `
+    <p style="color:var(--text-muted);font-size:12px;margin:0 0 16px">Подписи-визитки для писем. Выбираются в селекте «От имени» при написании письма.</p>
+    ${cards || '<div class="settings-card" style="text-align:center;color:var(--text-muted)">Пока нет сотрудников</div>'}
+    <div class="settings-card">
+      <div class="settings-card-title">+ Новый сотрудник</div>
+      <form onsubmit="adminCreatePersona(event)" style="display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:12px;color:var(--text-muted)">Имя
+          <input type="text" name="name" placeholder="Ольга Иванова" required style="display:block;width:100%;padding:10px 12px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box">
+        </label>
+        <label style="font-size:12px;color:var(--text-muted)">Визитка
+          <textarea name="signature" rows="5" placeholder="С уважением,&#10;Ольга Иванова&#10;менеджер по аренде&#10;+7 (xxx) xxx-xx-xx&#10;olya@example.com" required style="display:block;width:100%;padding:10px 12px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-family:inherit;font-size:13px;box-sizing:border-box;resize:vertical"></textarea>
+        </label>
+        <button type="submit" style="align-self:flex-start;padding:10px 20px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Добавить</button>
+      </form>
+    </div>
   `;
 }
 async function adminCreatePersona(e) {
