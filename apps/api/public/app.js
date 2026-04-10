@@ -947,7 +947,9 @@ async function showFinanceView() {
   document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
   await checkSberStatus();
   await loadSberData();
-  await loadFinance();
+  // Hide manual company list — Sber data is primary
+  document.getElementById("finance-totals").style.display = "none";
+  document.getElementById("finance-list").style.display = "none";
 }
 
 function exitFinanceView() {
@@ -964,15 +966,15 @@ async function checkSberStatus() {
     if (!s.connected) {
       connectBtn.style.display = "";
       loadBtn.style.display = "none";
-      statusEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px">🏦 Сбер не подключён. Нажмите «Подключить Сбер» → авторизуйтесь в СберБизнес.</span>';
+      statusEl.innerHTML = '<span style="color:var(--text-muted);font-size:12px">Сбер не подключён</span>';
     } else if (s.expired && !s.hasRefresh) {
       connectBtn.style.display = "";
       loadBtn.style.display = "none";
-      statusEl.innerHTML = '<span style="color:var(--danger);font-size:12px">🔴 Токен Сбера истёк. Переавторизуйтесь.</span>';
+      statusEl.innerHTML = '<span style="color:var(--danger);font-size:12px">Токен Сбера истёк</span>';
     } else {
       connectBtn.style.display = "none";
       loadBtn.style.display = "";
-      statusEl.innerHTML = `<span style="color:#21a038;font-size:12px">🟢 Сбер подключён (токен до ${new Date(s.expiresAt).toLocaleString("ru")})</span>`;
+      statusEl.innerHTML = "";
     }
   } catch {
     document.getElementById("sber-connect-btn").style.display = "none";
@@ -995,7 +997,8 @@ async function loadSberData() {
     const info = await api("/api/sber/accounts");
     const today = new Date().toISOString().slice(0, 10);
     let totalBalance = 0;
-    let html = `<div style="font-weight:600;margin-bottom:12px">${escapeHtml(info.fullName || info.shortName || "")} · ИНН ${escapeHtml(info.inn || "—")}</div>`;
+    const shortName = (info.fullName || info.shortName || "").replace(/ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ /i, "ИП ").replace(/ГНАТЮК /i, "");
+    let html = `<div style="font-size:13px;color:var(--text-muted);margin-bottom:12px">${escapeHtml(shortName)}</div>`;
     for (const acc of (info.accounts || [])) {
       if (acc.state !== "OPEN") continue;
       let summary = null;
@@ -1018,9 +1021,7 @@ async function loadSberData() {
         </div>
       `;
     }
-    if (totalBalance > 0) {
-      html = `<div style="font-size:28px;font-weight:700;margin-bottom:14px">${fmtMoney(totalBalance)} ₽</div>` + html;
-    }
+    // No duplicate total — balance is shown on each account card
     el.innerHTML = html;
   } catch (e) {
     el.innerHTML = `<div style="color:var(--danger)">Ошибка: ${escapeHtml(e.message)}</div>`;
