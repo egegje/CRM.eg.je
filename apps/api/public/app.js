@@ -1824,27 +1824,37 @@ async function renderAdminTab() {
 
 async function renderUsersTab() {
   const users = await api("/admin/users");
-  const rows = users.map((u) => `<tr>
-    <td>${escapeHtml(u.email)}</td><td>${escapeHtml(u.name)}</td>
-    <td>${escapeHtml(u.role)}</td>
-    <td>${u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleString("ru") : "—"}</td>
-    <td style="font-size:11px;color:var(--text-muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${u.signature ? escapeHtml(u.signature.split("\n")[0]) : "<i>нет</i>"}</td>
-    <td>
-      <button onclick="editUser('${u.id}','${escapeHtml(u.name)}','${u.role}')">✏️</button>
-      <button onclick="editUserSignature('${u.id}')">подпись</button>
-      <button onclick="manageUserAccess('${u.id}','${escapeHtml(u.email)}','${u.role}')">доступ</button>
-      <button class="danger" onclick="adminDeleteUser('${u.id}')">удалить</button>
-    </td>
-  </tr>`).join("");
+  const roleColors = { owner: "#6366f1", admin: "#2563eb", manager: "#6b7280" };
+  const cards = users.map((u) => `
+    <div class="settings-card" style="display:flex;gap:14px;align-items:start">
+      <div style="width:40px;height:40px;border-radius:50%;background:${roleColors[u.role] || "#6b7280"};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:14px;flex-shrink:0">${escapeHtml((u.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase())}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-weight:600;font-size:14px">${escapeHtml(u.name)}</span>
+          <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${roleColors[u.role]}22;color:${roleColors[u.role]};font-weight:500">${u.role}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtml(u.email)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">${u.lastLoginAt ? "Последний вход: " + new Date(u.lastLoginAt).toLocaleString("ru") : "Ещё не входил"}</div>
+      </div>
+      <div style="display:flex;gap:4px;flex-shrink:0;flex-wrap:wrap">
+        <button onclick="editUser('${u.id}','${escapeHtml(u.name)}','${u.role}')" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px" title="Редактировать">✏️</button>
+        <button onclick="manageUserAccess('${u.id}','${escapeHtml(u.email)}','${u.role}')" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px" title="Доступ">🔑</button>
+        <button onclick="adminDeleteUser('${u.id}')" style="padding:5px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)" title="Удалить">✕</button>
+      </div>
+    </div>
+  `).join("");
   return `
-    <form class="admin-form" onsubmit="adminCreateUser(event)">
-      <input name="email" type="email" placeholder="email" required>
-      <input name="password" type="password" placeholder="пароль" required>
-      <input name="name" placeholder="имя" required>
-      <select name="role"><option value="manager">manager</option><option value="admin">admin</option><option value="owner">owner</option></select>
-      <button type="submit">+ Добавить</button>
-    </form>
-    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Роль</th><th>Последний вход</th><th>Подпись</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    ${cards}
+    <div class="settings-card">
+      <div class="settings-card-title">+ Новый пользователь</div>
+      <form onsubmit="adminCreateUser(event)" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--text-muted)">Email<input type="email" name="email" placeholder="user@example.com" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">Пароль<input type="password" name="password" placeholder="мин. 4 символа" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">Имя<input name="name" placeholder="Иванов Иван" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">Роль<select name="role" style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"><option value="manager">manager</option><option value="admin">admin</option><option value="owner">owner</option></select></label>
+        <button type="submit" style="grid-column:span 2;padding:10px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Добавить</button>
+      </form>
+    </div>
   `;
 }
 
@@ -1929,25 +1939,31 @@ async function adminDeleteUser(id) {
 
 async function renderMailboxesTab() {
   const list = await api("/admin/mailboxes");
-  const rows = list.map((m) => `<tr>
-    <td>${escapeHtml(m.email)}</td><td>${escapeHtml(m.displayName)}</td>
-    <td>
-      <label><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"> вкл</label>
-    </td>
-    <td>
-      <button onclick="renameMailbox('${m.id}', ${JSON.stringify(m.displayName).replace(/"/g,'&quot;')})">✏️ имя</button>
-      <button onclick="editSignature('${m.id}', ${JSON.stringify(m.signature || "").replace(/"/g,'&quot;')})">✏️ подпись</button>
-      <button class="danger" onclick="adminDeleteMailbox('${m.id}')">удалить</button>
-    </td>
-  </tr>`).join("");
+  const cards = list.map((m) => `
+    <div class="settings-card" style="display:flex;gap:14px;align-items:center">
+      <div style="width:40px;height:40px;border-radius:50%;background:${m.enabled ? "#10b981" : "#9ca3af"};display:flex;align-items:center;justify-content:center;color:white;font-size:18px;flex-shrink:0">📧</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:600;font-size:14px">${escapeHtml(m.displayName)}</div>
+        <div style="font-size:12px;color:var(--text-muted)">${escapeHtml(m.email)}</div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
+        <label class="toggle-switch"><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"><span class="slider"></span></label>
+        <button onclick="renameMailbox('${m.id}', ${JSON.stringify(m.displayName).replace(/"/g,'&quot;')})" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">✏️</button>
+        <button onclick="adminDeleteMailbox('${m.id}')" style="padding:5px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)">✕</button>
+      </div>
+    </div>
+  `).join("");
   return `
-    <form class="admin-form" onsubmit="adminCreateMailbox(event)">
-      <input name="email" type="email" placeholder="user@mail.ru" required>
-      <input name="displayName" placeholder="название" required>
-      <input name="appPassword" type="password" placeholder="пароль приложения" required>
-      <button type="submit">+ Добавить</button>
-    </form>
-    <table class="admin-table"><thead><tr><th>Email</th><th>Название</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    ${cards}
+    <div class="settings-card">
+      <div class="settings-card-title">+ Новый ящик</div>
+      <form onsubmit="adminCreateMailbox(event)" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--text-muted)">Email<input type="email" name="email" placeholder="user@mail.ru" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">Название<input name="displayName" placeholder="Основной" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted);grid-column:span 2">Пароль приложения<input type="password" name="appPassword" placeholder="из настроек почты" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <button type="submit" style="grid-column:span 2;padding:10px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Добавить</button>
+      </form>
+    </div>
   `;
 }
 async function renameMailbox(id, current) {
@@ -2026,14 +2042,16 @@ async function renderContactsTab() {
     <td><button class="danger" onclick="adminDeleteContact('${c.id}')">удалить</button></td>
   </tr>`).join("");
   return `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-      <span style="color:var(--text-muted);font-size:12px">Топ-200 контактов по частоте использования</span>
+    <div class="settings-card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <span style="color:var(--text-muted);font-size:13px">${list.length} контактов</span>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button onclick="scanContactsHistory()" style="padding:6px 12px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🔄 Перебрать всю историю</button>
-        <a href="/admin/contacts/export.csv" download class="link-btn" style="padding:6px 12px;background:var(--accent);color:white;border-radius:5px;text-decoration:none">⬇ Выгрузить (CSV)</a>
+        <button onclick="scanContactsHistory()" style="padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px">🔄 Перебрать историю</button>
+        <a href="/admin/contacts/export.csv" download style="padding:8px 14px;background:var(--accent);color:white;border-radius:8px;text-decoration:none;font-size:12px;font-weight:500">⬇ CSV</a>
       </div>
     </div>
-    <table class="admin-table"><thead><tr><th>Email</th><th>Имя</th><th>Использований</th><th>Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <div class="settings-card" style="padding:0;overflow:hidden">
+      <table class="admin-table"><thead><tr><th style="padding:10px 12px">Email</th><th style="padding:10px 12px">Имя</th><th style="padding:10px 12px">Кол-во</th><th style="padding:10px 12px">Последнее</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
   `;
 }
 async function scanContactsHistory() {
