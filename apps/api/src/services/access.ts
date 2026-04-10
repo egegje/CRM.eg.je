@@ -6,7 +6,10 @@ import { Forbidden, NotFound } from "../errors.js";
  * has full access (owner/admin role).
  */
 export async function accessibleMailboxIds(user: User): Promise<string[] | null> {
-  if (user.role === "owner" || user.role === "admin") return null;
+  // Owner sees everything
+  if (user.role === "owner") return null;
+  // Admin and manager: only mailboxes with explicit access grant.
+  // No grants = no access (empty array).
   const rows = await prisma.userMailbox.findMany({
     where: { userId: user.id },
     select: { mailboxId: true },
@@ -17,7 +20,7 @@ export async function accessibleMailboxIds(user: User): Promise<string[] | null>
 /** Throws if the user cannot access the given message. Returns the message if OK. */
 export async function assertMessageAccess<T extends { mailboxId: string }>(user: User, msg: T | null): Promise<T> {
   if (!msg) throw new NotFound();
-  if (user.role === "owner" || user.role === "admin") return msg;
+  if (user.role === "owner") return msg;
   const rows = await prisma.userMailbox.findMany({
     where: { userId: user.id, mailboxId: msg.mailboxId },
     select: { mailboxId: true },

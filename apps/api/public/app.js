@@ -1893,7 +1893,7 @@ async function manageUserAccess(userId, email, role) {
     ${role !== "owner" ? `
       <div class="settings-card">
         <div class="settings-card-title">📧 Ящики</div>
-        <p style="margin:0 0 8px">Если ничего не отмечено — доступ ко всем ящикам (для admin).</p>
+        <p style="margin:0 0 8px">Отметьте ящики к которым у пользователя есть доступ. Без галочек — почта не видна.</p>
         <div id="access-mb-list">${mbList || "<span style='color:var(--text-muted)'>нет ящиков</span>"}</div>
       </div>
     ` : ""}
