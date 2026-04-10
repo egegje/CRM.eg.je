@@ -103,7 +103,7 @@ struct TaskDetailView: View {
         var req = URLRequest(url: URL(string: "https://crm.eg.je/tasks/\(task.id)/comments")!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let (respData, _) = try? await URLSession.shared.data(for: req) {
+        if let (respData, _) = try? await APIClient.urlSession.data(for: req) {
             if let comment = try? JSONDecoder().decode(TaskComment.self, from: respData) {
                 comments.append(comment)
                 newComment = ""

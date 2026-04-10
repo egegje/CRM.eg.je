@@ -107,20 +107,12 @@ struct ComposeView: View {
                 "bodyText": bodyText,
             ]
             guard let draftData = try? JSONSerialization.data(withJSONObject: draftBody) else { return }
-            var req = URLRequest(url: URL(string: "https://crm.eg.je/messages")!)
-            req.httpMethod = "POST"
-            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            let (data, _) = try await URLSession.shared.data(for: req)
-
-            guard let draft = try? JSONSerialization.jsonObject(with: draftData) as? [String: Any],
-                  let _ = draft["mailboxId"] else { return }
-
-            // Actually send via API
             var createReq = URLRequest(url: URL(string: "https://crm.eg.je/messages")!)
             createReq.httpMethod = "POST"
             createReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
             createReq.httpBody = draftData
-            let (respData, _) = try await URLSession.shared.data(for: createReq)
+            let session = await APIClient.urlSession
+            let (respData, _) = try await session.data(for: createReq)
 
             if let draftResp = try? JSONSerialization.jsonObject(with: respData) as? [String: Any],
                let draftId = draftResp["id"] as? String {
@@ -131,14 +123,14 @@ struct ComposeView: View {
                     patchReq.httpMethod = "PATCH"
                     patchReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     patchReq.httpBody = patchBody
-                    _ = try? await URLSession.shared.data(for: patchReq)
+                    let s = await APIClient.urlSession; _ = try? await s.data(for: patchReq)
                 }
                 // Send
                 var sendReq = URLRequest(url: URL(string: "https://crm.eg.je/messages/\(draftId)/send")!)
                 sendReq.httpMethod = "POST"
                 sendReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 sendReq.httpBody = "{}".data(using: .utf8)
-                _ = try await URLSession.shared.data(for: sendReq)
+                let s = await APIClient.urlSession; _ = try await s.data(for: sendReq)
             }
             dismiss()
         } catch {

@@ -137,13 +137,13 @@ struct TaskFormView: View {
                 req.httpMethod = "PATCH"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 req.httpBody = patchData
-                _ = try await URLSession.shared.data(for: req)
+                let s = await APIClient.urlSession; _ = try await s.data(for: req)
             } else {
                 var req = URLRequest(url: URL(string: "https://crm.eg.je/tasks")!)
                 req.httpMethod = "POST"
                 req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                 req.httpBody = jsonData
-                _ = try await URLSession.shared.data(for: req)
+                let s = await APIClient.urlSession; _ = try await s.data(for: req)
             }
             dismiss()
         } catch {

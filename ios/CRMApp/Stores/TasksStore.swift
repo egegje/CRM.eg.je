@@ -78,6 +78,6 @@ final class TasksStore: ObservableObject {
         req.httpMethod = "PATCH"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = data
-        _ = try? await URLSession.shared.data(for: req)
+        let s = await APIClient.urlSession; _ = try? await s.data(for: req)
     }
 }

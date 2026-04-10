@@ -25,7 +25,7 @@ actor APIClient {
 
     var baseURL = URL(string: "https://crm.eg.je")!
 
-    private lazy var session: URLSession = {
+    lazy var session: URLSession = {
         let cfg = URLSessionConfiguration.default
         cfg.httpCookieStorage = HTTPCookieStorage.shared
         cfg.httpCookieAcceptPolicy = .always
@@ -33,6 +33,11 @@ actor APIClient {
         cfg.timeoutIntervalForRequest = 30
         return URLSession(configuration: cfg)
     }()
+
+    /// Shared URLSession with cookies for use outside APIClient
+    static var urlSession: URLSession {
+        get async { await shared.session }
+    }
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()

@@ -141,14 +141,6 @@ struct FinanceView: View {
         }
     }
 
-    private func formatMoney(_ v: Double) -> String {
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .decimal
-        fmt.minimumFractionDigits = 2
-        fmt.maximumFractionDigits = 2
-        fmt.groupingSeparator = " "
-        return fmt.string(from: NSNumber(value: v)) ?? "0.00"
-    }
 }
 
 struct StatementView: View {
@@ -228,14 +220,6 @@ struct StatementView: View {
         )) ?? []
     }
 
-    private func formatMoney(_ v: Double) -> String {
-        let fmt = NumberFormatter()
-        fmt.numberStyle = .decimal
-        fmt.minimumFractionDigits = 2
-        fmt.maximumFractionDigits = 2
-        fmt.groupingSeparator = " "
-        return fmt.string(from: NSNumber(value: v)) ?? "0.00"
-    }
 }
 
 struct BankTx: Codable, Identifiable, Hashable {

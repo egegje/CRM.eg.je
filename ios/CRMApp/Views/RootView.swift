@@ -34,19 +34,6 @@ struct MainTabs: View {
     }
 }
 
-struct ComingSoonView: View {
-    let title: String
-    var body: some View {
-        NavigationStack {
-            ContentUnavailableView(
-                "\(title) — скоро",
-                systemImage: "hammer",
-                description: Text("Экран пока не реализован нативно. В следующем релизе.")
-            )
-            .navigationTitle(title)
-        }
-    }
-}
 
 struct MoreView: View {
     @EnvironmentObject var auth: AuthStore
