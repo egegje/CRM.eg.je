@@ -18,16 +18,14 @@ export async function financeRoutes(app: FastifyInstance): Promise<void> {
         include: { accounts: { orderBy: { bank: "asc" } } },
       });
     }
+    // Admin sees only companies with explicit access grant
     const access = await prisma.userCompanyAccess.findMany({
       where: { userId: user.id },
       select: { companyId: true },
     });
     if (access.length === 0) {
-      // No restrictions set — admin sees all
-      return prisma.company.findMany({
-        orderBy: { name: "asc" },
-        include: { accounts: { orderBy: { bank: "asc" } } },
-      });
+      // No access granted — sees nothing
+      return [];
     }
     return prisma.company.findMany({
       where: { id: { in: access.map((a) => a.companyId) } },

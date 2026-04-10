@@ -1900,7 +1900,7 @@ async function manageUserAccess(userId, email, role) {
     ${role !== "owner" ? `
       <div class="settings-card">
         <div class="settings-card-title">💰 Компании (финансы)</div>
-        <p style="margin:0 0 8px">Если ничего не отмечено — видит все компании. Отметьте конкретные чтобы ограничить.</p>
+        <p style="margin:0 0 8px">Отметьте компании которые пользователь может видеть. Без галочек — финансы не видны.</p>
         <div id="access-co-list">${coList || "<span style='color:var(--text-muted)'>нет компаний</span>"}</div>
       </div>
     ` : '<p style="color:var(--text-muted)">Owner имеет полный доступ ко всему.</p>'}

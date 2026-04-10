@@ -70,9 +70,23 @@ export async function sberRoutes(app: FastifyInstance): Promise<void> {
 
   // ---- Data endpoints (proxy to Sber API) ----
 
-  /** Get org info + list of accounts. */
+  /** Get org info + list of accounts. Auto-creates Company record. */
   app.get("/api/sber/accounts", { preHandler: requireRole("owner", "admin") }, async () => {
-    return getClientInfo();
+    const info = await getClientInfo();
+    // Auto-upsert Company from Sber data so it appears in access management
+    if (info.inn) {
+      const existing = await prisma.company.findFirst({ where: { inn: info.inn } });
+      if (!existing) {
+        await prisma.company.create({
+          data: {
+            name: info.shortName || info.fullName || "Сбер",
+            inn: info.inn,
+            sberCustId: info.inn,
+          },
+        });
+      }
+    }
+    return info;
   });
 
   /** Get statement summary for a given account + date. */
