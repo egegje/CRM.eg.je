@@ -2124,29 +2124,67 @@ async function renderAnalyticsTab() {
     </tr>`;
   }).join("");
 
+  // Summary metrics
+  const totalSessions = list.reduce((s, u) => s + u.sessionCount, 0);
+  const totalHours = list.reduce((s, u) => s + parseFloat(u.totalSessionHours || 0), 0);
+  const totalSent = list.reduce((s, u) => s + u.sent, 0);
+  const activeUsers = list.filter(u => u.sessionCount > 0).length;
+
+  // User cards
+  const roleColors = { owner: "#6366f1", admin: "#2563eb", manager: "#6b7280" };
+  const userCards = list.map((u) => {
+    const inactive = u.inactiveDays !== null && u.inactiveDays > 7;
+    return `
+      <div class="settings-card" style="display:flex;gap:14px;align-items:start;${inactive ? "border-left:3px solid var(--danger);" : ""}">
+        <div style="width:40px;height:40px;border-radius:50%;background:${roleColors[u.role] || "#6b7280"};display:flex;align-items:center;justify-content:center;color:white;font-weight:600;font-size:14px;flex-shrink:0">${escapeHtml((u.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase())}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-weight:600;font-size:14px">${escapeHtml(u.name)}</span>
+            <span style="font-size:10px;padding:2px 8px;border-radius:10px;background:${roleColors[u.role]}22;color:${roleColors[u.role]}">${u.role}</span>
+            ${inactive ? `<span style="font-size:10px;padding:2px 8px;border-radius:10px;background:#ef444422;color:#ef4444">неактивен ${u.inactiveDays} дн</span>` : ""}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-top:2px">${escapeHtml(u.email)}</div>
+          <div style="display:flex;gap:16px;margin-top:8px;flex-wrap:wrap">
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600">${u.sessionCount}</div><div style="font-size:10px;color:var(--text-muted)">сессий</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600">${u.totalSessionHours}ч</div><div style="font-size:10px;color:var(--text-muted)">время</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600;color:var(--accent)">${u.sent}</div><div style="font-size:10px;color:var(--text-muted)">отправл.</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600">${u.deleted}</div><div style="font-size:10px;color:var(--text-muted)">удалено</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600">${u.avgResponseHours !== null ? u.avgResponseHours + "ч" : "—"}</div><div style="font-size:10px;color:var(--text-muted)">ответ</div></div>
+            <div style="text-align:center"><div style="font-size:18px;font-weight:600">${u.aiUsageRatio}%</div><div style="font-size:10px;color:var(--text-muted)">AI</div></div>
+          </div>
+          ${u.lastLoginAt ? `<div style="font-size:11px;color:var(--text-muted);margin-top:6px">Последний вход: ${new Date(u.lastLoginAt).toLocaleString("ru")}</div>` : ""}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // Leaderboard (only if data)
+  const lbFiltered = leaderboard.filter((l) => Number(l.sent) > 0);
+
   return `
-    <div style="display:flex;gap:24px;margin-bottom:18px">
-      <div style="flex:1">${lbHtml}</div>
-      <div style="flex:2;overflow-x:auto">${hmHtml}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:16px">
+      <div class="settings-card" style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--accent)">${activeUsers}</div><div style="font-size:11px;color:var(--text-muted)">активных</div></div>
+      <div class="settings-card" style="text-align:center"><div style="font-size:24px;font-weight:700">${totalSessions}</div><div style="font-size:11px;color:var(--text-muted)">сессий</div></div>
+      <div class="settings-card" style="text-align:center"><div style="font-size:24px;font-weight:700">${totalHours.toFixed(1)}ч</div><div style="font-size:11px;color:var(--text-muted)">часов</div></div>
+      <div class="settings-card" style="text-align:center"><div style="font-size:24px;font-weight:700;color:#10b981">${totalSent}</div><div style="font-size:11px;color:var(--text-muted)">отправлено</div></div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <p style="color:var(--text-muted);font-size:12px;margin:0">⚠ — неактивен >7 дней</p>
-      <button onclick="exportAnalyticsCSV()" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);color:var(--text);cursor:pointer">📊 экспорт CSV</button>
+    ${lbFiltered.length ? `
+      <div class="settings-card" style="margin-bottom:16px">
+        <div class="settings-card-title">🏆 Лидерборд за 7 дней</div>
+        <div style="display:flex;gap:16px;flex-wrap:wrap">
+          ${lbFiltered.slice(0,5).map((l, i) => `<div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:18px;font-weight:700;color:${i===0?"#f59e0b":i===1?"#9ca3af":i===2?"#b45309":"var(--text)"}">${i+1}</span>
+            <div><div style="font-size:13px;font-weight:500">${escapeHtml(l.email)}</div><div style="font-size:11px;color:var(--text-muted)">${Number(l.sent)} писем</div></div>
+          </div>`).join("")}
+        </div>
+      </div>
+    ` : ""}
+    ${maxV > 0 ? `<div class="settings-card" style="overflow-x:auto;margin-bottom:16px"><div class="settings-card-title">📊 Активность отправки за 30 дней</div>${hmHtml}</div>` : ""}
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:13px;font-weight:500">По пользователям</span>
+      <button onclick="exportAnalyticsCSV()" style="padding:8px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);cursor:pointer;font-size:12px">📊 CSV</button>
     </div>
-    <table class="admin-table">
-      <thead><tr>
-        <th>Пользователь</th>
-        <th title="Сессии">Сесс.</th>
-        <th title="Суммарное время">Время</th>
-        <th title="Отправлено">Отпр.</th>
-        <th title="Удалено">Удал.</th>
-        <th title="Среднее время ответа на входящее">Ответ</th>
-        <th title="AI саммари / AI ответы">AI</th>
-        <th title="% использования AI ответов">AI%</th>
-        <th>Посл. вход</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
+    ${userCards}
   `;
 }
 
