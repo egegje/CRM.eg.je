@@ -88,16 +88,18 @@ struct TaskListView: View {
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 16) {
                         Button {
                             showKanban = true
                         } label: {
-                            Image(systemName: "rectangle.split.3x1")
+                            Image(systemName: "square.grid.3x1.below.line.grid.1x2")
+                                .font(.system(size: 16))
                         }
                         Button {
                             showCreateForm = true
                         } label: {
-                            Image(systemName: "plus")
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 16))
                         }
                     }
                 }
