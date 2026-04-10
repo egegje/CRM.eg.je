@@ -8,8 +8,33 @@ struct TaskListView: View {
     @State private var editingTask: CRMTask?
     @State private var showKanban = false
 
+    private let filterIcons: [(TasksStore.Filter, String)] = [
+        (.mine, "pin.fill"),
+        (.createdByMe, "paperplane.fill"),
+        (.unassigned, "questionmark.circle"),
+        (.overdue, "clock.badge.exclamationmark"),
+        (.done, "checkmark.circle"),
+    ]
+
     var body: some View {
         NavigationStack {
+            VStack(spacing: 0) {
+                // Filter bar
+                HStack(spacing: 0) {
+                    ForEach(filterIcons, id: \.0) { f in
+                        Button {
+                            filter = f.0
+                            Task { await load() }
+                        } label: {
+                            Image(systemName: filter == f.0 ? f.1 : f.1.replacingOccurrences(of: ".fill", with: ""))
+                                .font(.system(size: 20))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .foregroundStyle(filter == f.0 ? Color.accentColor : .secondary)
+                        }
+                    }
+                }
+                .overlay(alignment: .bottom) { Divider() }
             List {
                 ForEach(store.tasks) { task in
                     NavigationLink(value: task) {
@@ -59,21 +84,8 @@ struct TaskListView: View {
                 TaskDetailView(task: task, onEdit: { editingTask = task })
             }
             .navigationTitle(filter.title)
+            }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Menu {
-                        ForEach(TasksStore.Filter.allCases) { f in
-                            Button {
-                                filter = f
-                                Task { await load() }
-                            } label: {
-                                Label(f.title, systemImage: f.systemImage)
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
-                }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
                         Button {
