@@ -43,6 +43,7 @@ struct MailListView: View {
                         NavigationLink(value: msg) {
                             MailRow(message: msg)
                         }
+                        .listRowSeparatorTint(Color(.separator))
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
                                 Task { await deleteMessage(msg.id) }
@@ -72,6 +73,7 @@ struct MailListView: View {
                         .listRowBackground(Color.clear)
                     }
                 }
+                .listStyle(.plain)
                 .overlay {
                     if isLoading && messages.isEmpty { ProgressView() }
                 }

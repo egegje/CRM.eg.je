@@ -48,6 +48,7 @@ struct TaskListView: View {
                     .listRowBackground(Color.clear)
                 }
             }
+            .listStyle(.plain)
             .overlay {
                 if store.isLoading && store.tasks.isEmpty {
                     ProgressView()
