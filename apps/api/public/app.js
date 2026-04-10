@@ -1813,8 +1813,7 @@ async function renderAdminTab() {
     else if (adminTab === "contacts") c.innerHTML = await renderContactsTab();
     else if (adminTab === "audit") c.innerHTML = await renderAuditTab();
     else if (adminTab === "analytics") c.innerHTML = await renderAnalyticsTab();
-    else if (adminTab === "tgchats") c.innerHTML = await renderTgChatsTab();
-    else if (adminTab === "tgbindings") c.innerHTML = await renderTgBindingsTab();
+    else if (adminTab === "telegram") c.innerHTML = await renderTelegramTab();
     else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
     else if (adminTab === "personas") c.innerHTML = await renderPersonasTab();
   } catch (e) {
@@ -2217,58 +2216,66 @@ async function renderAuditTab() {
   return `<table class="admin-table"><thead><tr><th>Время</th><th>User</th><th>Действие</th><th>Детали</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
-async function renderTgChatsTab() {
-  const list = await api("/admin/tg-chats");
-  const rows = list.map((c) => `<tr>
-    <td><code>${escapeHtml(c.chatId)}</code></td>
-    <td>${escapeHtml(c.name)}</td>
-    <td>${new Date(c.addedAt).toLocaleString("ru")}</td>
-    <td><button class="danger" onclick="adminDeleteTgChat('${escapeHtml(c.chatId)}')">удалить</button></td>
-  </tr>`).join("");
-  return `
-    <p style="color:var(--text-muted);font-size:12px">Чаты Telegram, в которых task-бот (@task_crm_bot) принимает сообщения с #task / #задача. Для группы chat_id отрицательный (вида -100…). Узнать chat_id можно через @userinfobot или forward сообщения из группы в @userinfobot.</p>
-    <form class="admin-form" onsubmit="adminCreateTgChat(event)">
-      <input name="chatId" placeholder="chat_id (например -1003861923660)" required>
-      <input name="name" placeholder="название" required>
-      <button type="submit">+ Добавить</button>
-    </form>
-    <table class="admin-table"><thead><tr><th>chat_id</th><th>Название</th><th>Добавлено</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=4 style='color:var(--text-muted)'>пусто</td></tr>"}</tbody></table>
-  `;
-}
-async function adminCreateTgChat(e) {
-  e.preventDefault();
-  const f = new FormData(e.target);
-  await api("/admin/tg-chats", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
-  renderAdminTab();
-}
-async function adminDeleteTgChat(chatId) {
-  if (!confirm("Удалить чат " + chatId + "?")) return;
-  await api("/admin/tg-chats/" + encodeURIComponent(chatId), { method: "DELETE" });
-  renderAdminTab();
-}
-
-async function renderTgBindingsTab() {
-  const [list, users] = await Promise.all([api("/admin/tg-bindings"), api("/admin/users")]);
+async function renderTelegramTab() {
+  const [chats, bindings, users] = await Promise.all([
+    api("/admin/tg-chats"),
+    api("/admin/tg-bindings"),
+    api("/admin/users"),
+  ]);
   const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
-  const rows = list.map((b) => {
+
+  // Chat cards
+  const chatCards = chats.map((c) => `
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="width:36px;height:36px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;flex-shrink:0">💬</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;font-size:13px">${escapeHtml(c.name)}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${escapeHtml(c.chatId)}</div>
+      </div>
+      <button onclick="adminDeleteTgChat('${escapeHtml(c.chatId)}')" style="padding:4px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)">✕</button>
+    </div>
+  `).join("");
+
+  // Binding cards
+  const bindingCards = bindings.map((b) => {
     const u = userMap[b.userId];
-    return `<tr>
-      <td>${u ? escapeHtml(u.email) + " <span style='color:var(--text-muted);font-size:11px'>(" + escapeHtml(u.name) + ")</span>" : "<i>удалён</i>"}</td>
-      <td><code>${escapeHtml(b.tgUserId)}</code></td>
-      <td>${b.tgUsername ? "@" + escapeHtml(b.tgUsername) : "—"}</td>
-      <td><button class="danger" onclick="adminDeleteTgBinding('${b.userId}')">удалить</button></td>
-    </tr>`;
+    return `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
+        <div style="width:36px;height:36px;border-radius:50%;background:#10b981;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;flex-shrink:0">${u ? escapeHtml((u.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()) : "?"}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;font-size:13px">${u ? escapeHtml(u.name) : "<i>удалён</i>"} <span style="color:var(--text-muted);font-size:11px">${u ? escapeHtml(u.email) : ""}</span></div>
+          <div style="font-size:11px;color:var(--text-muted)">ID: ${escapeHtml(b.tgUserId)} ${b.tgUsername ? " · @" + escapeHtml(b.tgUsername) : ""}</div>
+        </div>
+        <button onclick="adminDeleteTgBinding('${b.userId}')" style="padding:4px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)">✕</button>
+      </div>
+    `;
   }).join("");
-  const userOptions = users.map((u) => `<option value="${u.id}">${escapeHtml(u.email)}</option>`).join("");
+
+  const userOptions = users.map((u) => `<option value="${u.id}">${escapeHtml(u.name)} (${escapeHtml(u.email)})</option>`).join("");
+
   return `
-    <p style="color:var(--text-muted);font-size:12px">Привязка пользователя CRM к Telegram-аккаунту. Нужна и для исполнителей (task-бот ищет по @username), и для авторов (бот определяет, кто создал задачу). Telegram user_id и username сотрудник может узнать через @userinfobot.</p>
-    <form class="admin-form" onsubmit="adminCreateTgBinding(event)">
-      <select name="userId" required><option value="">— пользователь CRM —</option>${userOptions}</select>
-      <input name="tgUserId" placeholder="tg user_id (число)" required>
-      <input name="tgUsername" placeholder="@username (без @, опционально)">
-      <button type="submit">+ Привязать</button>
-    </form>
-    <table class="admin-table"><thead><tr><th>Пользователь CRM</th><th>tg user_id</th><th>@username</th><th></th></tr></thead><tbody>${rows || "<tr><td colspan=4 style='color:var(--text-muted)'>пусто</td></tr>"}</tbody></table>
+    <div class="settings-card">
+      <div class="settings-card-title">💬 Чаты для задач</div>
+      <p style="margin:0 0 10px">Группы где @task_crm_bot принимает #task / #задача и создаёт задачи.</p>
+      ${chatCards || '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">нет чатов</div>'}
+      <form onsubmit="adminCreateTgChat(event)" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <input type="text" name="chatId" placeholder="chat_id (-100...)" required style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px">
+        <input type="text" name="name" placeholder="название группы" required style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px">
+        <button type="submit" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500">+ Чат</button>
+      </form>
+    </div>
+
+    <div class="settings-card">
+      <div class="settings-card-title">🔗 Привязки пользователей</div>
+      <p style="margin:0 0 10px">Связь CRM-юзера с Telegram-аккаунтом. Нужна для назначения задач через @username, уведомлений и утреннего дайджеста. ID и @username можно узнать через @userinfobot.</p>
+      ${bindingCards || '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">нет привязок</div>'}
+      <form onsubmit="adminCreateTgBinding(event)" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <select name="userId" required style="flex:1;min-width:140px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px"><option value="">— пользователь —</option>${userOptions}</select>
+        <input type="text" name="tgUserId" placeholder="tg user_id" required style="width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px">
+        <input type="text" name="tgUsername" placeholder="@username" style="width:120px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px">
+        <button type="submit" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500">+ Связать</button>
+      </form>
+    </div>
   `;
 }
 async function adminCreateTgBinding(e) {
