@@ -2212,85 +2212,64 @@ async function renderTaskSettingsTab() {
     `<option value="${u.id}"${selected === u.id ? " selected" : ""}>${escapeHtml(u.email)} (${escapeHtml(u.name)})</option>`
   ).join("");
   return `
-    <p style="color:var(--text-muted);font-size:12px">Хранится в TaskSetting (key/value). Изменения применяются сразу — воркеры читают свежие значения каждый раз.</p>
-    <form class="admin-form" style="display:flex;flex-direction:column;gap:14px;max-width:600px" onsubmit="saveTaskSettings(event)">
+    <form style="display:flex;flex-direction:column;gap:0;max-width:640px" onsubmit="saveTaskSettings(event)">
 
-      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
-        <legend>🏦 ВТБ Host-to-Host</legend>
-        <label style="display:block;margin-bottom:6px">
-          CustID:
-          <input name="vtb_cust_id" value="${escapeHtml(s.vtb_cust_id || "")}" placeholder="662875628" style="width:200px;margin-left:8px">
-        </label>
-        <label style="display:block;margin-bottom:6px">
-          Логин ВТБ Бизнес:
-          <input name="vtb_login" value="${escapeHtml(s.vtb_login || "")}" placeholder="логин" style="width:200px;margin-left:8px">
-        </label>
-        <label style="display:block;margin-bottom:6px">
-          Пароль ВТБ Бизнес:
-          <input name="vtb_password" type="password" value="${escapeHtml(s.vtb_password || "")}" placeholder="пароль" style="width:200px;margin-left:8px">
-        </label>
-        <p style="font-size:11px;color:var(--text-muted);margin:0">Логин и пароль от ВТБ Бизнес Онлайн для ИП Семенов. Используются сервером для H2H авторизации вместе с сертификатом КЭП.</p>
-      </fieldset>
+      <div class="settings-card">
+        <div class="settings-card-title">🏦 ВТБ Host-to-Host</div>
+        <label>CustID<input type="text" name="vtb_cust_id" value="${escapeHtml(s.vtb_cust_id || "")}" placeholder="662875628"></label>
+        <label>Логин ВТБ Бизнес<input type="text" name="vtb_login" value="${escapeHtml(s.vtb_login || "")}" placeholder="логин"></label>
+        <label>Пароль ВТБ Бизнес<input type="password" name="vtb_password" value="${escapeHtml(s.vtb_password || "")}" placeholder="пароль"></label>
+        <p>Используются сервером для H2H авторизации вместе с сертификатом КЭП.</p>
+      </div>
 
-      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
-        <legend>🏷 Метки задач</legend>
-        <label style="display:block;margin-bottom:6px">
-          Список меток (через запятую):
-          <input name="task_labels" value="${escapeHtml(s.task_labels || "")}" placeholder="электричество, планировки, арендаторы, документы, ремонт" style="display:block;width:100%;padding:8px;margin-top:4px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);box-sizing:border-box">
-        </label>
-        <p style="font-size:11px;color:var(--text-muted);margin:0">Эти метки появятся в выпадающем списке при создании/редактировании задачи, и как фильтр в «Поставлено мной».</p>
-      </fieldset>
+      <div class="settings-card">
+        <div class="settings-card-title">🏷 Метки задач</div>
+        <label>Список меток (через запятую)<input type="text" name="task_labels" value="${escapeHtml(s.task_labels || "")}" placeholder="электричество, планировки, арендаторы"></label>
+        <p>Появятся в выпадающем списке при создании задачи и как фильтр в «Поставлено мной».</p>
+      </div>
 
-      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
-        <legend>⏰ Утренний дайджест</legend>
-        <label style="display:block;margin-bottom:6px">
-          Час МСК (0-23):
-          <input name="digest_hour_msk" type="number" min="0" max="23" value="${escapeHtml(s.digest_hour_msk || "9")}" style="width:80px;margin-left:8px">
-        </label>
-        <p style="font-size:11px;color:var(--text-muted);margin:0">Каждое утро в указанный час task-бот шлёт каждому юзеру с TG-привязкой список открытых задач.</p>
-      </fieldset>
+      <div class="settings-card">
+        <div class="settings-card-title">⏰ Утренний дайджест</div>
+        <label>Час МСК (0-23)<input type="number" name="digest_hour_msk" min="0" max="23" value="${escapeHtml(s.digest_hour_msk || "9")}" style="width:100px"></label>
+        <p>Каждое утро task-бот шлёт каждому юзеру с TG-привязкой список открытых задач.</p>
+      </div>
 
-      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
-        <legend>📧 AI: задачи из писем</legend>
-        <label style="display:block;margin-bottom:6px">
-          <input name="ai_email_detect_enabled" type="checkbox" ${s.ai_email_detect_enabled === "true" ? "checked" : ""}>
-          Включить — AI смотрит каждое incoming, и если похоже на задачу — присылает в TG предложение «Создать?»
+      <div class="settings-card">
+        <div class="settings-card-title">📧 AI: задачи из писем</div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <label class="toggle-switch"><input name="ai_email_detect_enabled" type="checkbox" ${s.ai_email_detect_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>
+          AI смотрит каждое входящее и предлагает создать задачу
         </label>
-        <label style="display:block;margin-bottom:6px">
-          Кому слать предложения:
-          <select name="email_ai_notify_user_id" style="margin-left:8px">
+        <label>Кому слать предложения
+          <select name="email_ai_notify_user_id">
             <option value="">— никто —</option>
             ${userOptions(s.email_ai_notify_user_id)}
           </select>
         </label>
-        <p style="font-size:11px;color:var(--text-muted);margin:0">Используется Claude Haiku. Только с уверенностью ≥60%. Кнопки в TG: создать / игнор.</p>
-        <label style="display:block;margin-top:10px">
-          <input name="ai_autoclose_enabled" type="checkbox" ${s.ai_autoclose_enabled === "true" ? "checked" : ""}>
-          Также проверять автозакрытие — если новое письмо от того же контрагента похоже на «работа сделана», AI спросит «Закрыть задачу N?»
+        <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+          <label class="toggle-switch"><input name="ai_autoclose_enabled" type="checkbox" ${s.ai_autoclose_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>
+          Автозакрытие — AI спрашивает «Закрыть задачу N?»
         </label>
-      </fieldset>
+        <p>Claude Haiku, уверенность ≥60%. Кнопки в TG: создать / игнор.</p>
+      </div>
 
-      <fieldset style="border:1px solid var(--border);border-radius:6px;padding:12px">
-        <legend>🏗 Авто-задачи из metr (выкуп объектов)</legend>
-        <label style="display:block;margin-bottom:6px">
-          <input name="metr_deadline_enabled" type="checkbox" ${s.metr_deadline_enabled === "true" ? "checked" : ""}>
-          Включить — каждый день в 8:00 МСК создавать задачи на ближайшие выкупы
+      <div class="settings-card">
+        <div class="settings-card-title">🏗 Авто-задачи из metr</div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <label class="toggle-switch"><input name="metr_deadline_enabled" type="checkbox" ${s.metr_deadline_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>
+          Создавать задачи на ближайшие выкупы (8:00 МСК)
         </label>
-        <label style="display:block;margin-bottom:6px">
-          За сколько дней до даты выкупа создавать:
-          <input name="metr_deadline_lead_days" type="number" min="1" max="30" value="${escapeHtml(s.metr_deadline_lead_days || "3")}" style="width:80px;margin-left:8px">
-        </label>
-        <label style="display:block;margin-bottom:6px">
-          Назначать на:
-          <select name="metr_default_assignee_user_id" style="margin-left:8px">
+        <label>За сколько дней до даты выкупа<input type="number" name="metr_deadline_lead_days" min="1" max="30" value="${escapeHtml(s.metr_deadline_lead_days || "3")}" style="width:100px"></label>
+        <label>Назначать на
+          <select name="metr_default_assignee_user_id">
             <option value="">— не назначать —</option>
             ${userOptions(s.metr_default_assignee_user_id)}
           </select>
         </label>
-        <p style="font-size:11px;color:var(--text-muted);margin:0">Источник: <code>metr.Object.buyback_date</code>. Дубли не создаёт (помечает sourceEmailMessageId маркером).</p>
-      </fieldset>
+        <p>Источник: metr.Object.buyback_date. Дубли не создаёт.</p>
+      </div>
 
-      <button type="submit" style="padding:10px 18px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer;align-self:flex-start">Сохранить</button>
+      <button type="submit" style="padding:12px 24px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;align-self:flex-start;margin-top:4px">Сохранить</button>
     </form>
   `;
 }

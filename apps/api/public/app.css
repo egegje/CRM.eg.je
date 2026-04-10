@@ -148,8 +148,25 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .admin-table button { padding: 4px 8px; font-size: 12px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-alt); cursor: pointer; color: var(--text); }
 .admin-table button.danger { color: var(--danger); border-color: var(--danger); }
 .admin-form { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: end; }
-.admin-form input, .admin-form select { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); }
-.admin-form button { padding: 7px 14px; background: var(--accent); color: white; border: none; border-radius: 5px; cursor: pointer; }
+.admin-form input, .admin-form select { padding: 8px 12px; border: none; border-bottom: 2px solid var(--border); border-radius: 0; background: transparent; color: var(--text); font-size: 14px; transition: border-color 0.2s; outline: none; }
+.admin-form input:focus, .admin-form select:focus { border-bottom-color: var(--accent); }
+.admin-form button { padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
+
+/* Settings cards */
+.settings-card { background: var(--bg); border-radius: 12px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04); }
+.settings-card legend, .settings-card-title { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.settings-card label { font-size: 13px; color: var(--text); display: block; margin-bottom: 8px; }
+.settings-card p { font-size: 11px; color: var(--text-muted); margin: 8px 0 0; }
+.settings-card input[type="text"], .settings-card input[type="number"], .settings-card input[type="password"], .settings-card select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-alt); color: var(--text); font-size: 13px; box-sizing: border-box; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+.settings-card input:focus, .settings-card select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+/* Toggle switch */
+.toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-switch .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background: #ccc; border-radius: 24px; transition: 0.3s; }
+.toggle-switch .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: 0.3s; }
+.toggle-switch input:checked + .slider { background: var(--accent); }
+.toggle-switch input:checked + .slider:before { transform: translateX(20px); }
 
 .burger, .tabbar { display: none; }
 
