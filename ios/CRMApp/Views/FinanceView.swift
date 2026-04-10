@@ -25,24 +25,13 @@ struct FinanceView: View {
                             Double(s.closingBalance?.amount ?? "0")
                         }.reduce(0, +)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("Баланс")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            Text(fmtMoney(total) + " ₽")
-                                .font(.system(size: 32, weight: .bold, design: .rounded))
-                                .minimumScaleFactor(0.6)
-                                .lineLimit(1)
-                        }
-                        .padding(.horizontal)
-
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(info.shortName ?? info.fullName ?? "")
-                                .font(.subheadline).lineLimit(2)
-                            if let inn = info.inn {
-                                Text("ИНН \(inn)")
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
+                            let name = info.fullName ?? info.shortName ?? ""
+                            let short = name
+                                .replacingOccurrences(of: "ИНДИВИДУАЛЬНЫЙ ПРЕДПРИНИМАТЕЛЬ ", with: "ИП ")
+                                .replacingOccurrences(of: "Индивидуальный предприниматель ", with: "ИП ")
+                            Text(short)
+                                .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
                         .padding(.horizontal)
 
