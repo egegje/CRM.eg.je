@@ -3,103 +3,137 @@ import SwiftUI
 struct KanbanView: View {
     @State private var tasks: [CRMTask] = []
     @State private var isLoading = false
+    @State private var selectedColumn = 0
 
-    private let columns: [(key: String, title: String, color: Color)] = [
-        ("open", "Открыта", .blue),
-        ("in_progress", "В работе", .orange),
-        ("done", "Выполнена", .green),
-        ("cancelled", "Отменена", .gray),
+    private let columns: [(key: String, title: String, icon: String, color: Color)] = [
+        ("open", "Открыта", "tray.fill", .blue),
+        ("in_progress", "В работе", "gearshape.fill", .orange),
+        ("done", "Выполнена", "checkmark.circle.fill", .green),
+        ("cancelled", "Отменена", "xmark.circle.fill", .gray),
     ]
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 12) {
-                ForEach(columns, id: \.key) { col in
-                    kanbanColumn(col)
+        VStack(spacing: 0) {
+            // Column picker
+            HStack(spacing: 0) {
+                ForEach(Array(columns.enumerated()), id: \.offset) { idx, col in
+                    let count = tasks.filter { $0.status == col.key }.count
+                    Button {
+                        withAnimation { selectedColumn = idx }
+                    } label: {
+                        VStack(spacing: 4) {
+                            HStack(spacing: 4) {
+                                Image(systemName: col.icon)
+                                    .font(.system(size: 14))
+                                if count > 0 {
+                                    Text("\(count)")
+                                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                                }
+                            }
+                            .foregroundStyle(selectedColumn == idx ? col.color : .secondary)
+
+                            Rectangle()
+                                .fill(selectedColumn == idx ? col.color : .clear)
+                                .frame(height: 2)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding()
+            .padding(.horizontal)
+            .padding(.top, 8)
+            .background(Color(.secondarySystemBackground))
+
+            // Swipeable pages
+            TabView(selection: $selectedColumn) {
+                ForEach(Array(columns.enumerated()), id: \.offset) { idx, col in
+                    let items = tasks.filter { $0.status == col.key }
+                    ScrollView {
+                        LazyVStack(spacing: 10) {
+                            if items.isEmpty {
+                                VStack(spacing: 12) {
+                                    Image(systemName: col.icon)
+                                        .font(.system(size: 40))
+                                        .foregroundStyle(.tertiary)
+                                    Text("Пусто")
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, 60)
+                            }
+                            ForEach(items) { task in
+                                kanbanCard(task, column: col)
+                            }
+                        }
+                        .padding()
+                    }
+                    .tag(idx)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
         }
-        .refreshable { await load() }
+        .overlay {
+            if isLoading && tasks.isEmpty { ProgressView() }
+        }
         .task { await load() }
     }
 
-    private func kanbanColumn(_ col: (key: String, title: String, color: Color)) -> some View {
-        let items = tasks.filter { $0.status == col.key }
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Circle().fill(col.color).frame(width: 8, height: 8)
-                Text(col.title).font(.subheadline).bold()
-                Text("· \(items.count)").font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 4)
-
-            ForEach(items) { task in
-                kanbanCard(task)
-            }
-
-            if items.isEmpty {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color(.tertiarySystemBackground))
-                    .frame(height: 60)
-                    .overlay {
-                        Text("пусто").font(.caption).foregroundStyle(.secondary)
-                    }
-            }
-        }
-        .frame(width: 200)
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
-    }
-
-    private func kanbanCard(_ task: CRMTask) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(task.title)
-                .font(.subheadline).fontWeight(.semibold)
-                .lineLimit(2)
-            if let p = task.project?.name {
-                Label(p, systemImage: "folder")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            if let d = task.dueDate {
-                let overdue = d < Date() && task.status != "done"
-                Label(d.formatted(date: .abbreviated, time: .omitted), systemImage: overdue ? "clock.badge.exclamationmark" : "calendar")
-                    .font(.caption2)
-                    .foregroundStyle(overdue ? .red : .secondary)
-            }
-            HStack {
-                priorityBadge(task.priority)
+    private func kanbanCard(_ task: CRMTask, column: (key: String, title: String, icon: String, color: Color)) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                PriorityDot(priority: task.priority)
+                    .frame(width: 16)
+                Text(task.title)
+                    .font(.body).fontWeight(.semibold)
                 Spacer()
-                Menu {
-                    Button("Открыта") { Task { await move(task, to: "open") } }
-                    Button("В работе") { Task { await move(task, to: "in_progress") } }
-                    Button("Выполнена") { Task { await move(task, to: "done") } }
-                    Button("Отменена") { Task { await move(task, to: "cancelled") } }
-                } label: {
-                    Image(systemName: "arrow.right.circle")
+            }
+
+            HStack(spacing: 8) {
+                if let p = task.project?.name {
+                    Label(p, systemImage: "folder")
                         .font(.caption).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                if let d = task.dueDate {
+                    let overdue = d < Date() && task.status != "done"
+                    Label(d.formatted(date: .abbreviated, time: .omitted),
+                          systemImage: overdue ? "clock.badge.exclamationmark" : "calendar")
+                        .font(.caption)
+                        .foregroundStyle(overdue ? .red : .secondary)
+                }
+                if let cat = task.category, !cat.isEmpty {
+                    LabelPill(text: cat)
+                }
+            }
+
+            // Move actions
+            HStack(spacing: 8) {
+                ForEach(columns.filter { $0.key != column.key }, id: \.key) { target in
+                    Button {
+                        Task { await move(task, to: target.key) }
+                    } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: target.icon)
+                                .font(.system(size: 10))
+                            Text(target.title)
+                                .font(.system(size: 10))
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(target.color.opacity(0.1))
+                        .foregroundStyle(target.color)
+                        .clipShape(Capsule())
+                    }
                 }
             }
         }
-        .padding(10)
+        .padding(14)
         .background(Color(.systemBackground))
-        .cornerRadius(8)
-        .shadow(color: .black.opacity(0.05), radius: 2, y: 1)
-    }
-
-    @ViewBuilder
-    private func priorityBadge(_ p: String) -> some View {
-        switch p {
-        case "urgent":
-            Label("срочно", systemImage: "flame.fill")
-                .font(.caption2).foregroundStyle(.red)
-        case "high":
-            Label("высокий", systemImage: "exclamationmark.triangle.fill")
-                .font(.caption2).foregroundStyle(.orange)
-        default:
-            EmptyView()
-        }
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.06), radius: 4, y: 2)
     }
 
     private func move(_ task: CRMTask, to status: String) async {
