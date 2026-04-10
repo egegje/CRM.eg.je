@@ -1873,32 +1873,51 @@ async function editUser(id, currentName, currentRole) {
 }
 
 async function manageUserAccess(userId, email, role) {
-  if (role === "owner" || role === "admin") {
-    return alert(`${role} имеет доступ ко всем ящикам автоматически.`);
-  }
-  const [allMailboxes, assigned] = await Promise.all([
+  const [allMailboxes, assignedMb, allCompanies, assignedCo] = await Promise.all([
     api("/admin/mailboxes"),
     api("/admin/users/" + userId + "/mailboxes"),
+    api("/companies").catch(() => []),
+    api("/admin/users/" + userId + "/companies").catch(() => []),
   ]);
-  const assignedSet = new Set(assigned);
-  const list = allMailboxes
-    .map((mb) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-mb="${mb.id}" ${assignedSet.has(mb.id) ? "checked" : ""}> ${escapeHtml(mb.displayName)} (${escapeHtml(mb.email)})</label>`)
+  const mbSet = new Set(assignedMb);
+  const coSet = new Set(assignedCo);
+  const mbList = allMailboxes
+    .map((mb) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-mb="${mb.id}" ${mbSet.has(mb.id) ? "checked" : ""}> ${escapeHtml(mb.displayName)} (${escapeHtml(mb.email)})</label>`)
+    .join("");
+  const coList = allCompanies
+    .map((co) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-co="${co.id}" ${coSet.has(co.id) ? "checked" : ""}> ${escapeHtml(co.name)}${co.inn ? " (ИНН " + escapeHtml(co.inn) + ")" : ""}</label>`)
     .join("");
   const c = document.getElementById("admin-view-content");
-  const html = `
-    <h4 style="margin-top:0">Доступ к ящикам: ${escapeHtml(email)}</h4>
-    <div id="access-list">${list}</div>
+  c.innerHTML = `
+    <h4 style="margin-top:0">Доступ: ${escapeHtml(email)} (${escapeHtml(role)})</h4>
+    ${role !== "owner" ? `
+      <div class="settings-card">
+        <div class="settings-card-title">📧 Ящики</div>
+        <p style="margin:0 0 8px">Если ничего не отмечено — доступ ко всем ящикам (для admin).</p>
+        <div id="access-mb-list">${mbList || "<span style='color:var(--text-muted)'>нет ящиков</span>"}</div>
+      </div>
+    ` : ""}
+    ${role !== "owner" ? `
+      <div class="settings-card">
+        <div class="settings-card-title">💰 Компании (финансы)</div>
+        <p style="margin:0 0 8px">Если ничего не отмечено — видит все компании. Отметьте конкретные чтобы ограничить.</p>
+        <div id="access-co-list">${coList || "<span style='color:var(--text-muted)'>нет компаний</span>"}</div>
+      </div>
+    ` : '<p style="color:var(--text-muted)">Owner имеет полный доступ ко всему.</p>'}
     <div style="display:flex;gap:8px;margin-top:14px">
-      <button onclick="saveAccess('${userId}')" style="padding:8px 16px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">Сохранить</button>
-      <button onclick="renderAdminTab()">← Назад</button>
+      <button onclick="saveAccess('${userId}')" style="padding:10px 20px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Сохранить</button>
+      <button onclick="renderAdminTab()" style="padding:10px 20px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg)">← Назад</button>
     </div>
   `;
-  c.innerHTML = html;
 }
 
 async function saveAccess(userId) {
-  const ids = [...document.querySelectorAll('#access-list input[type=checkbox]:checked')].map((c) => c.dataset.mb);
-  await api("/admin/users/" + userId + "/mailboxes", { method: "PUT", body: JSON.stringify({ mailboxIds: ids }) });
+  const mbIds = [...document.querySelectorAll('#access-mb-list input[type=checkbox]:checked')].map((c) => c.dataset.mb);
+  const coIds = [...document.querySelectorAll('#access-co-list input[type=checkbox]:checked')].map((c) => c.dataset.co);
+  await Promise.all([
+    api("/admin/users/" + userId + "/mailboxes", { method: "PUT", body: JSON.stringify({ mailboxIds: mbIds }) }),
+    api("/admin/users/" + userId + "/companies", { method: "PUT", body: JSON.stringify({ companyIds: coIds }) }).catch(() => {}),
+  ]);
   renderAdminTab();
 }
 

@@ -143,6 +143,26 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.send("\uFEFF" + lines.join("\n"));
   });
 
+  // ---- user company access ----
+  app.get("/admin/users/:id/companies", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const rows = await prisma.userCompanyAccess.findMany({ where: { userId: id }, select: { companyId: true } });
+    return rows.map((r) => r.companyId);
+  });
+
+  app.put("/admin/users/:id/companies", { preHandler: requireRole("owner") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ companyIds: z.array(z.string()) }).parse(req.body);
+    await prisma.$transaction([
+      prisma.userCompanyAccess.deleteMany({ where: { userId: id } }),
+      prisma.userCompanyAccess.createMany({
+        data: body.companyIds.map((c) => ({ userId: id, companyId: c })),
+        skipDuplicates: true,
+      }),
+    ]);
+    return { count: body.companyIds.length };
+  });
+
   // ---- personas (signature cards for compose «From person») ----
   app.get("/personas", { preHandler: requireRole("owner", "admin", "manager") }, async () => {
     return prisma.persona.findMany({ orderBy: { name: "asc" } });

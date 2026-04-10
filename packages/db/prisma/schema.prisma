@@ -272,13 +272,24 @@ model SberToken {
 }
 
 model Company {
-  id          String        @id @default(cuid())
+  id          String              @id @default(cuid())
   name        String
   inn         String?
   sberCustId  String?
   notes       String?
-  createdAt   DateTime      @default(now())
+  createdAt   DateTime            @default(now())
   accounts    BankAccount[]
+  userAccess  UserCompanyAccess[]
+}
+
+model UserCompanyAccess {
+  userId    String
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, companyId])
+  @@index([companyId])
 }
 
 model BankTransaction {

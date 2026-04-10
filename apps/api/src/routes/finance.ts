@@ -8,8 +8,29 @@ const Params = z.object({ id: z.string() });
 
 export async function financeRoutes(app: FastifyInstance): Promise<void> {
   // ---- companies ----
-  app.get("/companies", { preHandler: requireRole("owner", "admin") }, async () => {
+  app.get("/companies", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const user = req.user!;
+    // Owner sees all. Admin sees only companies they have access to
+    // (if no access rows exist for them, they see all — backwards compat).
+    if (user.role === "owner") {
+      return prisma.company.findMany({
+        orderBy: { name: "asc" },
+        include: { accounts: { orderBy: { bank: "asc" } } },
+      });
+    }
+    const access = await prisma.userCompanyAccess.findMany({
+      where: { userId: user.id },
+      select: { companyId: true },
+    });
+    if (access.length === 0) {
+      // No restrictions set — admin sees all
+      return prisma.company.findMany({
+        orderBy: { name: "asc" },
+        include: { accounts: { orderBy: { bank: "asc" } } },
+      });
+    }
     return prisma.company.findMany({
+      where: { id: { in: access.map((a) => a.companyId) } },
       orderBy: { name: "asc" },
       include: { accounts: { orderBy: { bank: "asc" } } },
     });
