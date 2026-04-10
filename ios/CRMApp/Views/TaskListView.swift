@@ -84,6 +84,7 @@ struct TaskListView: View {
                 TaskDetailView(task: task, onEdit: { editingTask = task })
             }
             .navigationTitle(filter.title)
+            .navigationBarTitleDisplayMode(.inline)
             }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -161,7 +162,8 @@ struct TaskRow: View {
                 .frame(width: 16)
             VStack(alignment: .leading, spacing: 5) {
                 Text(task.title)
-                    .font(.body)
+                    .font(.subheadline)
+                    .fontWeight(task.status == "done" ? .regular : .medium)
                     .strikethrough(task.status == "done")
                     .foregroundStyle(task.status == "done" ? .secondary : .primary)
                     .lineLimit(2)

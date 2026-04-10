@@ -85,6 +85,7 @@ struct MailListView: View {
                 MailDetailView(message: msg, onReply: { replyMessage = msg })
             }
             .navigationTitle("Почта")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     if mailboxes.count > 1 {
