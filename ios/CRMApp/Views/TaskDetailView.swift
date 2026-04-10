@@ -99,11 +99,13 @@ struct TaskDetailView: View {
     private func sendComment() async {
         let text = newComment.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty else { return }
-        guard let data = try? JSONSerialization.data(withJSONObject: ["text": text]) else { return }
+        guard let body = try? JSONSerialization.data(withJSONObject: ["text": text]) else { return }
         var req = URLRequest(url: URL(string: "https://crm.eg.je/tasks/\(task.id)/comments")!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let (respData, _) = try? await APIClient.urlSession.data(for: req) {
+        req.httpBody = body
+        let session = await APIClient.urlSession
+        if let (respData, _) = try? await session.data(for: req) {
             if let comment = try? JSONDecoder().decode(TaskComment.self, from: respData) {
                 comments.append(comment)
                 newComment = ""

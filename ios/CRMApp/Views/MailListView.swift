@@ -32,7 +32,7 @@ struct MailListView: View {
                                 .font(.system(size: 20))
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .foregroundStyle(selectedFolder == f.0 ? .accentColor : .secondary)
+                                .foregroundStyle(selectedFolder == f.0 ? Color.accentColor : .secondary)
                         }
                     }
                 }
