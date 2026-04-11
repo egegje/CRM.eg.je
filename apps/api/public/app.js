@@ -201,7 +201,7 @@ async function loadFolders() {
   for (const f of systemFolders) {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.key ? " active" : "");
-    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons[f.icon]}${escapeHtml(f.label)}</span>`;
+    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons[f.icon]}<span class="folder-label">${escapeHtml(f.label)}</span></span>`;
     d.onclick = () => {
       exitTasksView();
       state.currentFolder = f.key;
@@ -217,7 +217,7 @@ async function loadFolders() {
   for (const f of custom) {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.id ? " active" : "");
-    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.custom}${escapeHtml(f.name)}</span>`;
+    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.custom}<span class="folder-label">${escapeHtml(f.name)}</span></span>`;
     d.onclick = () => { exitTasksView(); state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
@@ -234,7 +234,7 @@ async function loadFolders() {
     for (const sf of smart) {
       const d = document.createElement("div");
       d.className = "folder-item" + (state.currentFolder === "smart:" + sf.id ? " active" : "");
-      d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.smart}${escapeHtml(sf.name)}</span>`;
+      d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.smart}<span class="folder-label">${escapeHtml(sf.name)}</span></span>`;
       d.onclick = () => { exitTasksView(); state.currentFolder = "smart:" + sf.id; refreshList(); };
       list.appendChild(d);
     }
