@@ -506,18 +506,23 @@ function renderPreview(m) {
         ${(m.ccAddrs || []).length ? `<b>Копия:</b> ${escapeHtml(m.ccAddrs.join(", "))}<br>` : ""}
         <b>Дата:</b> ${date}
       </div>
-      <div class="preview-actions">
-        <button class="mobile-back" onclick="closePreview()">← Назад</button>
-        <button onclick="replyTo('${m.id}')">↩️ Ответить</button>
-        <button onclick="aiReply('${m.id}')">🤖 AI ответ</button>
-        <button onclick="forwardMsg('${m.id}')">↪️ Переслать</button>
-        <button onclick="emailToTask('${m.id}')">📋 → задача</button>
-        <button onclick="snoozeMsg('${m.id}')">⏰ Напомнить</button>
-        <button onclick="exportPdf('${m.id}')">📄 PDF</button>
-        <button onclick="blockSender('${escapeHtml(m.fromAddr)}')">🚫 Блок отправителя</button>
-        <button onclick="toggleStar('${m.id}', ${m.isStarred})">${m.isStarred ? "☆ Снять" : "⭐ Важное"}</button>
-        <button onclick="markUnread('${m.id}')">📩 Непрочитано</button>
-        <button onclick="deleteMsg('${m.id}')">🗑 Удалить</button>
+      <div class="preview-actions" style="align-items:center">
+        <button class="mobile-back" onclick="closePreview()" title="Назад"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <button onclick="replyTo('${m.id}')" title="Ответить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M4 12h12a4 4 0 014 4v1"/></svg></button>
+        <button onclick="aiReply('${m.id}')" title="AI ответ"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg></button>
+        <button onclick="forwardMsg('${m.id}')" title="Переслать"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 17l5-5-5-5"/><path d="M20 12H8a4 4 0 00-4 4v1"/></svg></button>
+        <button onclick="deleteMsg('${m.id}')" title="Удалить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
+        <button onclick="toggleStar('${m.id}', ${m.isStarred})" title="${m.isStarred ? 'Снять' : 'Важное'}"><svg width="18" height="18" fill="${m.isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg></button>
+        <button onclick="markUnread('${m.id}')" title="Непрочитано"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 7l10 7 10-7"/></svg></button>
+        <div style="position:relative;display:inline-block">
+          <button onclick="toggleMailMenu(this)" title="Ещё" style="font-size:18px;line-height:1;padding:6px 8px">⋮</button>
+          <div class="mail-menu" style="display:none;position:absolute;right:0;top:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:50;min-width:200px;padding:6px 0">
+            <div onclick="emailToTask('${m.id}');closeMailMenu()" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg> Задача из письма</div>
+            <div onclick="snoozeMsg('${m.id}');closeMailMenu()" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Напомнить</div>
+            <div onclick="exportPdf('${m.id}');closeMailMenu()" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg> PDF</div>
+            <div onclick="blockSender('${escapeHtml(m.fromAddr)}');closeMailMenu()" style="padding:10px 16px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:10px;color:var(--danger)" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background=''"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M4.93 4.93l14.14 14.14"/></svg> Блок отправителя</div>
+          </div>
+        </div>
       </div>
     </div>
     ${aiHtml}
@@ -525,6 +530,16 @@ function renderPreview(m) {
     ${attachHtml ? `<div class="attachments">${attachHtml}</div>` : ""}
   `;
 }
+
+function toggleMailMenu(btn) {
+  const menu = btn.nextElementSibling;
+  menu.style.display = menu.style.display === "none" ? "block" : "none";
+  if (menu.style.display === "block") {
+    const close = (e) => { if (!menu.contains(e.target) && e.target !== btn) { menu.style.display = "none"; document.removeEventListener("click", close); } };
+    setTimeout(() => document.addEventListener("click", close), 0);
+  }
+}
+function closeMailMenu() { document.querySelectorAll(".mail-menu").forEach(m => m.style.display = "none"); }
 
 function closePreview() {
   document.getElementById("app").classList.remove("show-preview");
