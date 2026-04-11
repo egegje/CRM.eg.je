@@ -2457,16 +2457,16 @@ async function renderTaskSettingsTab() {
     <form style="display:flex;flex-direction:column;gap:0;max-width:640px" onsubmit="saveTaskSettings(event)">
 
       <div class="settings-card">
-        <div class="settings-card-title">⏸ Пауза</div>
+        <div class="settings-card-title">✉️ Отправка</div>
         <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <label class="toggle-switch"><input name="email_sending_paused" type="checkbox" ${s.email_sending_paused === "true" ? "checked" : ""}><span class="slider"></span></label>
-          Приостановить отправку писем
+          <label class="toggle-switch"><input name="email_sending_enabled" type="checkbox" ${s.email_sending_paused !== "true" ? "checked" : ""}><span class="slider"></span></label>
+          Отправка писем
         </label>
         <label style="display:flex;align-items:center;gap:10px">
-          <label class="toggle-switch"><input name="tg_notifications_paused" type="checkbox" ${s.tg_notifications_paused === "true" ? "checked" : ""}><span class="slider"></span></label>
-          Приостановить уведомления в Telegram
+          <label class="toggle-switch"><input name="tg_notifications_enabled" type="checkbox" ${s.tg_notifications_paused !== "true" ? "checked" : ""}><span class="slider"></span></label>
+          Уведомления в Telegram
         </label>
-        <p>Когда включено — письма не отправляются, TG-уведомления (почта, задачи, дайджест, напоминания) не приходят.</p>
+        <p>Галка включена — письма отправляются, TG-уведомления приходят. Выключено — на паузе.</p>
       </div>
 
       <div class="settings-card">
@@ -2593,8 +2593,8 @@ async function saveTaskSettings(e) {
     vtb_password: String(f.get("vtb_password") || ""),
     task_labels: String(f.get("task_labels") || ""),
     digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
-    email_sending_paused: e.target.email_sending_paused.checked ? "true" : "false",
-    tg_notifications_paused: e.target.tg_notifications_paused.checked ? "true" : "false",
+    email_sending_paused: e.target.email_sending_enabled.checked ? "false" : "true",
+    tg_notifications_paused: e.target.tg_notifications_enabled.checked ? "false" : "true",
     ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
     ai_autoclose_enabled: e.target.ai_autoclose_enabled.checked ? "true" : "false",
     email_ai_notify_user_id: String(f.get("email_ai_notify_user_id") || ""),
