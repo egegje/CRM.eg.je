@@ -182,17 +182,26 @@ async function loadFolders() {
   state.folders = await api("/folders");
   const list = document.getElementById("folders-list");
   list.innerHTML = "";
+  const folderIcons = {
+    inbox: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11L2 12v6a2 2 0 002 2h16a2 2 0 002-2v-6l-3.45-6.89A2 2 0 0016.76 4H7.24a2 2 0 00-1.79 1.11z"/></svg>',
+    sent: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4z"/></svg>',
+    drafts: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>',
+    starred: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>',
+    trash: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
+    custom: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
+    smart: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
+  };
   const systemFolders = [
-    { key: "__inbox", label: "📥 Входящие", kind: "inbox" },
-    { key: "__sent", label: "📤 Отправленные", kind: "sent" },
-    { key: "__drafts", label: "📝 Черновики", kind: "drafts" },
-    { key: "__starred", label: "⭐ Важные", kind: null },
-    { key: "__trash", label: "🗑 Корзина", kind: "trash" },
+    { key: "__inbox", label: "Входящие", icon: "inbox", kind: "inbox" },
+    { key: "__sent", label: "Отправленные", icon: "sent", kind: "sent" },
+    { key: "__drafts", label: "Черновики", icon: "drafts", kind: "drafts" },
+    { key: "__starred", label: "Важные", icon: "starred", kind: null },
+    { key: "__trash", label: "Корзина", icon: "trash", kind: "trash" },
   ];
   for (const f of systemFolders) {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.key ? " active" : "");
-    d.textContent = f.label;
+    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons[f.icon]}${escapeHtml(f.label)}</span>`;
     d.onclick = () => {
       exitTasksView();
       state.currentFolder = f.key;
@@ -208,7 +217,7 @@ async function loadFolders() {
   for (const f of custom) {
     const d = document.createElement("div");
     d.className = "folder-item" + (state.currentFolder === f.id ? " active" : "");
-    d.innerHTML = `<span>📁 ${escapeHtml(f.name)}</span>`;
+    d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.custom}${escapeHtml(f.name)}</span>`;
     d.onclick = () => { exitTasksView(); state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
@@ -225,7 +234,7 @@ async function loadFolders() {
     for (const sf of smart) {
       const d = document.createElement("div");
       d.className = "folder-item" + (state.currentFolder === "smart:" + sf.id ? " active" : "");
-      d.innerHTML = `<span>🔮 ${escapeHtml(sf.name)}</span>`;
+      d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.smart}${escapeHtml(sf.name)}</span>`;
       d.onclick = () => { exitTasksView(); state.currentFolder = "smart:" + sf.id; refreshList(); };
       list.appendChild(d);
     }
