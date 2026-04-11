@@ -130,8 +130,6 @@ async function bootApp() {
   }).catch(() => {});
   if (state.user.role === "owner" || state.user.role === "admin") {
     document.getElementById("admin-btn").classList.remove("hidden");
-    const ibTeam = document.getElementById("ib-team");
-    if (ibTeam) ibTeam.style.display = "";
     const ibAdmin = document.getElementById("ib-admin");
     if (ibAdmin) ibAdmin.style.display = "";
     const ibFinance = document.getElementById("ib-finance");
@@ -1270,10 +1268,13 @@ async function showTasksView(filter) {
     team: "👥 Команда",
   };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
+  const filtersEl = document.getElementById("tasks-filters");
   if (filter === "team") {
     tasksMode = "team";
+    if (filtersEl) filtersEl.style.display = "none";
     await loadTeamColumns();
   } else {
+    if (filtersEl) filtersEl.style.display = "";
     await loadTasks();
   }
 }
@@ -1323,10 +1324,12 @@ async function loadTeamView() {
 }
 
 async function loadTeamColumns() {
-  const [team, allTasks] = await Promise.all([
+  const [team, openTasks, progressTasks] = await Promise.all([
     api("/tasks/team-stats"),
-    api("/tasks?status=open,in_progress&limit=500"),
+    api("/tasks?status=open&limit=500"),
+    api("/tasks?status=in_progress&limit=500"),
   ]);
+  const allTasks = [...openTasks, ...progressTasks];
   const list = document.getElementById("tasks-list");
   if (!team.length) {
     list.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет данных</div>';
@@ -1350,12 +1353,12 @@ async function loadTeamColumns() {
               <div style="font-weight:700;font-size:14px">${escapeHtml(u.name)}</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${u.tasks.length} активных · ${overdue ? '<span style="color:var(--danger)">' + u.overdue + ' просроч.</span>' : '0 просроч.'}</div>
             </div>
-            <div style="padding:8px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+            <div class="team-drop-zone" data-user-id="${u.id}" ondragover="event.preventDefault();this.style.background='var(--bg-hover)'" ondragleave="this.style.background=''" ondrop="dropTask(event,this)" style="padding:8px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px;min-height:60px">
               ${u.tasks.length ? u.tasks.map((t) => {
                 const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
                 const prio = t.priority === "high" ? "🔥 " : t.priority === "urgent" ? "🚨 " : "";
                 return `
-                  <div onclick="openTaskDetail('${t.id}')" style="cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${t.id}')" onclick="openTaskDetail('${t.id}')" style="cursor:grab;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s,opacity .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
                     <div style="font-size:13px;font-weight:500">${prio}${escapeHtml(t.title)}</div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
                       ${t.dueDate ? `<span style="${isOverdue ? 'color:var(--danger)' : ''}">${isOverdue ? '⏰' : '📅'} ${new Date(t.dueDate).toLocaleDateString("ru")}</span>` : ''}
@@ -1371,6 +1374,20 @@ async function loadTeamColumns() {
       }).join("")}
     </div>
   `;
+}
+
+async function dropTask(event, dropZone) {
+  event.preventDefault();
+  dropZone.style.background = "";
+  const taskId = event.dataTransfer.getData("text/plain");
+  const newAssigneeId = dropZone.dataset.userId;
+  if (!taskId || !newAssigneeId) return;
+  try {
+    await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ assigneeId: newAssigneeId }) });
+    await loadTeamColumns();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
 }
 
 async function openUserKanban(userId) {

@@ -6,7 +6,7 @@
 <title>crm.eg.je</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=55" />
+<link rel="stylesheet" href="/app.css?v=57" />
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
 </head>
@@ -31,7 +31,6 @@
     <div class="ib-item active" data-section="mail" onclick="switchSection('mail')" title="Почта">📧</div>
     <div class="ib-item" data-section="tasks" onclick="switchSection('tasks')" title="Задачи">✅</div>
     <div class="ib-item" id="ib-finance" style="display:none" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
-    <div class="ib-item" id="ib-team" style="display:none" data-section="team" onclick="switchSection('team')" title="Команда">👥</div>
     <div style="flex:1"></div>
     <div class="ib-item" id="ib-admin" style="display:none" data-section="admin" onclick="switchSection('admin')" title="Админка">⚙</div>
     <div class="ib-item" onclick="toggleTheme()" title="Тема">🌓</div>
@@ -134,9 +133,9 @@
       <button onclick="showTasksView('unassigned')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">❓ Без исполнителя</button>
       <button onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">⏰ Просроченные</button>
       <button onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">✔️ Выполненные</button>
-      <button id="team-subnav-btn" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text);display:none">👥 Команда</button>
+      <button id="team-subnav-btn" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">👥 Команда</button>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div id="tasks-filters" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
       <select id="tasks-assignee-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все исполнители</option></select>
       <select id="tasks-label-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все метки</option></select>
@@ -243,6 +242,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=55"></script>
+<script src="/app.js?v=58"></script>
 </body>
 </html>
