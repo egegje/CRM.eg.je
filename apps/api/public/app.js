@@ -2338,15 +2338,38 @@ function exportAnalyticsCSV() {
 }
 
 async function renderAuditTab() {
-  const list = await api("/admin/audit?limit=200");
+  const [list, users] = await Promise.all([api("/admin/audit?limit=200"), api("/admin/users")]);
+  const userMap = Object.fromEntries(users.map(u => [u.id, u.name || u.email]));
+  const actionLabels = {
+    "auth.login": "Вход",
+    "auth.logout": "Выход",
+    "message.send": "Отправка",
+    "message.delete": "Удаление",
+    "message.summarize": "AI саммари",
+    "message.ai_reply": "AI ответ",
+    "task.update": "Задача",
+  };
+  function fmtDetails(d) {
+    if (!d || !Object.keys(d).length) return "";
+    const parts = [];
+    if (d.subject) parts.push(d.subject);
+    if (d.to) parts.push("→ " + (Array.isArray(d.to) ? d.to.join(", ") : d.to));
+    if (d.taskId) parts.push("задача");
+    if (d.changes) {
+      const ch = d.changes;
+      parts.push(Object.entries(ch).map(([k,v]) => k + ": " + v).join(", "));
+    }
+    if (d.messageId && !parts.length) parts.push("msg");
+    if (!parts.length) return JSON.stringify(d).slice(0, 80);
+    return parts.join(" · ");
+  }
   const rows = list.map((a) => `<tr>
-    <td>${new Date(a.createdAt).toLocaleString("ru")}</td>
-    <td>${escapeHtml(a.userId || "—")}</td>
-    <td>${escapeHtml(a.action)}</td>
-    <td><code style="font-size:11px">${escapeHtml(JSON.stringify(a.details || {}))}</code></td>
-    <td>${escapeHtml(a.ip || "")}</td>
+    <td style="white-space:nowrap;font-size:12px">${new Date(a.createdAt).toLocaleString("ru",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"})}</td>
+    <td style="font-size:12px">${escapeHtml(userMap[a.userId] || "—")}</td>
+    <td style="font-size:12px">${escapeHtml(actionLabels[a.action] || a.action)}</td>
+    <td style="font-size:12px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(fmtDetails(a.details))}</td>
   </tr>`).join("");
-  return `<table class="admin-table"><thead><tr><th>Время</th><th>User</th><th>Действие</th><th>Детали</th><th>IP</th></tr></thead><tbody>${rows}</tbody></table>`;
+  return `<table class="admin-table"><thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Детали</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 async function renderTelegramTab() {
