@@ -6,7 +6,7 @@
 <title>crm.eg.je</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=54" />
+<link rel="stylesheet" href="/app.css?v=55" />
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
 </head>
@@ -134,6 +134,7 @@
       <button onclick="showTasksView('unassigned')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">❓ Без исполнителя</button>
       <button onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">⏰ Просроченные</button>
       <button onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">✔️ Выполненные</button>
+      <button id="team-subnav-btn" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text);display:none">👥 Команда</button>
     </div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
@@ -242,6 +243,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=54"></script>
+<script src="/app.js?v=55"></script>
 </body>
 </html>

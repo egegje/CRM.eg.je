@@ -138,6 +138,8 @@ async function bootApp() {
     if (ibFinance) ibFinance.style.display = "";
     const mtabFinance = document.getElementById("mtab-finance");
     if (mtabFinance) mtabFinance.style.display = "";
+    const teamSubnav = document.getElementById("team-subnav-btn");
+    if (teamSubnav) teamSubnav.style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
   await refreshList();
@@ -911,7 +913,7 @@ function switchSection(section) {
   } else if (section === "finance") {
     showFinanceView();
   } else if (section === "team") {
-    showTeamView();
+    showTasksView("team");
   } else if (section === "admin") {
     showAdminView();
   }
@@ -1265,9 +1267,15 @@ async function showTasksView(filter) {
     unassigned: "Без исполнителя",
     overdue: "Просроченные",
     done: "Выполненные",
+    team: "👥 Команда",
   };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
-  await loadTasks();
+  if (filter === "team") {
+    tasksMode = "team";
+    await loadTeamColumns();
+  } else {
+    await loadTasks();
+  }
 }
 
 async function showTeamView() {
@@ -1306,6 +1314,57 @@ async function loadTeamView() {
               <div><b style="font-size:18px">${u.open}</b><div style="font-size:10px;color:var(--text-muted)">открытых</div></div>
               <div><b style="font-size:18px;color:${u.overdue > 0 ? "#ef4444" : "var(--text)"}">${u.overdue}</b><div style="font-size:10px;color:var(--text-muted)">⏰ просроч.</div></div>
               <div><b style="font-size:18px;color:#10b981">${u.doneWeek}</b><div style="font-size:10px;color:var(--text-muted)">✓ за нед.</div></div>
+            </div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+async function loadTeamColumns() {
+  const [team, allTasks] = await Promise.all([
+    api("/tasks/team-stats"),
+    api("/tasks?status=open,in_progress&limit=500"),
+  ]);
+  const list = document.getElementById("tasks-list");
+  if (!team.length) {
+    list.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет данных</div>';
+    return;
+  }
+  // Group tasks by assignee
+  const byUser = {};
+  for (const u of team) byUser[u.id] = { ...u, tasks: [] };
+  for (const t of allTasks) {
+    if (t.assigneeId && byUser[t.assigneeId]) byUser[t.assigneeId].tasks.push(t);
+  }
+  const users = Object.values(byUser);
+
+  list.innerHTML = `
+    <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:start">
+      ${users.map((u) => {
+        const overdue = u.overdue > 0;
+        return `
+          <div style="min-width:260px;max-width:300px;flex-shrink:0;background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg)">
+              <div style="font-weight:700;font-size:14px">${escapeHtml(u.name)}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${u.tasks.length} активных · ${overdue ? '<span style="color:var(--danger)">' + u.overdue + ' просроч.</span>' : '0 просроч.'}</div>
+            </div>
+            <div style="padding:8px;max-height:60vh;overflow-y:auto;display:flex;flex-direction:column;gap:6px">
+              ${u.tasks.length ? u.tasks.map((t) => {
+                const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
+                const prio = t.priority === "high" ? "🔥 " : t.priority === "urgent" ? "🚨 " : "";
+                return `
+                  <div onclick="openTaskDetail('${t.id}')" style="cursor:pointer;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                    <div style="font-size:13px;font-weight:500">${prio}${escapeHtml(t.title)}</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
+                      ${t.dueDate ? `<span style="${isOverdue ? 'color:var(--danger)' : ''}">${isOverdue ? '⏰' : '📅'} ${new Date(t.dueDate).toLocaleDateString("ru")}</span>` : ''}
+                      <span>${t.status === "in_progress" ? "⚙ в работе" : "открыта"}</span>
+                      ${t.project ? `<span>📁 ${escapeHtml(t.project.name)}</span>` : ''}
+                    </div>
+                    ${t.labels?.length ? `<div style="margin-top:4px;display:flex;gap:4px;flex-wrap:wrap">${t.labels.map(l => `<span style="font-size:9px;padding:2px 6px;border-radius:4px;background:var(--bg-hover);color:var(--text-muted)">${escapeHtml(l)}</span>`).join("")}</div>` : ''}
+                  </div>`;
+              }).join("") : '<div style="padding:12px;text-align:center;color:var(--text-muted);font-size:12px">нет задач</div>'}
             </div>
           </div>
         `;
