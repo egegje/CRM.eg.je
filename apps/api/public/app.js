@@ -907,7 +907,9 @@ function switchSection(section) {
   if (section === "mail") {
     exitTasksView();
   } else if (section === "tasks") {
-    showTasksView(tasksFilter || "me");
+    const saved = tasksFilter || localStorage.getItem("crm-tasks-filter") || "me";
+    if (saved === "kanban") showKanbanView();
+    else showTasksView(saved);
   } else if (section === "finance") {
     showFinanceView();
   } else if (section === "team") {
@@ -1249,6 +1251,7 @@ async function deleteAccount(id) {
 async function showTasksView(filter) {
   tasksFilter = filter || null;
   tasksMode = "list";
+  localStorage.setItem("crm-tasks-filter", filter || "me");
   document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
@@ -1454,6 +1457,7 @@ async function openUserKanban(userId) {
 async function showKanbanView() {
   tasksFilter = null;
   tasksMode = "kanban";
+  localStorage.setItem("crm-tasks-filter", "kanban");
   document.querySelector(".sidebar").classList.add("hidden");
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
