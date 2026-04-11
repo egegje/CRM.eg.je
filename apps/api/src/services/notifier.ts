@@ -81,6 +81,10 @@ function esc(s: string): string {
 }
 
 export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise<void> {
+  // Check if TG notifications are paused
+  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  if (pauseSetting?.value === "true") return;
+
   let summary = "";
   let actions: string[] = [];
   try {

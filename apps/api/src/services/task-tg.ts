@@ -41,6 +41,10 @@ export async function sendTaskBotToUser(
 
 /** Notify an assignee that a new task was created or assigned to them. */
 export async function notifyAssignment(taskId: string, byUserId: string | null): Promise<void> {
+  // Check if TG notifications are paused
+  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  if (pauseSetting?.value === "true") return;
+
   const t = await prisma.task.findUnique({ where: { id: taskId }, include: { project: true } });
   if (!t || !t.assigneeId) return;
   if (byUserId && t.assigneeId === byUserId) return; // self-assigned, no ping

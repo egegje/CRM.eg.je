@@ -1008,9 +1008,9 @@ async function loadSberData() {
       const bal = summary ? sberAmt(summary.closingBalance) : 0;
       totalBalance += bal;
       html += `
-        <div onclick="openStatement('${acc.number}')" style="cursor:pointer;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
-          <div>
-            <div style="font-family:monospace;font-size:13px">${escapeHtml(acc.number)}</div>
+        <div onclick="openStatement('${acc.number}')" style="cursor:pointer;background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;transition:border-color 0.15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+          <div style="min-width:0">
+            <div style="font-family:monospace;font-size:13px;word-break:break-all">${escapeHtml(acc.number)}</div>
             <div style="font-size:11px;color:var(--text-muted);margin-top:2px">БИК ${escapeHtml(acc.bic)} · ${escapeHtml(acc.name || acc.type || "")}</div>
             ${summary ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px">Дебет: ${fmtMoney(sberAmt(summary.debitTurnover))} (${summary.debitTransactionsNumber}) · Кредит: ${fmtMoney(sberAmt(summary.creditTurnover))} (${summary.creditTransactionsNumber})</div>` : ""}
           </div>
@@ -2302,6 +2302,19 @@ async function renderTaskSettingsTab() {
     <form style="display:flex;flex-direction:column;gap:0;max-width:640px" onsubmit="saveTaskSettings(event)">
 
       <div class="settings-card">
+        <div class="settings-card-title">⏸ Пауза</div>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <label class="toggle-switch"><input name="email_sending_paused" type="checkbox" ${s.email_sending_paused === "true" ? "checked" : ""}><span class="slider"></span></label>
+          Приостановить отправку писем
+        </label>
+        <label style="display:flex;align-items:center;gap:10px">
+          <label class="toggle-switch"><input name="tg_notifications_paused" type="checkbox" ${s.tg_notifications_paused === "true" ? "checked" : ""}><span class="slider"></span></label>
+          Приостановить уведомления в Telegram
+        </label>
+        <p>Когда включено — письма не отправляются, TG-уведомления (почта, задачи, дайджест, напоминания) не приходят.</p>
+      </div>
+
+      <div class="settings-card">
         <div class="settings-card-title">🏦 ВТБ Host-to-Host</div>
         <label>CustID<input type="text" name="vtb_cust_id" value="${escapeHtml(s.vtb_cust_id || "")}" placeholder="662875628"></label>
         <label>Логин ВТБ Бизнес<input type="text" name="vtb_login" value="${escapeHtml(s.vtb_login || "")}" placeholder="логин"></label>
@@ -2425,6 +2438,8 @@ async function saveTaskSettings(e) {
     vtb_password: String(f.get("vtb_password") || ""),
     task_labels: String(f.get("task_labels") || ""),
     digest_hour_msk: String(f.get("digest_hour_msk") || "9"),
+    email_sending_paused: e.target.email_sending_paused.checked ? "true" : "false",
+    tg_notifications_paused: e.target.tg_notifications_paused.checked ? "true" : "false",
     ai_email_detect_enabled: e.target.ai_email_detect_enabled.checked ? "true" : "false",
     ai_autoclose_enabled: e.target.ai_autoclose_enabled.checked ? "true" : "false",
     email_ai_notify_user_id: String(f.get("email_ai_notify_user_id") || ""),

@@ -18,6 +18,9 @@ function escapeHtml(s: string): string {
 }
 
 export async function sendMorningDigest(): Promise<void> {
+  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  if (pauseSetting?.value === "true") return;
+
   const bindings = await prisma.tgUserBinding.findMany();
   for (const b of bindings) {
     const tasks = await prisma.task.findMany({

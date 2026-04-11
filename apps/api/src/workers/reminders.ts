@@ -5,6 +5,9 @@ const REMINDER_HOURS = 24;
 const FOLLOWUP_HOURS = 72;
 
 export async function runReminders(now = new Date()): Promise<void> {
+  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  if (pauseSetting?.value === "true") return;
+
   const cutoff = new Date(now.getTime() - REMINDER_HOURS * 3600 * 1000);
   // Unread messages older than 24h, not yet reminded.
   const stale = await prisma.message.findMany({
@@ -43,6 +46,9 @@ export async function runReminders(now = new Date()): Promise<void> {
 }
 
 export async function runFollowups(now = new Date()): Promise<void> {
+  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  if (pauseSetting?.value === "true") return;
+
   const cutoff = new Date(now.getTime() - FOLLOWUP_HOURS * 3600 * 1000);
   // Sent messages older than 72h with no incoming reply from any of `toAddrs`.
   const sent = await prisma.message.findMany({

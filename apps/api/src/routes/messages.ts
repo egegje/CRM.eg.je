@@ -336,6 +336,11 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     if (!m) throw new NotFound();
     await assertMessageAccess(req.user!, m);
     if (!m.mailbox.enabled) throw new BadRequest("mailbox disabled");
+
+    // Check if email sending is paused globally
+    const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "email_sending_paused" } });
+    if (pauseSetting?.value === "true") throw new BadRequest("Отправка писем приостановлена администратором");
+
     const user = req.user!;
 
     if (body.sendAt && body.sendAt.getTime() > Date.now()) {
