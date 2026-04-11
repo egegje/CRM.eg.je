@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>crm.eg.je</title>
+<title>METR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/app.css?v=57" />
@@ -13,7 +13,7 @@
 <body>
 <div id="login-screen" class="hidden">
   <div class="login-box">
-    <h1>crm.eg.je</h1>
+    <h1 style="font-weight:800;letter-spacing:2px">METR</h1>
     <form id="login-form">
       <input name="email" type="email" placeholder="email" required />
       <input name="password" type="password" placeholder="пароль" required />
@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <nav class="icon-bar" id="icon-bar">
-    <div class="ib-logo">C</div>
+    <div class="ib-logo" style="font-size:13px;letter-spacing:2px;font-weight:800">M</div>
     <div class="ib-item active" data-section="mail" onclick="switchSection('mail')" title="Почта">📧</div>
     <div class="ib-item" data-section="tasks" onclick="switchSection('tasks')" title="Задачи">✅</div>
     <div class="ib-item" id="ib-finance" style="display:none" data-section="finance" onclick="switchSection('finance')" title="Финансы">💰</div>
@@ -39,7 +39,7 @@
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar">
     <div class="brand">
-      <span>crm.eg.je <span id="outbox-badge" class="badge"></span></span>
+      <span>METR <span id="outbox-badge" class="badge"></span></span>
       <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
     </div>
     <button class="compose-btn" onclick="openCompose()">✉️ Написать</button>
@@ -242,6 +242,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=63"></script>
+<script src="/app.js?v=64"></script>
 </body>
 </html>
