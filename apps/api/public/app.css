@@ -106,20 +106,20 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .toast button { background: none; border: 1px solid currentColor; color: inherit; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 
 /* preview */
-.preview-pane { overflow-y: auto; padding: 20px 28px; }
+.preview-pane { overflow-y: auto; overflow-x: hidden; padding: 20px 28px; min-width: 0; }
 #tasks-view, #finance-view, #team-view, #admin-view { overflow: auto; word-break: break-word; grid-column: 2 / -1; }
 .preview-pane .empty { color: var(--text-muted); text-align: center; margin-top: 80px; }
 .preview-header { padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
 .preview-header h2 { margin: 0 0 8px; font-size: 18px; }
 .preview-meta { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
-.preview-actions { display: flex; gap: 6px; margin: 14px 0; }
-.preview-actions button { padding: 6px 12px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 5px; cursor: pointer; color: var(--text); }
+.preview-actions { display: flex; gap: 6px; margin: 14px 0; flex-wrap: wrap; }
+.preview-actions button { padding: 6px 12px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text); font-size: 12px; white-space: nowrap; }
 .preview-actions button:hover { background: var(--bg-hover); }
 .mobile-back { display: none; }
 @media (max-width: 900px) { .mobile-back { display: inline-block; } }
 .ai-block { background: var(--summary-bg); padding: 12px 14px; margin: 14px 0; border-radius: 10px; font-size: 13px; }
 .ai-block .ai-label { font-size: 11px; text-transform: uppercase; color: var(--summary-border); font-weight: 600; margin-bottom: 4px; }
-.preview-body { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
+.preview-body { font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; overflow-wrap: break-word; max-width: 100%; }
 .attachments { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
 .attachment { display: inline-block; padding: 6px 10px; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 5px; margin: 4px 6px 4px 0; text-decoration: none; color: var(--text); font-size: 12px; }
 .attachment:hover { background: var(--bg-hover); }
