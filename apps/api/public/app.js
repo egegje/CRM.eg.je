@@ -189,7 +189,6 @@ async function loadFolders() {
     starred: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg>',
     trash: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>',
     custom: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>',
-    smart: '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>',
   };
   const systemFolders = [
     { key: "__inbox", label: "Входящие", icon: "inbox", kind: "inbox" },
@@ -221,42 +220,6 @@ async function loadFolders() {
     d.onclick = () => { exitTasksView(); state.currentFolder = f.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
-  // Smart folders
-  try {
-    const smart = await api("/smart-folders");
-    if (smart.length) {
-      const title = document.createElement("div");
-      title.className = "folder-title";
-      title.textContent = "Умные папки";
-      title.style.marginTop = "12px";
-      list.appendChild(title);
-    }
-    for (const sf of smart) {
-      const d = document.createElement("div");
-      d.className = "folder-item" + (state.currentFolder === "smart:" + sf.id ? " active" : "");
-      d.innerHTML = `<span style="display:flex;align-items:center;gap:10px">${folderIcons.smart}<span class="folder-label">${escapeHtml(sf.name)}</span></span>`;
-      d.onclick = () => { exitTasksView(); state.currentFolder = "smart:" + sf.id; refreshList(); };
-      list.appendChild(d);
-    }
-    const add = document.createElement("button");
-    add.className = "link-btn";
-    add.textContent = "+ умная папка";
-    add.classList.add("folder-label");
-    add.onclick = createSmartFolder;
-    list.appendChild(add);
-  } catch {}
-}
-
-async function createSmartFolder() {
-  const name = prompt("Название умной папки:");
-  if (!name) return;
-  const q = prompt("Поисковая фраза (FTS):") || "";
-  const from = prompt("От кого (необязательно):") || "";
-  await api("/smart-folders", {
-    method: "POST",
-    body: JSON.stringify({ name, query: { q, from: from || undefined } }),
-  });
-  loadFolders();
 }
 
 async function refreshList() {
@@ -286,12 +249,7 @@ async function refreshList() {
     params.set("folderId", state.currentFolder);
   }
   params.set("limit", "100");
-  let messages;
-  if (state.currentFolder && state.currentFolder.startsWith("smart:")) {
-    messages = await api("/smart-folders/" + state.currentFolder.slice(6) + "/messages");
-  } else {
-    messages = await api("/messages?" + params.toString());
-  }
+  let messages = await api("/messages?" + params.toString());
   if (sysKind) {
     const ids = new Set(state.folders.filter((f) => f.kind === sysKind).map((f) => f.id));
     if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
