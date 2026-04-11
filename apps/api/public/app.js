@@ -1541,7 +1541,7 @@ function exitTasksView() {
   // re-apply persisted resizer widths
   const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
   if (saved && window.innerWidth > 900) {
-    document.getElementById("app").style.gridTemplateColumns = `56px ${saved.sidebar}px 4px ${saved.list}px 4px 1fr`;
+    document.getElementById("app").style.gridTemplateColumns = `56px 56px 4px ${saved.list}px 4px 1fr`;
   }
   // Update icon bar
   document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
@@ -2685,7 +2685,7 @@ window.addEventListener("online", () => {
   let listW = saved?.list ?? 380;
   function apply() {
     if (window.innerWidth <= 900) return;
-    app.style.gridTemplateColumns = `56px ${sidebarW}px 4px ${listW}px 4px 1fr`;
+    app.style.gridTemplateColumns = `56px 56px 4px ${listW}px 4px 1fr`;
   }
   apply();
   window.addEventListener("resize", apply);
