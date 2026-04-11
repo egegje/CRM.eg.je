@@ -68,8 +68,8 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
 .sidebar:hover #mailboxes-group, .sidebar.sidebar-expanded #mailboxes-group { display: block; }
 .sidebar .folder-item { white-space: nowrap; overflow: hidden; border-radius: 8px; padding: 8px 10px; }
 .sidebar .folder-item svg { flex-shrink: 0; }
-.sidebar .folder-item .folder-label { display: none; }
-.sidebar:hover .folder-item .folder-label, .sidebar.sidebar-expanded .folder-item .folder-label { display: inline; }
+.sidebar .folder-label { display: none; }
+.sidebar:hover .folder-label, .sidebar.sidebar-expanded .folder-label { display: inline; }
 .brand { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .sidebar-close { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 4px 8px; }
 @media (max-width: 900px) { .sidebar-close { display: block; } .sidebar { width: 280px; min-width: 280px; padding: 16px; } .sidebar .brand, .sidebar .compose-btn, .sidebar .folder-title, .sidebar .user-box, .sidebar .link-btn, .sidebar .folder-item .count { opacity: 1; } }
