@@ -241,6 +241,7 @@ async function loadFolders() {
     const add = document.createElement("button");
     add.className = "link-btn";
     add.textContent = "+ умная папка";
+    add.classList.add("folder-label");
     add.onclick = createSmartFolder;
     list.appendChild(add);
   } catch {}
