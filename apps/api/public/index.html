@@ -6,7 +6,7 @@
 <title>METR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=68" />
+<link rel="stylesheet" href="/app.css?v=69" />
 <link rel="manifest" href="/manifest.json" />
 <meta name="theme-color" content="#2563eb" />
 </head>
@@ -44,14 +44,13 @@
     </div>
     <button class="compose-btn" onclick="openCompose()">✉️ Написать</button>
     <div class="folders">
-      <div class="folder-group">
+      <div class="folder-group" id="folders-group">
+        <div id="folders-list"></div>
+        <button class="link-btn sidebar-label" onclick="createFolder()">+ новая папка</button>
+      </div>
+      <div class="folder-group sidebar-label" id="mailboxes-group">
         <div class="folder-title">Ящики</div>
         <div id="mailboxes-list"></div>
-      </div>
-      <div class="folder-group">
-        <div class="folder-title">Папки</div>
-        <div id="folders-list"></div>
-        <button class="link-btn" onclick="createFolder()">+ новая папка</button>
       </div>
     </div>
     <div class="user-box" style="font-size:11px;color:var(--text-muted)">
@@ -242,6 +241,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=68"></script>
+<script src="/app.js?v=69"></script>
 </body>
 </html>
