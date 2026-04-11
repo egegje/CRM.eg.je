@@ -1343,13 +1343,22 @@ async function loadTeamColumns() {
   }
   const users = Object.values(byUser);
 
+  // Apply saved column order
+  const savedOrder = JSON.parse(localStorage.getItem("team-col-order") || "null");
+  if (savedOrder) {
+    users.sort((a, b) => {
+      const ai = savedOrder.indexOf(a.id), bi = savedOrder.indexOf(b.id);
+      return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+    });
+  }
+
   list.innerHTML = `
-    <div style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:start">
+    <div id="team-columns" style="display:flex;gap:12px;overflow-x:auto;padding-bottom:8px;align-items:start">
       ${users.map((u) => {
         const overdue = u.overdue > 0;
         return `
-          <div style="min-width:260px;max-width:300px;flex-shrink:0;background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;overflow:hidden">
-            <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg)">
+          <div class="team-column" draggable="true" data-col-user="${u.id}" ondragstart="dragColumn(event)" ondragover="dragOverColumn(event)" ondrop="dropColumn(event)" ondragend="dragEndColumn(event)" style="min-width:260px;max-width:300px;flex-shrink:0;background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:opacity .15s">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border);background:var(--bg);cursor:grab">
               <div style="font-weight:700;font-size:14px">${escapeHtml(u.name)}</div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${u.tasks.length} активных · ${overdue ? '<span style="color:var(--danger)">' + u.overdue + ' просроч.</span>' : '0 просроч.'}</div>
             </div>
@@ -1358,7 +1367,7 @@ async function loadTeamColumns() {
                 const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
                 const prio = t.priority === "high" ? "🔥 " : t.priority === "urgent" ? "🚨 " : "";
                 return `
-                  <div draggable="true" ondragstart="event.dataTransfer.setData('text/plain','${t.id}')" onclick="openTaskDetail('${t.id}')" style="cursor:grab;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s,opacity .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div draggable="true" ondragstart="event.stopPropagation();event.dataTransfer.setData('text/plain','${t.id}')" onclick="openTaskDetail('${t.id}')" style="cursor:grab;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s,opacity .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
                     <div style="font-size:13px;font-weight:500">${prio}${escapeHtml(t.title)}</div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
                       ${t.dueDate ? `<span style="${isOverdue ? 'color:var(--danger)' : ''}">${isOverdue ? '⏰' : '📅'} ${new Date(t.dueDate).toLocaleDateString("ru")}</span>` : ''}
@@ -1376,10 +1385,53 @@ async function loadTeamColumns() {
   `;
 }
 
+let _dragColId = null;
+function dragColumn(e) {
+  _dragColId = e.currentTarget.dataset.colUser;
+  e.dataTransfer.effectAllowed = "move";
+  e.dataTransfer.setData("text/column", _dragColId);
+  setTimeout(() => { e.currentTarget.style.opacity = "0.4"; }, 0);
+}
+function dragOverColumn(e) {
+  if (!_dragColId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+}
+function dropColumn(e) {
+  if (!_dragColId) return;
+  e.preventDefault();
+  const targetId = e.currentTarget.dataset.colUser;
+  if (!targetId || targetId === _dragColId) return;
+  const container = document.getElementById("team-columns");
+  const cols = [...container.querySelectorAll(".team-column")];
+  const order = cols.map(c => c.dataset.colUser);
+  const fromIdx = order.indexOf(_dragColId);
+  const toIdx = order.indexOf(targetId);
+  if (fromIdx === -1 || toIdx === -1) return;
+  order.splice(fromIdx, 1);
+  order.splice(toIdx, 0, _dragColId);
+  localStorage.setItem("team-col-order", JSON.stringify(order));
+  // Reorder DOM
+  const fromEl = cols[fromIdx];
+  const toEl = cols[toIdx];
+  if (fromIdx < toIdx) {
+    container.insertBefore(fromEl, toEl.nextSibling);
+  } else {
+    container.insertBefore(fromEl, toEl);
+  }
+  _dragColId = null;
+}
+function dragEndColumn(e) {
+  e.currentTarget.style.opacity = "";
+  _dragColId = null;
+}
+
 async function dropTask(event, dropZone) {
   event.preventDefault();
+  event.stopPropagation();
   dropZone.style.background = "";
   const taskId = event.dataTransfer.getData("text/plain");
+  if (!taskId) return; // not a task drag
   const newAssigneeId = dropZone.dataset.userId;
   if (!taskId || !newAssigneeId) return;
   try {
