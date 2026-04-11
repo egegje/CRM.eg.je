@@ -128,12 +128,12 @@
       </div>
     </div>
     <div id="tasks-subnav" style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-      <button onclick="showTasksView('me')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📌 Мои</button>
-      <button onclick="showTasksView('createdByMe')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📤 Поставлено мной</button>
-      <button onclick="showTasksView('unassigned')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">❓ Без исполнителя</button>
-      <button onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">⏰ Просроченные</button>
-      <button onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">✔️ Выполненные</button>
-      <button id="team-subnav-btn" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">👥 Команда</button>
+      <button data-nav="me" draggable="true" onclick="showTasksView('me')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">📌 Мои</button>
+      <button data-nav="createdByMe" draggable="true" onclick="showTasksView('createdByMe')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">📤 Поставлено мной</button>
+      <button data-nav="unassigned" draggable="true" onclick="showTasksView('unassigned')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">❓ Без исполнителя</button>
+      <button data-nav="overdue" draggable="true" onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">⏰ Просроченные</button>
+      <button data-nav="done" draggable="true" onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">✔️ Выполненные</button>
+      <button data-nav="team" id="team-subnav-btn" draggable="true" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">👥 Команда</button>
     </div>
     <div id="tasks-filters" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
@@ -242,6 +242,6 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=62"></script>
+<script src="/app.js?v=63"></script>
 </body>
 </html>

@@ -140,6 +140,7 @@ async function bootApp() {
     if (teamSubnav) teamSubnav.style.display = "";
   }
   await Promise.all([loadMailboxes(), loadFolders()]);
+  initSubnavDrag();
   await refreshList();
 }
 
@@ -1386,6 +1387,50 @@ async function loadTeamColumns() {
       }).join("")}
     </div>
   `;
+}
+
+// Subnav drag & drop
+let _dragNavId = null;
+function initSubnavDrag() {
+  const container = document.getElementById("tasks-subnav");
+  if (!container) return;
+  // Restore saved order
+  const saved = JSON.parse(localStorage.getItem("crm-subnav-order") || "null");
+  if (saved) {
+    const btns = [...container.querySelectorAll("[data-nav]")];
+    const map = Object.fromEntries(btns.map(b => [b.dataset.nav, b]));
+    saved.forEach(id => { if (map[id]) container.appendChild(map[id]); });
+  }
+  container.addEventListener("dragstart", (e) => {
+    const btn = e.target.closest("[data-nav]");
+    if (!btn) return;
+    _dragNavId = btn.dataset.nav;
+    e.dataTransfer.effectAllowed = "move";
+    setTimeout(() => btn.style.opacity = "0.4", 0);
+  });
+  container.addEventListener("dragover", (e) => { if (_dragNavId) e.preventDefault(); });
+  container.addEventListener("drop", (e) => {
+    e.preventDefault();
+    if (!_dragNavId) return;
+    const target = e.target.closest("[data-nav]");
+    if (!target || target.dataset.nav === _dragNavId) { _dragNavId = null; return; }
+    const btns = [...container.querySelectorAll("[data-nav]")];
+    const from = btns.find(b => b.dataset.nav === _dragNavId);
+    if (!from) { _dragNavId = null; return; }
+    const rect = target.getBoundingClientRect();
+    if (e.clientX < rect.left + rect.width / 2) {
+      container.insertBefore(from, target);
+    } else {
+      container.insertBefore(from, target.nextSibling);
+    }
+    const order = [...container.querySelectorAll("[data-nav]")].map(b => b.dataset.nav);
+    localStorage.setItem("crm-subnav-order", JSON.stringify(order));
+    _dragNavId = null;
+  });
+  container.addEventListener("dragend", (e) => {
+    e.target.style.opacity = "";
+    _dragNavId = null;
+  });
 }
 
 let _dragColId = null;
