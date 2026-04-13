@@ -101,6 +101,7 @@ model Message {
   imapUid     Int?
   messageId   String?      @unique
   fromAddr    String
+  fromName    String?
   toAddrs     String[]
   ccAddrs     String[]
   subject     String

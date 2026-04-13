@@ -402,7 +402,7 @@ function renderList() {
       <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
-        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromAddr || "", q)}</div><div class="msg-date">${date}</div></div>
+        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromName || m.fromAddr || "", q)}</div><div class="msg-date">${date}</div></div>
         <div class="msg-subject">${star}${clip} ${highlight(m.subject || "(без темы)", q)}</div>
         <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
@@ -461,7 +461,7 @@ function renderPreview(m) {
     <div class="preview-header">
       <h2>${escapeHtml(m.subject || "(без темы)")}</h2>
       <div class="preview-meta">
-        <b>От:</b> ${escapeHtml(m.fromAddr || "")}<br>
+        <b>От:</b> ${m.fromName ? escapeHtml(m.fromName) + ' &lt;' + escapeHtml(m.fromAddr) + '&gt;' : escapeHtml(m.fromAddr || "")}<br>
         <b>Кому:</b> ${escapeHtml((m.toAddrs || []).join(", "))}<br>
         ${(m.ccAddrs || []).length ? `<b>Копия:</b> ${escapeHtml(m.ccAddrs.join(", "))}<br>` : ""}
         <b>Дата:</b> ${date}

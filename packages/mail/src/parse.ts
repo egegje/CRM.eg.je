@@ -3,6 +3,7 @@ import { simpleParser, type ParsedMail, type AddressObject } from "mailparser";
 export type Parsed = {
   messageId?: string;
   from: string;
+  fromName?: string;
   to: string[];
   cc: string[];
   subject: string;
@@ -23,6 +24,7 @@ export async function parseRaw(raw: Buffer): Promise<Parsed> {
   return {
     messageId: m.messageId,
     from: m.from?.value[0]?.address ?? "",
+    fromName: m.from?.value[0]?.name || undefined,
     to: flatAddrs(m.to),
     cc: flatAddrs(m.cc),
     subject: m.subject ?? "",

@@ -45,6 +45,7 @@ async function persistMessage(
       imapUid: msg.uid,
       messageId: parsed.messageId,
       fromAddr: stripNul(parsed.from) ?? "",
+      fromName: parsed.fromName ? stripNul(parsed.fromName) : null,
       toAddrs: parsed.to,
       ccAddrs: parsed.cc,
       subject: stripNul(parsed.subject) ?? "",
@@ -96,11 +97,16 @@ async function persistMessage(
       .filter((e) => !ownEmails.has(e)),
   );
   for (const email of addrs) {
+    const contactName = (email === parsed.from?.toLowerCase() && parsed.fromName) ? parsed.fromName : "";
     await prisma.contact
       .upsert({
         where: { email },
-        create: { email, name: "", useCount: 1, lastUsedAt: new Date() },
-        update: { useCount: { increment: 1 }, lastUsedAt: new Date() },
+        create: { email, name: contactName, useCount: 1, lastUsedAt: new Date() },
+        update: {
+          useCount: { increment: 1 },
+          lastUsedAt: new Date(),
+          ...(contactName ? { name: contactName } : {}),
+        },
       })
       .catch(() => {});
   }
