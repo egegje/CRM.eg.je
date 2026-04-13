@@ -38,7 +38,7 @@
   </nav>
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
   <aside class="sidebar" id="main-sidebar" style="position:relative">
-    <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Свернуть/Развернуть">‹</button>
+    
     <div class="brand">
       <span>METR <span id="outbox-badge" class="badge"></span></span>
       <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
@@ -54,9 +54,6 @@
       <div id="mailboxes-group" style="display:none">
         <div id="mailboxes-list"></div>
       </div>
-      <div class="folder-group" id="sheets-group">
-        <div class="folder-title folder-label">Таблицы</div>
-        <div id="sheets-list"></div>
       </div>
     </div>
     <div class="user-box" style="font-size:11px;color:var(--text-muted)">
@@ -64,6 +61,7 @@
       <span id="version-footer" style="font-size:8px;opacity:0.2"></span>
       <span id="admin-btn" class="hidden"></span>
     </div>
+      <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Свернуть"><svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
   </aside>
 
   <div class="resizer" id="resizer-1"></div>

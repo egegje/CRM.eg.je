@@ -69,9 +69,10 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
 .sidebar.collapsed #mailboxes-group, .sidebar.collapsed #sheets-group, .sidebar.collapsed .folder-label { display: none; }
 .sidebar .folder-item { white-space: nowrap; overflow: hidden; border-radius: 8px; padding: 8px 10px; }
 .sidebar .folder-item svg { flex-shrink: 0; }
-.sidebar-toggle-btn { background: var(--bg); border: 1.5px solid var(--border); border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; font-weight: 700; color: var(--text-muted); position: absolute; right: -14px; top: 20px; z-index: 21; transition: transform 0.2s; box-shadow: 0 2px 6px oklch(0 0 0/0.1); }
-.sidebar-toggle-btn:hover { background: var(--accent); color: white; border-color: var(--accent); }
-.sidebar.collapsed .sidebar-toggle-btn { transform: rotate(180deg); }
+.sidebar-toggle-btn { background: none; border: none; width: 100%; padding: 8px; cursor: pointer; color: var(--text-muted); display: flex; align-items: center; justify-content: center; transition: color 0.15s; margin-top: auto; flex-shrink: 0; }
+.sidebar-toggle-btn:hover { color: var(--accent); }
+.sidebar-toggle-btn svg { transition: transform 0.2s; }
+.sidebar.collapsed .sidebar-toggle-btn svg { transform: rotate(180deg); }
 .brand { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
 .sidebar-close { display: none; background: none; border: none; font-size: 24px; cursor: pointer; color: var(--text); padding: 4px 8px; }
 @media (max-width: 900px) { .sidebar-close { display: block; } .sidebar { width: 280px; min-width: 280px; padding: 16px; } .sidebar .brand, .sidebar .compose-btn, .sidebar .folder-title, .sidebar .user-box, .sidebar .link-btn, .sidebar .folder-item .count { opacity: 1; } }

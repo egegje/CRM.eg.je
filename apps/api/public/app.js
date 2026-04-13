@@ -1,6 +1,7 @@
 "use strict";
 
 const state = {
+  aiSummaryEnabled: true,
   user: null,
   mailboxes: [],
   folders: [],
@@ -157,6 +158,8 @@ async function bootApp() {
     const teamSubnav = document.getElementById("team-subnav-btn");
     if (teamSubnav) teamSubnav.style.display = "";
   }
+  // Load AI summary setting
+  try { const _s = await api('/admin/task-settings').catch(()=>({})); state.aiSummaryEnabled = _s.ai_summary_enabled !== 'false'; } catch {}
   await Promise.all([loadMailboxes(), loadFolders(), loadQuickLinks()]);
   initSubnavDrag();
   await refreshList();
@@ -533,7 +536,7 @@ function renderPreview(m) {
     .join("");
   const body = m.bodyText || stripHtml(m.bodyHtml || "");
   const aiActions = (m.aiActions || []).filter((a) => !a.startsWith("_"));
-  const aiHtml = m.aiSummary
+  const aiHtml = !state.aiSummaryEnabled ? "" : m.aiSummary
     ? `<div class="ai-block"><div class="ai-label">AI · суть</div>${escapeHtml(m.aiSummary)}${
         aiActions.length
           ? `<div class="ai-label" style="margin-top:8px">Что сделать</div><ul style="margin:4px 0 0 18px;padding:0">${aiActions
