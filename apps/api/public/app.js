@@ -453,17 +453,22 @@ async function selectMessage(id) {
 function renderPreview(m) {
   const el = document.getElementById("message-preview");
   const date = m.receivedAt ? new Date(m.receivedAt).toLocaleString("ru") : "";
-  const attachHtml = (m.attachments || [])
-    .map((a) => {
+  const _previewableAttachments = (m.attachments || []).map((a, i) => ({...a, _idx: i}));
+  const attachHtml = _previewableAttachments
+    .map((a, i) => {
       const isImg = /^image\//.test(a.mime || "");
-      if (isImg) {
-        return `<div style="display:inline-block;margin:6px 8px 6px 0;vertical-align:top"><img src="/attachments/${a.id}" alt="${escapeHtml(a.filename)}" style="max-width:240px;max-height:240px;border-radius:6px;border:1px solid var(--border);display:block"><a class="attachment" href="/attachments/${a.id}" download style="display:block;margin-top:4px;font-size:11px">⬇ ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a></div>`;
-      }
       const isPdf = /\.pdf$/i.test(a.filename || "") || (a.mime || "").includes("pdf");
-      if (isPdf) {
-        return `<div style="margin:8px 0"><div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><iframe src="/attachments/${a.id}#toolbar=1" style="width:100%;height:min(500px,50vh);border:none;display:block"></iframe></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:12px;color:var(--text-muted)">📄 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</span><a href="/attachments/${a.id}" download style="font-size:11px;color:var(--accent);text-decoration:none">⬇ Скачать</a></div></div>`;
-      }
-      return `<a class="attachment" href="/attachments/${a.id}" download>📎 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a>`;
+      const canPreview = isImg || isPdf;
+      const icon = isImg ? '🖼' : isPdf ? '📄' : '📎';
+      const thumb = isImg ? `<img src="/attachments/${a.id}" style="width:48px;height:48px;object-fit:cover;border-radius:6px">` : `<span style="font-size:28px">${icon}</span>`;
+      return `<div class="attachment" style="display:inline-flex;align-items:center;gap:10px;cursor:${canPreview ? 'pointer' : 'default'}" ${canPreview ? `onclick="openFileViewer(${JSON.stringify(_previewableAttachments.map(x=>({id:x.id,filename:x.filename,mime:x.mime,size:x.size}))).replace(/"/g,'&quot;')}, ${i})"` : ''}>
+        ${thumb}
+        <div>
+          <div style="font-size:12px;font-weight:500">${escapeHtml(a.filename)}</div>
+          <div style="font-size:10px;color:var(--text-muted)">${fmtSize(a.size)}</div>
+        </div>
+        <a href="/attachments/${a.id}" download onclick="event.stopPropagation()" style="font-size:16px;text-decoration:none;margin-left:auto" title="Скачать">⬇</a>
+      </div>`;
     })
     .join("");
   const body = m.bodyText || stripHtml(m.bodyHtml || "");
@@ -940,6 +945,71 @@ function stripHtml(h) {
   d.innerHTML = h;
   return d.textContent || "";
 }
+/* --- Fullscreen file viewer --- */
+let _viewerAttachments = [];
+let _viewerIdx = 0;
+
+function openFileViewer(attachments, idx) {
+  _viewerAttachments = attachments;
+  _viewerIdx = idx;
+  renderFileViewer();
+}
+
+function renderFileViewer() {
+  let overlay = document.getElementById('file-viewer-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'file-viewer-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:300;display:flex;flex-direction:column';
+    document.body.appendChild(overlay);
+  }
+  overlay.style.display = 'flex';
+  const a = _viewerAttachments[_viewerIdx];
+  const isImg = /^image\//.test(a.mime || '');
+  const isPdf = /\.pdf$/i.test(a.filename || '') || (a.mime || '').includes('pdf');
+  const hasPrev = _viewerIdx > 0;
+  const hasNext = _viewerIdx < _viewerAttachments.length - 1;
+
+  let content = '';
+  if (isImg) {
+    content = `<img src="/attachments/${a.id}" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px;box-shadow:0 4px 32px rgba(0,0,0,0.5)">`;
+  } else if (isPdf) {
+    content = `<iframe src="/attachments/${a.id}#toolbar=1&navpanes=0" style="width:90vw;height:82vh;border:none;border-radius:8px;background:white"></iframe>`;
+  }
+
+  overlay.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 20px;color:white">
+      <div style="font-size:14px;font-weight:600">${escapeHtml(a.filename)} <span style="opacity:0.5;font-size:12px">(${fmtSize(a.size)})</span></div>
+      <div style="display:flex;gap:12px;align-items:center">
+        <a href="/attachments/${a.id}" download style="color:white;text-decoration:none;font-size:14px;padding:6px 12px;border:1px solid rgba(255,255,255,0.3);border-radius:8px">⬇ Скачать</a>
+        <button onclick="closeFileViewer()" style="background:none;border:none;color:white;font-size:24px;cursor:pointer;padding:4px 8px">&times;</button>
+      </div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:center;position:relative;padding:0 60px">
+      ${hasPrev ? '<button onclick="navigateViewer(-1)" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);border:none;color:white;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer">‹</button>' : ''}
+      ${content}
+      ${hasNext ? '<button onclick="navigateViewer(1)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:rgba(255,255,255,0.15);border:none;color:white;font-size:28px;width:44px;height:44px;border-radius:50%;cursor:pointer">›</button>' : ''}
+    </div>
+    <div style="text-align:center;padding:8px;color:rgba(255,255,255,0.5);font-size:12px">${_viewerIdx + 1} / ${_viewerAttachments.length}</div>
+  `;
+  // Close on Escape
+  overlay._keyHandler = function(e) { if (e.key === 'Escape') closeFileViewer(); };
+  document.addEventListener('keydown', overlay._keyHandler);
+}
+
+function navigateViewer(dir) {
+  _viewerIdx = Math.max(0, Math.min(_viewerAttachments.length - 1, _viewerIdx + dir));
+  renderFileViewer();
+}
+
+function closeFileViewer() {
+  const overlay = document.getElementById('file-viewer-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+    if (overlay._keyHandler) document.removeEventListener('keydown', overlay._keyHandler);
+  }
+}
+
 function fmtSize(b) {
   if (b < 1024) return b + " B";
   if (b < 1024 * 1024) return (b / 1024).toFixed(1) + " KB";
