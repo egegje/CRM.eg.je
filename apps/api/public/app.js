@@ -901,14 +901,14 @@ async function trackingManual(taskId) {
   const due = new Date(Date.now() + 3 * 86400000).toISOString();
   await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ dueDate: due }) });
   await api("/tasks/" + taskId + "/comments", { method: "POST", body: JSON.stringify({ text: "✏️ Ответ будет подготовлен вручную. Срок: 3 дня." }) });
-  showToast("Срок продлён на 3 дня", "green");
+  showToast("Срок продлён на 3 дня", null);
   loadTasks();
 }
 
 async function trackingDone(taskId) {
   await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
   await api("/tasks/" + taskId + "/comments", { method: "POST", body: JSON.stringify({ text: "✅ Ответ получен. Отслеживание завершено." }) });
-  showToast("Отслеживание завершено", "green");
+  showToast("Отслеживание завершено", null);
   loadTasks();
   document.getElementById("task-form-modal").classList.add("hidden");
 }
@@ -1086,6 +1086,7 @@ function renderFileViewer() {
     <div style="text-align:center;padding:8px;color:rgba(255,255,255,0.5);font-size:12px">${_viewerIdx + 1} / ${_viewerAttachments.length}</div>
   `;
   // Close on Escape
+  if (overlay._keyHandler) document.removeEventListener("keydown", overlay._keyHandler);
   overlay._keyHandler = function(e) { if (e.key === 'Escape') closeFileViewer(); };
   document.addEventListener('keydown', overlay._keyHandler);
 }
@@ -1658,7 +1659,7 @@ async function loadTeamColumns() {
                 const isOverdue = t.dueDate && new Date(t.dueDate) < new Date();
                 const prio = t.priority === "high" ? "🔥 " : t.priority === "urgent" ? "🚨 " : "";
                 return `
-                  <div draggable="true" ondragstart="event.stopPropagation();event.dataTransfer.setData('text/plain','${t.id}')" onclick="openTaskDetail('${t.id}')" style="cursor:grab;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s,opacity .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                  <div draggable="true" ondragstart="event.stopPropagation();event.dataTransfer.setData('text/plain','${t.id}')" onclick="openTaskForm('${t.id}')" style="cursor:grab;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;transition:border-color .15s,opacity .15s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
                     <div style="font-size:13px;font-weight:500">${prio}${escapeHtml(t.title)}</div>
                     <div style="font-size:11px;color:var(--text-muted);margin-top:4px;display:flex;gap:8px;flex-wrap:wrap">
                       ${t.dueDate ? `<span style="${isOverdue ? 'color:var(--danger)' : ''}">${isOverdue ? '⏰' : '📅'} ${new Date(t.dueDate).toLocaleDateString("ru")}</span>` : ''}
@@ -2820,6 +2821,10 @@ async function renderTaskSettingsTab() {
           <label class="toggle-switch"><input name="tg_notifications_enabled" type="checkbox" ${s.tg_notifications_paused !== "true" ? "checked" : ""}><span class="slider"></span></label>
           Уведомления в Telegram
         </label>
+        <label style="display:flex;align-items:center;gap:10px;margin-top:10px">
+          <label class="toggle-switch"><input name="ai_summary_enabled" type="checkbox" ${s.ai_summary_enabled !== "false" ? "checked" : ""}><span class="slider"></span></label>
+          AI краткое содержание писем
+        </label>
         <p>Галка включена — письма отправляются, TG-уведомления приходят. Выключено — на паузе.</p>
       </div>
 
@@ -2957,6 +2962,7 @@ async function saveTaskSettings(e) {
     metr_deadline_enabled: e.target.metr_deadline_enabled.checked ? "true" : "false",
     metr_deadline_lead_days: String(f.get("metr_deadline_lead_days") || "3"),
     metr_default_assignee_user_id: String(f.get("metr_default_assignee_user_id") || ""),
+    ai_summary_enabled: e.target.ai_summary_enabled ? (e.target.ai_summary_enabled.checked ? "true" : "false") : "true",
   };
   await api("/admin/task-settings", { method: "PUT", body: JSON.stringify(payload) });
   alert("Сохранено");

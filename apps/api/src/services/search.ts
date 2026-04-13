@@ -35,22 +35,26 @@ export function buildWhere(f: Filters): Prisma.MessageWhereInput {
   return w;
 }
 
-/** Build a SQL fragment for scoped text search */
-export function buildSearchCondition(q: string, searchIn: SearchIn = "all"): string {
-  // Escape single quotes for SQL safety
-  const escaped = q.replace(/'/g, "''");
-  const like = `'%${escaped}%'`;
+/** Build Prisma WHERE for scoped text search (safe from SQL injection) */
+export function buildSearchWhere(q: string, searchIn: SearchIn = "all"): Prisma.MessageWhereInput {
+  const contains = q;
+  const mode = "insensitive" as const;
   switch (searchIn) {
     case "subject":
-      return `"subject" ILIKE ${like}`;
+      return { subject: { contains, mode } };
     case "body":
-      return `"bodyText" ILIKE ${like}`;
+      return { bodyText: { contains, mode } };
     case "from":
-      return `("fromAddr" ILIKE ${like} OR "fromName" ILIKE ${like})`;
+      return { OR: [{ fromAddr: { contains, mode } }, { fromName: { contains, mode } }] };
     case "to":
-      return `array_to_string("toAddrs", ',') ILIKE ${like}`;
+      return { toAddrs: { has: q } };
     case "all":
     default:
-      return `("fts" @@ plainto_tsquery('simple', '${escaped}') OR "fromName" ILIKE ${like})`;
+      return { OR: [
+        { subject: { contains, mode } },
+        { bodyText: { contains, mode } },
+        { fromAddr: { contains, mode } },
+        { fromName: { contains, mode } },
+      ] };
   }
 }

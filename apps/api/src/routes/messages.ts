@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
-import { buildWhere, buildSearchCondition } from "../services/search.js";
+import { buildWhere, buildSearchWhere } from "../services/search.js";
 import type { SearchIn, FolderKind } from "../services/search.js";
 import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
@@ -69,13 +69,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const q = ListQuery.parse(req.query);
     const accessIds = await accessibleMailboxIds(req.user!);
     if (q.q) {
-      // Scoped text search: build SQL condition based on searchIn param
-      const searchCond = buildSearchCondition(q.q, q.searchIn as SearchIn);
-      const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM "Message" WHERE ${searchCond} ORDER BY "receivedAt" DESC NULLS LAST LIMIT 1000`,
-      );
-      const ids = rows.map((r) => r.id);
-      if (!ids.length) return [];
+      // Scoped text search using Prisma (safe from SQL injection)
+      const searchWhere = buildSearchWhere(q.q, q.searchIn as SearchIn);
       const baseWhere = buildWhere({
         folderId: q.folderId,
         mailboxId: q.mailboxId,
@@ -89,7 +84,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       return prisma.message.findMany({
         where: {
           ...baseWhere,
-          id: { in: ids },
+          ...searchWhere,
           ...(accessIds ? { mailboxId: { in: accessIds } } : {}),
         },
         orderBy: { receivedAt: "desc" },
