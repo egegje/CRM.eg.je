@@ -1169,6 +1169,35 @@ function fmtSize(b) {
 }
 
 let searchTimer;
+
+/* Scroll to top */
+function scrollToTop() {
+  var targets = [
+    document.querySelector('.messages-list'),
+    document.querySelector('.preview-pane'),
+    document.getElementById('tasks-view'),
+    document.getElementById('finance-view'),
+    document.getElementById('admin-view'),
+  ];
+  targets.forEach(function(el) {
+    if (el && el.offsetParent !== null) el.scrollTo({top:0, behavior:'smooth'});
+  });
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+(function() {
+  var btn = null;
+  function checkScroll() {
+    if (!btn) btn = document.getElementById('scroll-top-btn');
+    if (!btn) return;
+    var scrolled = false;
+    var targets = [document.querySelector('.messages-list'), document.querySelector('.preview-pane'), document.getElementById('tasks-view')];
+    targets.forEach(function(el) { if (el && el.scrollTop > 300) scrolled = true; });
+    if (window.scrollY > 300) scrolled = true;
+    btn.classList.toggle('visible', scrolled);
+  }
+  setInterval(checkScroll, 500);
+})();
 function debouncedSearch() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(refreshList, 300);
