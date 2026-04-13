@@ -90,11 +90,13 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 /* list pane */
 .list-pane { border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden; }
 .toolbar { padding: 12px; border-bottom: 1px solid var(--border); display: flex; gap: 8px; }
-.toolbar input, .toolbar select, .toolbar button { padding: 6px 10px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); }
+.toolbar input, .toolbar select, .toolbar button { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-family: inherit; font-size: 0.85rem; transition: border-color .2s; }
+.toolbar input:focus, .toolbar select:focus { outline: none; border-color: var(--accent); }
 .toolbar input { flex: 1; }
 .messages-list { flex: 1; overflow-y: auto; }
-.msg-item { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 10px; }
+.msg-item { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; gap: 10px; transition: background .1s; }
 .msg-item:hover { background: var(--bg-hover); }
+.msg-item:active { background: var(--bg-alt); }
 .msg-item.selected { background: var(--bg-hover); }
 .msg-item.unread { background: var(--unread-bg); }
 .msg-item.unread .msg-from, .msg-item.unread .msg-subject { font-weight: 700; }
@@ -115,8 +117,10 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .prio-high { background: var(--danger); color: white; }
 .prio-spam { background: var(--text-muted); color: white; }
 .bulk-bar { display: flex; gap: 8px; align-items: center; padding: 10px 14px; background: var(--bg-alt); border-bottom: 1px solid var(--border); font-size: 13px; }
-.bulk-bar button { padding: 4px 10px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); cursor: pointer; }
-.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-size: 13px; z-index: 200; display: flex; gap: 12px; align-items: center; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+.bulk-bar button { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); cursor: pointer; font-family: inherit; font-size: 0.8rem; font-weight: 600; transition: all .15s; }
+.bulk-bar button:hover { border-color: var(--accent); color: var(--accent); }
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 12px 20px; border-radius: 14px; font-size: 13px; font-weight: 600; z-index: 200; display: flex; gap: 12px; align-items: center; box-shadow: 0 8px 32px oklch(0 0 0 / 0.25); animation: toastIn .3s ease; }
+@keyframes toastIn { from { opacity:0; transform:translateX(-50%) translateY(20px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
 .toast button { background: none; border: 1px solid currentColor; color: inherit; padding: 4px 10px; border-radius: 4px; cursor: pointer; }
 
 /* preview */
