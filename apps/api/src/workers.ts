@@ -4,7 +4,7 @@ import { prisma } from "@crm/db";
 import { startSyncFor } from "./workers/sync.js";
 import { startScheduledSendWorker } from "./workers/scheduled-send.js";
 import { startTrashCleanupWorker } from "./workers/trash-cleanup.js";
-import { runReminders, runFollowups, runSnoozes } from "./workers/reminders.js";
+import { runReminders, runFollowups, runSnoozes, checkResponseTracking } from "./workers/reminders.js";
 import { startTelegramBot } from "./workers/telegram-bot.js";
 import { startTaskBot } from "./workers/task-bot.js";
 import { startMorningDigestCron } from "./workers/morning-digest.js";
@@ -31,6 +31,7 @@ const FIVE_MIN = 5 * 60 * 1000;
 async function hourly() {
   try { await runReminders(); } catch (e) { console.error("reminders:", (e as Error).message); }
   try { await runFollowups(); } catch (e) { console.error("followups:", (e as Error).message); }
+  try { await checkResponseTracking(); } catch (e) { console.error("tracking:", (e as Error).message); }
 }
 async function snoozeTick() {
   try { await runSnoozes(); } catch (e) { console.error("snoozes:", (e as Error).message); }

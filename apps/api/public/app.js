@@ -747,6 +747,69 @@ function toggleComposeMinimize() {
   }
 }
 
+/* --- Response tracking --- */
+let _trackDays = 7;
+function toggleTrackingOptions() {
+  const cb = document.getElementById("track-response-cb");
+  const opts = document.getElementById("tracking-options");
+  opts.style.display = cb.checked ? "flex" : "none";
+  if (cb.checked) selectTrackDays(7);
+}
+async function trackingResend(taskId) {
+  const t = await api("/tasks/" + taskId);
+  const desc = t.description || "";
+  const metaIdx = desc.indexOf("---TRACKING_META---");
+  const metaBlock = metaIdx >= 0 ? desc.slice(metaIdx) : "";
+  const toMatch = metaBlock.match(/toAddrs:(.+)/);
+  const toAddrs = toMatch ? JSON.parse(toMatch[1]) : [];
+  if (!toAddrs.length) { alert("Нет адресата"); return; }
+  // Open compose with resend
+  openCompose();
+  setTimeout(() => {
+    const f = document.getElementById("compose-form");
+    if (f) {
+      f.to.value = toAddrs.join(", ");
+      f.subject.value = "Re: " + (t.title.replace("🔔 Отслеживание: ", ""));
+      const ta = f.querySelector("textarea");
+      if (ta) ta.value = "По данному обращению нарушен срок ответа, просим незамедлительно предоставить ответ.\n\n";
+      // Enable tracking
+      const cb = document.getElementById("track-response-cb");
+      if (cb) { cb.checked = true; toggleTrackingOptions(); }
+    }
+  }, 200);
+  // Mark old task done
+  await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
+  await api("/tasks/" + taskId + "/comments", { method: "POST", body: JSON.stringify({ text: "📩 Отправлено повторно" }) });
+}
+
+async function trackingManual(taskId) {
+  const due = new Date(Date.now() + 3 * 86400000).toISOString();
+  await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ dueDate: due }) });
+  await api("/tasks/" + taskId + "/comments", { method: "POST", body: JSON.stringify({ text: "✏️ Ответ будет подготовлен вручную. Срок: 3 дня." }) });
+  showToast("Срок продлён на 3 дня", "green");
+  loadTasks();
+}
+
+async function trackingDone(taskId) {
+  await api("/tasks/" + taskId, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
+  await api("/tasks/" + taskId + "/comments", { method: "POST", body: JSON.stringify({ text: "✅ Ответ получен. Отслеживание завершено." }) });
+  showToast("Отслеживание завершено", "green");
+  loadTasks();
+  document.getElementById("task-form-modal").classList.add("hidden");
+}
+
+function selectTrackDays(days) {
+  _trackDays = days;
+  document.querySelectorAll(".track-day-btn").forEach((b) => {
+    b.classList.toggle("active", parseInt(b.dataset.days) === days);
+  });
+  const custom = document.getElementById("track-custom-days");
+  if (![3, 7, 14, 30].includes(days)) {
+    custom.value = days;
+    document.querySelectorAll(".track-day-btn").forEach((b) => b.classList.remove("active"));
+  }
+}
+
 function validateEmails(s) {
   if (!s.trim()) return true;
   return s.split(",").map((x) => x.trim()).filter(Boolean).every((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
@@ -801,6 +864,23 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
       method: "POST",
       body: JSON.stringify(sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
     });
+    // If tracking is enabled, create a tracking task
+    const trackCb = document.getElementById("track-response-cb");
+    if (trackCb && trackCb.checked && to.length) {
+      try {
+        await api("/track-response", {
+          method: "POST",
+          body: JSON.stringify({
+            messageId: draft.id,
+            subject: f.get("subject") || "(без темы)",
+            toAddrs: to,
+            trackDays: _trackDays || 7,
+          }),
+        });
+      } catch (trackErr) {
+        console.error("tracking create failed:", trackErr);
+      }
+    }
     closeCompose();
     refreshList();
   } catch (err) {
@@ -1882,6 +1962,25 @@ async function openTaskForm(id) {
     renderTaskTagsEditor(t.id, t.tagAssignments || []);
     document.getElementById("task-attach-row").style.display = "flex";
     renderTaskAttachments(t.id, t.attachments || []);
+    // Tracking actions
+    const isTracking = (t.tagAssignments || []).some((ta) => ta.tag && ta.tag.name === "отслеживание");
+    let trackEl = document.getElementById("task-tracking-actions");
+    if (!trackEl) {
+      trackEl = document.createElement("div");
+      trackEl.id = "task-tracking-actions";
+      trackEl.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;padding:10px 0;border-top:1px solid var(--border);margin-top:10px";
+      document.getElementById("task-attach-row").parentElement.appendChild(trackEl);
+    }
+    if (isTracking && t.status !== "done") {
+      trackEl.style.display = "flex";
+      trackEl.innerHTML = `
+        <button class="tracking-action-btn" onclick="trackingResend('${t.id}')">📩 Отправить повторно</button>
+        <button class="tracking-action-btn" onclick="trackingManual('${t.id}')">✏️ Отвечу сам (3 дня)</button>
+        <button class="tracking-action-btn" onclick="trackingDone('${t.id}')" style="color:var(--accent)">✅ Ответ получен</button>
+      `;
+    } else {
+      trackEl.style.display = "none";
+    }
   } else {
     document.getElementById("task-form-title").textContent = "Новая задача";
     f.id.value = "";

@@ -126,6 +126,141 @@ export async function runSnoozes(now = new Date()): Promise<void> {
   }
 }
 
+export async function checkResponseTracking(now = new Date()): Promise<void> {
+  // Find all tracking tasks (with tag "отслеживание") that are open and past due
+  const trackingTag = await prisma.taskTag.findUnique({ where: { name: "отслеживание" } });
+  if (!trackingTag) return;
+
+  const overdueTasks = await prisma.task.findMany({
+    where: {
+      status: { in: ["open", "in_progress"] },
+      tagAssignments: { some: { tagId: trackingTag.id } },
+      dueDate: { lte: now },
+    },
+    include: { comments: true },
+  });
+
+  for (const task of overdueTasks) {
+    // Skip if already has an expiry comment
+    if (task.comments.some((c) => c.text.includes("Срок ответа истёк") || c.text.includes("Ответ получен"))) {
+      continue;
+    }
+
+    // Parse tracking metadata from description
+    const meta = parseTrackingMeta(task.description || "");
+    if (!meta.toAddrs.length) continue;
+
+    // Check if a reply came from any of the tracked addresses
+    const reply = await prisma.message.findFirst({
+      where: {
+        fromAddr: { in: meta.toAddrs },
+        receivedAt: { gt: task.createdAt, not: null },
+        deletedAt: null,
+        isDraft: false,
+      },
+      orderBy: { receivedAt: "desc" },
+    });
+
+    // Use a system user ID for automated comments
+    const systemUserId = task.assigneeId || task.creatorId;
+
+    if (reply) {
+      const replyDate = reply.receivedAt
+        ? reply.receivedAt.toLocaleDateString("ru-RU")
+        : "неизвестно";
+      await prisma.taskComment.create({
+        data: {
+          taskId: task.id,
+          userId: systemUserId,
+          text: `\u2705 Ответ получен от ${reply.fromAddr} ${replyDate}`,
+        },
+      });
+      await prisma.task.update({
+        where: { id: task.id },
+        data: { status: "done", completedAt: new Date() },
+      });
+    } else {
+      await prisma.taskComment.create({
+        data: {
+          taskId: task.id,
+          userId: systemUserId,
+          text: `\u26A0\uFE0F Срок ответа истёк. Проверь пришёл ли ответ по обращению.`,
+        },
+      });
+      // Send TG notification
+      try {
+        const lines = [
+          `\u{1F514} <b>Срок ответа истёк</b>`,
+          `<b>Задача:</b> ${escapeHtml(task.title)}`,
+          `<b>Ожидали ответ от:</b> ${escapeHtml(meta.toAddrs.join(", "))}`,
+        ];
+        await sendTelegram(lines.join("\n"));
+      } catch (e) {
+        console.error("tracking tg notify failed:", (e as Error).message);
+      }
+    }
+  }
+
+  // Also check non-overdue tracking tasks for early replies
+  const pendingTasks = await prisma.task.findMany({
+    where: {
+      status: { in: ["open", "in_progress"] },
+      tagAssignments: { some: { tagId: trackingTag.id } },
+      dueDate: { gt: now },
+    },
+    include: { comments: true },
+  });
+
+  for (const task of pendingTasks) {
+    if (task.comments.some((c) => c.text.includes("Ответ получен"))) continue;
+
+    const meta = parseTrackingMeta(task.description || "");
+    if (!meta.toAddrs.length) continue;
+
+    const reply = await prisma.message.findFirst({
+      where: {
+        fromAddr: { in: meta.toAddrs },
+        receivedAt: { gt: task.createdAt, not: null },
+        deletedAt: null,
+        isDraft: false,
+      },
+      orderBy: { receivedAt: "desc" },
+    });
+
+    if (reply) {
+      const systemUserId = task.assigneeId || task.creatorId;
+      const replyDate = reply.receivedAt
+        ? reply.receivedAt.toLocaleDateString("ru-RU")
+        : "неизвестно";
+      await prisma.taskComment.create({
+        data: {
+          taskId: task.id,
+          userId: systemUserId,
+          text: `\u2705 Ответ получен от ${reply.fromAddr} ${replyDate}`,
+        },
+      });
+      await prisma.task.update({
+        where: { id: task.id },
+        data: { status: "done", completedAt: new Date() },
+      });
+    }
+  }
+}
+
+function parseTrackingMeta(description: string): { toAddrs: string[]; messageId: string } {
+  const result = { toAddrs: [] as string[], messageId: "" };
+  const metaIdx = description.indexOf("---TRACKING_META---");
+  if (metaIdx === -1) return result;
+  const metaBlock = description.slice(metaIdx);
+  const toMatch = metaBlock.match(/toAddrs:(.+)/);
+  if (toMatch) {
+    try { result.toAddrs = JSON.parse(toMatch[1]); } catch {}
+  }
+  const msgMatch = metaBlock.match(/messageId:(.+)/);
+  if (msgMatch) result.messageId = msgMatch[1].trim();
+  return result;
+}
+
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
