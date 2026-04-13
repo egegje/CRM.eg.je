@@ -161,6 +161,7 @@ async function bootApp() {
   // Load AI summary setting
   try { const _s = await api('/admin/task-settings').catch(()=>({})); state.aiSummaryEnabled = _s.ai_summary_enabled !== 'false'; } catch {}
   await Promise.all([loadMailboxes(), loadFolders(), loadQuickLinks()]);
+  setTimeout(restoreSidebarItemOrder, 100);
   initSubnavDrag();
   setTimeout(initSidebarDrag, 500);
   await refreshList();
@@ -1249,6 +1250,28 @@ function initSidebarDrag() {
   initItemDrag('sheets-list', 'sidebar-sheets-order');
 }
 
+
+function restoreSidebarItemOrder() {
+  // Restore mailbox order
+  var mbList = document.getElementById('mailboxes-list');
+  var mbSaved = JSON.parse(localStorage.getItem('sidebar-mailbox-order') || 'null');
+  if (mbList && mbSaved) {
+    var items = {};
+    mbList.querySelectorAll('.folder-item').forEach(function(it) { items[it.textContent.trim()] = it; });
+    mbSaved.forEach(function(key) { if (items[key]) mbList.appendChild(items[key]); });
+  }
+  // Restore sheets order
+  var shList = document.getElementById('sheets-list');
+  var shSaved = JSON.parse(localStorage.getItem('sidebar-sheets-order') || 'null');
+  if (shList && shSaved) {
+    var items = {};
+    shList.querySelectorAll('.folder-item').forEach(function(it) { items[it.textContent.trim()] = it; });
+    shSaved.forEach(function(key) { if (items[key]) shList.appendChild(items[key]); });
+  }
+  // Re-init drag on new items
+  makeItemsDraggable(mbList, 'sidebar-mailbox-order');
+  makeItemsDraggable(shList, 'sidebar-sheets-order');
+}
 function initItemDrag(listId, storageKey) {
   var list = document.getElementById(listId);
   if (!list) return;
