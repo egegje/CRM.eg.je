@@ -162,6 +162,7 @@ async function bootApp() {
   try { const _s = await api('/admin/task-settings').catch(()=>({})); state.aiSummaryEnabled = _s.ai_summary_enabled !== 'false'; } catch {}
   await Promise.all([loadMailboxes(), loadFolders(), loadQuickLinks()]);
   initSubnavDrag();
+  setTimeout(initSidebarDrag, 500);
   await refreshList();
 }
 
@@ -1198,6 +1199,108 @@ function scrollToTop() {
   }
   setInterval(checkScroll, 500);
 })();
+
+/* Sidebar section & item drag reorder */
+function initSidebarDrag() {
+  const folders = document.querySelector('.folders');
+  if (!folders) return;
+
+  // Restore saved section order
+  const savedOrder = JSON.parse(localStorage.getItem('sidebar-section-order') || 'null');
+  if (savedOrder) {
+    const groups = {};
+    folders.querySelectorAll('.folder-group').forEach(function(g) { groups[g.id] = g; });
+    savedOrder.forEach(function(id) { if (groups[id]) folders.appendChild(groups[id]); });
+  }
+
+  // Make sections draggable
+  folders.querySelectorAll('.folder-group').forEach(function(group) {
+    group.setAttribute('draggable', 'true');
+    group.addEventListener('dragstart', function(e) {
+      e.dataTransfer.setData('text/section', group.id);
+      group.classList.add('dragging');
+      e.stopPropagation();
+    });
+    group.addEventListener('dragend', function() { group.classList.remove('dragging'); });
+    group.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      var dragging = folders.querySelector('.folder-group.dragging');
+      if (dragging && dragging !== group) group.classList.add('drag-over');
+    });
+    group.addEventListener('dragleave', function() { group.classList.remove('drag-over'); });
+    group.addEventListener('drop', function(e) {
+      e.preventDefault();
+      group.classList.remove('drag-over');
+      var sid = e.dataTransfer.getData('text/section');
+      if (!sid) return;
+      var dragged = document.getElementById(sid);
+      if (dragged && dragged !== group) {
+        folders.insertBefore(dragged, group);
+        // Save order
+        var order = [];
+        folders.querySelectorAll('.folder-group').forEach(function(g) { if (g.id) order.push(g.id); });
+        localStorage.setItem('sidebar-section-order', JSON.stringify(order));
+      }
+    });
+  });
+
+  // Make items within mailboxes and sheets draggable
+  initItemDrag('mailboxes-list', 'sidebar-mailbox-order');
+  initItemDrag('sheets-list', 'sidebar-sheets-order');
+}
+
+function initItemDrag(listId, storageKey) {
+  var list = document.getElementById(listId);
+  if (!list) return;
+
+  // Restore saved item order
+  var saved = JSON.parse(localStorage.getItem(storageKey) || 'null');
+  if (saved) {
+    var items = {};
+    list.querySelectorAll('.folder-item').forEach(function(item) {
+      var key = item.textContent.trim();
+      items[key] = item;
+    });
+    saved.forEach(function(key) { if (items[key]) list.appendChild(items[key]); });
+  }
+
+  // Observe for new items
+  var observer = new MutationObserver(function() { makeItemsDraggable(list, storageKey); });
+  observer.observe(list, {childList: true});
+  makeItemsDraggable(list, storageKey);
+}
+
+function makeItemsDraggable(list, storageKey) {
+  list.querySelectorAll('.folder-item').forEach(function(item) {
+    if (item._dragInit) return;
+    item._dragInit = true;
+    item.setAttribute('draggable', 'true');
+    item.addEventListener('dragstart', function(e) {
+      e.dataTransfer.setData('text/item', item.textContent.trim());
+      item.classList.add('dragging');
+      e.stopPropagation();
+    });
+    item.addEventListener('dragend', function() { item.classList.remove('dragging'); });
+    item.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      if (list.querySelector('.folder-item.dragging') && list.querySelector('.folder-item.dragging') !== item)
+        item.classList.add('drag-over');
+    });
+    item.addEventListener('dragleave', function() { item.classList.remove('drag-over'); });
+    item.addEventListener('drop', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      item.classList.remove('drag-over');
+      var dragged = list.querySelector('.folder-item.dragging');
+      if (dragged && dragged !== item) {
+        list.insertBefore(dragged, item);
+        var order = [];
+        list.querySelectorAll('.folder-item').forEach(function(it) { order.push(it.textContent.trim()); });
+        localStorage.setItem(storageKey, JSON.stringify(order));
+      }
+    });
+  });
+}
 function debouncedSearch() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(refreshList, 300);
