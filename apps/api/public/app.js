@@ -157,9 +157,45 @@ async function bootApp() {
     const teamSubnav = document.getElementById("team-subnav-btn");
     if (teamSubnav) teamSubnav.style.display = "";
   }
-  await Promise.all([loadMailboxes(), loadFolders()]);
+  await Promise.all([loadMailboxes(), loadFolders(), loadQuickLinks()]);
   initSubnavDrag();
   await refreshList();
+}
+
+async function loadQuickLinks() {
+  const links = await api("/quick-links").catch(() => []);
+  const list = document.getElementById("sheets-list");
+  if (!list) return;
+  list.innerHTML = "";
+  const tableIcon = '<svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/></svg>';
+  for (const link of links) {
+    const d = document.createElement("div");
+    d.className = "folder-item";
+    d.innerHTML = '<span style="display:flex;align-items:center;gap:10px">' + tableIcon + '<span class="folder-label">' + escapeHtml(link.name) + '</span></span>';
+    d.onclick = () => window.open(link.url, "_blank");
+    d.style.cursor = "pointer";
+    list.appendChild(d);
+  }
+  const group = document.getElementById("sheets-group");
+  if (group) group.style.display = links.length ? "" : "none";
+  // Also populate tasks-view dropdown
+  const dd = document.getElementById("tasks-sheets-dropdown");
+  if (dd && links.length) {
+    dd.innerHTML = links.map((l) =>
+      '<a href="' + escapeHtml(l.url) + '" target="_blank" style="display:block;padding:8px 14px;color:var(--text);text-decoration:none;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escapeHtml(l.name) + '</a>'
+    ).join("");
+  }
+}
+
+function toggleTasksSheets() {
+  const dd = document.getElementById("tasks-sheets-dropdown");
+  if (!dd) return;
+  const show = dd.style.display === "none";
+  dd.style.display = show ? "block" : "none";
+  if (show) {
+    const close = (e) => { if (!dd.parentElement.contains(e.target)) { dd.style.display = "none"; document.removeEventListener("click", close); } };
+    setTimeout(() => document.addEventListener("click", close), 0);
+  }
 }
 
 async function loadMailboxes() {
@@ -1511,6 +1547,8 @@ async function showTasksView(filter) {
     team: "👥 Команда",
   };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
+  const kanbanBackBtn = document.getElementById("kanban-back-btn");
+  if (kanbanBackBtn) kanbanBackBtn.style.display = "none";
   const filtersEl = document.getElementById("tasks-filters");
   if (filter === "team") {
     tasksMode = "team";
@@ -1752,7 +1790,9 @@ async function showKanbanView() {
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
   document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
-  document.getElementById("tasks-view-title").textContent = "🗂 Канбан";
+  document.getElementById("tasks-view-title").innerHTML = '<button onclick="showTasksView(localStorage.getItem(\'crm-tasks-filter\') || \'me\')" style="padding:6px 12px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:13px;margin-right:10px">← Задачи</button>🗂 Канбан';
+  const backBtn = document.getElementById("kanban-back-btn");
+  if (backBtn) backBtn.style.display = "";
   await loadTasks();
 }
 
@@ -2829,6 +2869,25 @@ async function renderTaskSettingsTab() {
 
       <button type="submit" style="padding:12px 24px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;align-self:flex-start;margin-top:4px">Сохранить</button>
     </form>
+
+    <div class="settings-card" style="max-width:640px;margin-top:16px">
+      <div class="settings-card-title">📋 Таблицы (быстрые ссылки)</div>
+      <form id="quick-links-form" onsubmit="saveQuickLinks(event)" style="display:flex;flex-direction:column;gap:10px">
+        ${(() => {
+          let ql = [];
+          try { ql = JSON.parse(s.quick_links || "[]"); } catch {}
+          return ql.map((l, i) => `
+            <div style="display:flex;gap:8px;align-items:center">
+              <input type="text" name="ql_name_${i}" value="${escapeHtml(l.name)}" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-alt);color:var(--text);font-size:13px" placeholder="Название">
+              <span style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.url)}">${escapeHtml(l.url.replace('https://docs.google.com/spreadsheets/d/', '...'))}</span>
+              <input type="hidden" name="ql_url_${i}" value="${escapeHtml(l.url)}">
+            </div>
+          `).join("");
+        })()}
+        <button type="submit" style="align-self:flex-start;padding:10px 20px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Сохранить названия</button>
+      </form>
+      <p style="margin-top:8px;font-size:12px;color:var(--text-muted)">Редактируйте названия ссылок. URL задаются в БД.</p>
+    </div>
   `;
 }
 
@@ -2907,6 +2966,21 @@ async function saveTaskSettings(e) {
   };
   await api("/admin/task-settings", { method: "PUT", body: JSON.stringify(payload) });
   alert("Сохранено");
+}
+
+async function saveQuickLinks(e) {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const links = [];
+  for (let i = 0; ; i++) {
+    const name = f.get("ql_name_" + i);
+    const url = f.get("ql_url_" + i);
+    if (name === null || url === null) break;
+    links.push({ name: String(name), url: String(url) });
+  }
+  await api("/admin/task-settings", { method: "PUT", body: JSON.stringify({ quick_links: JSON.stringify(links) }) });
+  await loadQuickLinks();
+  alert("Таблицы сохранены");
 }
 
 /* offline indicator */

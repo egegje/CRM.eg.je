@@ -141,6 +141,7 @@
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
       <h2 id="tasks-view-title" style="margin:0">Задачи</h2>
       <div style="display:flex;gap:6px;align-items:center">
+        <button id="kanban-back-btn" onclick="showTasksView(localStorage.getItem('crm-tasks-filter') || 'me')" style="display:none;padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">← Назад</button>
         <button onclick="showKanbanView()" style="padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🗂 Канбан</button>
         <button class="primary" onclick="openTaskForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Задача</button>
       </div>
@@ -152,6 +153,10 @@
       <button data-nav="overdue" draggable="true" onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">⏰ Просроченные</button>
       <button data-nav="done" draggable="true" onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">✔️ Выполненные</button>
       <button data-nav="team" id="team-subnav-btn" draggable="true" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">👥 Команда</button>
+      <span style="position:relative;display:inline-block">
+        <button id="tasks-sheets-btn" onclick="toggleTasksSheets()" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📋 Таблицы</button>
+        <div id="tasks-sheets-dropdown" style="display:none;position:absolute;top:100%;left:0;z-index:100;min-width:220px;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:6px 0;margin-top:4px"></div>
+      </span>
     </div>
     <div id="tasks-filters" style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="tasks-search" placeholder="🔍 поиск..." oninput="loadTasks()" style="flex:1;min-width:180px;padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">

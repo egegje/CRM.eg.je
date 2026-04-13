@@ -14,6 +14,13 @@ setKey(loadConfig().encKey);
 const Params = z.object({ id: z.string() });
 
 export async function extraRoutes(app: FastifyInstance): Promise<void> {
+  // ---- quick links (public for all authenticated users) ----
+  app.get("/quick-links", { preHandler: requireUser() }, async () => {
+    const row = await prisma.taskSetting.findUnique({ where: { key: "quick_links" } });
+    if (!row) return [];
+    try { return JSON.parse(row.value); } catch { return []; }
+  });
+
   // ---- smart folders ----
   app.get("/smart-folders", { preHandler: requireUser() }, async (req) => {
     const user = req.user!;
