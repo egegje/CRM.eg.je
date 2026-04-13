@@ -559,7 +559,7 @@ function renderPreview(m) {
       <div class="preview-actions" style="align-items:center">
         <button class="mobile-back" onclick="closePreview()" title="Назад"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <button onclick="replyTo('${m.id}')" title="Ответить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M4 12h12a4 4 0 014 4v1"/></svg></button>
-        <button onclick="aiReply('${m.id}')" title="AI ответ"><span style="font-size:11px;font-weight:800;letter-spacing:0.5px">AI</span></button>
+        <button onclick="aiReply('${m.id}')" title="AI ответ"><span style="font-size:9px;font-weight:800;letter-spacing:0.3px;line-height:1">AI</span></button>
         <button onclick="forwardMsg('${m.id}')" title="Переслать"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 17l5-5-5-5"/><path d="M20 12H8a4 4 0 00-4 4v1"/></svg></button>
         <button onclick="deleteMsg('${m.id}')" title="Удалить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})" title="${m.isStarred ? 'Снять' : 'Важное'}"><svg width="18" height="18" fill="${m.isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg></button>
