@@ -713,19 +713,39 @@ async function saveAsTemplate() {
   loadTemplates();
 }
 
+let _personas = [];
 async function loadSenderPersonas() {
   const sel = document.getElementById("compose-persona");
   if (!sel) return;
   try {
-    const personas = await api("/personas").catch(() => []);
+    _personas = await api("/personas").catch(() => []);
     const opts = ['<option value="">— без визитки —</option>'];
-    for (const p of personas) {
+    for (const p of _personas) {
       opts.push(`<option value="${p.id}">${escapeHtml(p.name)}</option>`);
     }
     sel.innerHTML = opts.join("");
-    sel.parentElement.style.display = personas.length ? "" : "none";
+    sel.parentElement.style.display = _personas.length ? "" : "none";
+    sel.onchange = updateComposeSignature;
   } catch {
     sel.parentElement.style.display = "none";
+  }
+}
+
+function updateComposeSignature() {
+  const sel = document.getElementById("compose-persona");
+  const ta = document.querySelector("#compose-form textarea[name='bodyText']");
+  if (!sel || !ta) return;
+  // Remove old signature (everything after \n--\n or \n---\n)
+  let text = ta.value;
+  const sigIdx = text.search(/\n--+\n/);
+  if (sigIdx >= 0) text = text.substring(0, sigIdx);
+  text = text.trimEnd();
+  // Add new signature
+  const persona = _personas.find((p) => p.id === sel.value);
+  if (persona && persona.signature) {
+    ta.value = text + "\n\n--\n" + persona.signature;
+  } else {
+    ta.value = text;
   }
 }
 
@@ -740,17 +760,25 @@ async function loadContactsDatalist() {
 function openCompose(defaults = {}) {
   loadContactsDatalist();
   loadTemplates();
-  loadSenderPersonas();
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
   if (defaults.mailboxId) form.mailboxId.value = defaults.mailboxId;
-  if (defaults.personaId) form.personaId.value = defaults.personaId;
   if (defaults.to) form.to.value = defaults.to;
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
   modal.classList.remove("hidden");
   document.getElementById("compose-minimized").classList.add("hidden");
+  // Load personas and auto-insert signature
+  loadSenderPersonas().then(() => {
+    if (defaults.personaId) {
+      form.personaId.value = defaults.personaId;
+    }
+    // Auto-insert default signature if no body text yet
+    if (!defaults.bodyText) {
+      setTimeout(updateComposeSignature, 100);
+    }
+  });
 }
 function closeCompose() {
   document.getElementById("compose-modal").classList.add("hidden");
