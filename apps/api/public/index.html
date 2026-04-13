@@ -63,8 +63,21 @@
   <div class="resizer" id="resizer-1"></div>
 
   <main class="list-pane">
-    <div class="toolbar">
+    <div class="toolbar" style="flex-wrap:wrap;gap:4px">
       <input id="search-input" type="search" placeholder="поиск..." oninput="debouncedSearch()" />
+      <select id="search-scope" onchange="refreshList()" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text);font-size:12px;max-width:120px">
+        <option value="all">Везде</option>
+        <option value="subject">Тема</option>
+        <option value="body">Текст</option>
+        <option value="from">Отправитель</option>
+        <option value="to">Получатель</option>
+      </select>
+      <select id="search-folder" onchange="refreshList()" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text);font-size:12px;max-width:130px">
+        <option value="">Текущая папка</option>
+        <option value="all">Все папки</option>
+        <option value="inbox">Входящие</option>
+        <option value="sent">Отправленные</option>
+      </select>
       <select id="status-filter" onchange="refreshList()">
         <option value="all">все</option>
         <option value="unread">непрочитанные</option>

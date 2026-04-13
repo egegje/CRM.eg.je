@@ -3,7 +3,8 @@ import { z } from "zod";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
-import { buildWhere } from "../services/search.js";
+import { buildWhere, buildSearchCondition } from "../services/search.js";
+import type { SearchIn, FolderKind } from "../services/search.js";
 import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
 import { sendQueue } from "../queue.js";
@@ -15,6 +16,8 @@ const ListQuery = z.object({
   mailboxId: z.string().optional(),
   q: z.string().optional(),
   from: z.string().optional(),
+  searchIn: z.enum(["all", "subject", "body", "from", "to"]).default("all"),
+  folderKind: z.enum(["all", "inbox", "sent", "drafts"]).optional(),
   dateFrom: z.coerce.date().optional(),
   dateTo: z.coerce.date().optional(),
   status: z.enum(["read", "unread", "all"]).optional(),
@@ -65,11 +68,10 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const q = ListQuery.parse(req.query);
     const accessIds = await accessibleMailboxIds(req.user!);
     if (q.q) {
-      // First narrow by FTS, then apply the same buildWhere filters so search
-      // honors current folder/mailbox/trash/status context.
+      // Scoped text search: build SQL condition based on searchIn param
+      const searchCond = buildSearchCondition(q.q, q.searchIn as SearchIn);
       const rows = await prisma.$queryRawUnsafe<{ id: string }[]>(
-        `SELECT id FROM "Message" WHERE "fts" @@ plainto_tsquery('simple', $1) ORDER BY "receivedAt" DESC NULLS LAST LIMIT 1000`,
-        q.q,
+        `SELECT id FROM "Message" WHERE ${searchCond} ORDER BY "receivedAt" DESC NULLS LAST LIMIT 1000`,
       );
       const ids = rows.map((r) => r.id);
       if (!ids.length) return [];
@@ -81,6 +83,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         dateTo: q.dateTo,
         status: q.status,
         trash: q.trash,
+        folderKind: q.folderKind as FolderKind,
       });
       return prisma.message.findMany({
         where: {
@@ -90,7 +93,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         },
         orderBy: { receivedAt: "desc" },
         take: q.limit,
-        include: { _count: { select: { attachments: true } } },
+        include: { folder: { select: { kind: true } }, _count: { select: { attachments: true } } },
       });
     }
     const where = buildWhere({
@@ -101,6 +104,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       dateTo: q.dateTo,
       status: q.status,
       trash: q.trash,
+      folderKind: q.folderKind as FolderKind,
     });
     if (accessIds) (where as { mailboxId?: { in: string[] } }).mailboxId = { in: accessIds };
     const args: Prisma.MessageFindManyArgs = {

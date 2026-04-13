@@ -228,31 +228,48 @@ async function refreshList() {
   const params = new URLSearchParams();
   const q = document.getElementById("search-input").value.trim();
   if (q) params.set("q", q);
+  const searchScope = document.getElementById("search-scope")?.value || "all";
+  if (q && searchScope !== "all") params.set("searchIn", searchScope);
+  const searchFolder = document.getElementById("search-folder")?.value || "";
   const status = document.getElementById("status-filter").value;
   if (status !== "all") params.set("status", status);
   const df = document.getElementById("date-from").value;
   const dt = document.getElementById("date-to").value;
   if (df) params.set("dateFrom", df);
   if (dt) params.set("dateTo", dt);
-  if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
-  const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
-  const sysKind = sysMap[state.currentFolder];
-  if (sysKind) {
-    const ids = state.folders.filter((f) => f.kind === sysKind).map((f) => f.id);
-    if (ids.length === 1) params.set("folderId", ids[0]);
-    // If multiple, leave unfiltered and post-filter client-side below
-  } else if (state.currentFolder === "__trash") {
-    params.set("trash", "true");
-  } else if (state.currentFolder === "__starred") {
-    // post-filter
-  } else if (state.currentFolder) {
-    params.set("folderId", state.currentFolder);
+  // Global search folder override
+  state._globalSearch = false;
+  if (searchFolder === "all") {
+    params.set("folderKind", "all");
+    state._globalSearch = true;
+  } else if (searchFolder === "inbox" || searchFolder === "sent") {
+    params.set("folderKind", searchFolder);
+    state._globalSearch = true;
+  } else {
+    // Normal folder-based browsing
+    if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
+    const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
+    const sysKind = sysMap[state.currentFolder];
+    if (sysKind) {
+      const ids = state.folders.filter((f) => f.kind === sysKind).map((f) => f.id);
+      if (ids.length === 1) params.set("folderId", ids[0]);
+    } else if (state.currentFolder === "__trash") {
+      params.set("trash", "true");
+    } else if (state.currentFolder === "__starred") {
+      // post-filter
+    } else if (state.currentFolder) {
+      params.set("folderId", state.currentFolder);
+    }
   }
   params.set("limit", "100");
   let messages = await api("/messages?" + params.toString());
-  if (sysKind) {
-    const ids = new Set(state.folders.filter((f) => f.kind === sysKind).map((f) => f.id));
-    if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
+  if (!searchFolder) {
+    const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
+    const sysKind = sysMap[state.currentFolder];
+    if (sysKind) {
+      const ids = new Set(state.folders.filter((f) => f.kind === sysKind).map((f) => f.id));
+      if (ids.size > 1) messages = messages.filter((m) => ids.has(m.folderId));
+    }
   }
   if (state.currentFolder === "__starred") messages = messages.filter((m) => m.isStarred);
   // outbox indicator
@@ -402,7 +419,7 @@ function renderList() {
       <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
-        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromName || m.fromAddr || "", q)}</div><div class="msg-date">${date}</div></div>
+        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromName || m.fromAddr || "", q)}</div><div class="msg-date">${state._globalSearch ? (m.folder?.kind === 'sent' ? '📤 ' : m.folder?.kind === 'inbox' ? '📥 ' : '') : ''}${date}</div></div>
         <div class="msg-subject">${star}${clip} ${highlight(m.subject || "(без темы)", q)}</div>
         <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
