@@ -284,7 +284,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .sidebar.collapsed .sidebar-close { display: none; }
 
 /* Scroll to top button */
-.scroll-top-btn { position:fixed; bottom:20px; right:20px; width:44px; height:44px; border-radius:50%; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:999; box-shadow:0 2px 10px oklch(0 0 0/0.2); transition:opacity .2s; }
+.scroll-top-btn { display:none; }
 .scroll-top-btn:hover { opacity:0.85; }
 
 
@@ -295,3 +295,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .sidebar .folder-item[draggable="true"] { cursor: grab; }
 .sidebar .folder-item.dragging { opacity: 0.4; }
 .sidebar .folder-item.drag-over { border-top: 2px solid var(--accent); }
+
+/* Panel scroll-to-top buttons */
+.scroll-top-panel { position:sticky; bottom:8px; left:50%; transform:translateX(-50%); width:36px; height:36px; border-radius:50%; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 8px oklch(0 0 0/0.12); margin-top:-44px; float:right; margin-right:8px; }
+.scroll-top-panel:hover { color:var(--accent); border-color:var(--accent); }
