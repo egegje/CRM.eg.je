@@ -406,6 +406,8 @@ function renderList() {
         <div class="msg-subject">${star}${clip} ${highlight(m.subject || "(без темы)", q)}</div>
         <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
+      <span class="msg-star" onclick="event.stopPropagation();toggleStar('${m.id}',${m.isStarred})" style="font-size:14px;cursor:pointer;color:${m.isStarred ? 'oklch(0.75 0.16 85)' : 'oklch(0.5 0.02 260)'};flex-shrink:0" title="${m.isStarred ? 'Убрать из важных' : 'Важное'}">${m.isStarred ? '★' : '☆'}</span>
+      <span class="msg-unread-dot" onclick="event.stopPropagation();toggleRead('${m.id}',${m.isRead})" style="width:10px;height:10px;border-radius:50%;background:${m.isRead ? 'transparent' : 'oklch(0.6 0.18 260)'};border:1.5px solid oklch(0.6 0.15 260);flex-shrink:0;cursor:pointer" title="${m.isRead ? 'Пометить непрочитанным' : 'Пометить прочитанным'}"></span>
     `;
     d.onclick = () => selectMessage(m.id);
     addSwipe(d, m);
@@ -525,6 +527,11 @@ async function generateSummary(id) {
 
 async function toggleStar(id, cur) {
   await api("/messages/" + id, { method: "PATCH", body: JSON.stringify({ isStarred: !cur }) });
+  refreshList();
+}
+
+async function toggleRead(id, currentState) {
+  await api("/messages/" + id, { method: "PATCH", body: JSON.stringify({ isRead: !currentState }) });
   refreshList();
 }
 
