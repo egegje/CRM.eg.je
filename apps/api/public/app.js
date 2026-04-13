@@ -1550,6 +1550,13 @@ async function showTasksView(filter) {
     team: "👥 Команда",
   };
   document.getElementById("tasks-view-title").textContent = titles[filter] || "Все задачи";
+  // Highlight active subnav button
+  document.querySelectorAll("#tasks-subnav .subnav-btn").forEach(function(b) {
+    const isActive = b.getAttribute("onclick") && b.getAttribute("onclick").includes("'" + filter + "'");
+    b.style.background = isActive ? "var(--accent)" : "";
+    b.style.color = isActive ? "white" : "";
+    b.style.borderColor = isActive ? "var(--accent)" : "";
+  });
   const kanbanBackBtn = document.getElementById("kanban-back-btn");
   if (kanbanBackBtn) kanbanBackBtn.style.display = "none";
   const filtersEl = document.getElementById("tasks-filters");
@@ -1793,7 +1800,7 @@ async function showKanbanView() {
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
   document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
-  document.getElementById("tasks-view-title").innerHTML = '<button onclick="showTasksView(localStorage.getItem(\'crm-tasks-filter\') || \'me\')" style="padding:6px 12px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:13px;margin-right:10px">← Задачи</button>🗂 Канбан';
+  document.getElementById("tasks-view-title").textContent = '🗂 Канбан';
   const backBtn = document.getElementById("kanban-back-btn");
   if (backBtn) backBtn.style.display = "";
   await loadTasks();
@@ -2295,6 +2302,7 @@ async function renderAdminTab() {
     else if (adminTab === "telegram") c.innerHTML = await renderTelegramTab();
     else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
     else if (adminTab === "personas") c.innerHTML = await renderPersonasTab();
+    else if (adminTab === "sheets") c.innerHTML = await renderSheetsAdminTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
   }
@@ -2873,24 +2881,7 @@ async function renderTaskSettingsTab() {
       <button type="submit" style="padding:12px 24px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:14px;align-self:flex-start;margin-top:4px">Сохранить</button>
     </form>
 
-    <div class="settings-card" style="max-width:640px;margin-top:16px">
-      <div class="settings-card-title">📋 Таблицы (быстрые ссылки)</div>
-      <form id="quick-links-form" onsubmit="saveQuickLinks(event)" style="display:flex;flex-direction:column;gap:10px">
-        ${(() => {
-          let ql = [];
-          try { ql = JSON.parse(s.quick_links || "[]"); } catch {}
-          return ql.map((l, i) => `
-            <div style="display:flex;gap:8px;align-items:center">
-              <input type="text" name="ql_name_${i}" value="${escapeHtml(l.name)}" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg-alt);color:var(--text);font-size:13px" placeholder="Название">
-              <span style="font-size:11px;color:var(--text-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(l.url)}">${escapeHtml(l.url.replace('https://docs.google.com/spreadsheets/d/', '...'))}</span>
-              <input type="hidden" name="ql_url_${i}" value="${escapeHtml(l.url)}">
-            </div>
-          `).join("");
-        })()}
-        <button type="submit" style="align-self:flex-start;padding:10px 20px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Сохранить названия</button>
-      </form>
-      <p style="margin-top:8px;font-size:12px;color:var(--text-muted)">Редактируйте названия ссылок. URL задаются в БД.</p>
-    </div>
+
   `;
 }
 
@@ -2969,6 +2960,47 @@ async function saveTaskSettings(e) {
   };
   await api("/admin/task-settings", { method: "PUT", body: JSON.stringify(payload) });
   alert("Сохранено");
+}
+
+async function renderSheetsAdminTab() {
+  const s = await api("/admin/task-settings").catch(() => ({}));
+  let links = [];
+  try { links = JSON.parse(s.quick_links || "[]"); } catch {}
+  let rows = links.map((l, i) => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+      <input type="text" name="ql_name_${i}" value="${escapeHtml(l.name)}" placeholder="Название" style="flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px">
+      <input type="text" name="ql_url_${i}" value="${escapeHtml(l.url)}" placeholder="https://..." style="flex:2;padding:8px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:12px">
+      <button type="button" onclick="removeQuickLink(${i})" style="padding:6px 10px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);color:var(--danger);cursor:pointer;font-size:12px">✕</button>
+    </div>
+  `).join("");
+  return `
+    <form id="quick-links-form" onsubmit="saveQuickLinks(event)">
+      <div style="margin-bottom:14px">${rows || '<div style="color:var(--text-muted)">Нет ссылок</div>'}</div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button type="button" onclick="addQuickLink()" style="padding:8px 16px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);cursor:pointer;font-size:13px">+ Добавить</button>
+        <button type="submit" style="padding:8px 20px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Сохранить</button>
+      </div>
+    </form>
+  `;
+}
+
+async function addQuickLink() {
+  const s = await api("/admin/task-settings").catch(() => ({}));
+  let links = [];
+  try { links = JSON.parse(s.quick_links || "[]"); } catch {}
+  links.push({ name: "Новая таблица", url: "" });
+  await api("/admin/task-settings", { method: "PUT", body: JSON.stringify({ quick_links: JSON.stringify(links) }) });
+  renderAdminTab();
+}
+
+async function removeQuickLink(idx) {
+  const s = await api("/admin/task-settings").catch(() => ({}));
+  let links = [];
+  try { links = JSON.parse(s.quick_links || "[]"); } catch {}
+  links.splice(idx, 1);
+  await api("/admin/task-settings", { method: "PUT", body: JSON.stringify({ quick_links: JSON.stringify(links) }) });
+  await loadQuickLinks();
+  renderAdminTab();
 }
 
 async function saveQuickLinks(e) {
