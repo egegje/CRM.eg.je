@@ -6,6 +6,7 @@ import { hashPassword } from "../auth.js";
 import { setKey, encrypt } from "../crypto.js";
 import { loadConfig } from "../config.js";
 import { NotFound, BadRequest } from "../errors.js";
+import { syncSentForMailbox } from "../workers/sync.js";
 
 setKey(loadConfig().encKey);
 
@@ -395,4 +396,33 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     await prisma.rule.delete({ where: { id } });
     return reply.status(204).send();
   });
+
+  // ---- sent folder sync ----
+  app.post(
+    "/admin/mailboxes/:id/sync-sent",
+    { preHandler: requireRole("owner", "admin") },
+    async (req) => {
+      const { id } = Params.parse(req.params);
+      const mb = await prisma.mailbox.findUnique({ where: { id } });
+      if (!mb) throw new NotFound();
+      const result = await syncSentForMailbox(id);
+      return { ok: true, mailboxId: id, ...result };
+    },
+  );
+
+  app.post(
+    "/admin/sync-sent-all",
+    { preHandler: requireRole("owner", "admin") },
+    async () => {
+      const mailboxes = await prisma.mailbox.findMany({ where: { enabled: true } });
+      const results = await Promise.allSettled(
+        mailboxes.map((m) => syncSentForMailbox(m.id)),
+      );
+      return {
+        ok: true,
+        total: mailboxes.length,
+        succeeded: results.filter((r) => r.status === "fulfilled").length,
+      };
+    },
+  );
 }

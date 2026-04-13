@@ -71,10 +71,11 @@ model UserMailbox {
 }
 
 model SyncState {
-  mailboxId String   @id
-  mailbox   Mailbox  @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
-  lastUid   Int      @default(0)
-  updatedAt DateTime @updatedAt
+  mailboxId   String   @id
+  mailbox     Mailbox  @relation(fields: [mailboxId], references: [id], onDelete: Cascade)
+  lastUid     Int      @default(0)
+  sentLastUid Int      @default(0)
+  updatedAt   DateTime @updatedAt
 }
 
 model Folder {
