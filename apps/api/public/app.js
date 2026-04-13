@@ -3368,3 +3368,25 @@ bootApp().catch(() => showLogin());
     watchScroll('#main-sidebar', '.sidebar-scroll-btn');
   }, 1000);
 })();
+
+/* Add scroll button to preview pane dynamically */
+(function() {
+  var observer = new MutationObserver(function() {
+    var pane = document.getElementById('preview-pane');
+    if (!pane) return;
+    if (pane.querySelector('.scroll-top-panel')) return;
+    var btn = document.createElement('button');
+    btn.className = 'scroll-top-panel preview-scroll-btn';
+    btn.title = 'Наверх';
+    btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>';
+    btn.onclick = function() { pane.scrollTo({top:0, behavior:'smooth'}); };
+    pane.appendChild(btn);
+    pane.addEventListener('scroll', function() {
+      btn.classList.toggle('show', pane.scrollTop > 200);
+    });
+  });
+  setTimeout(function() {
+    var pane = document.getElementById('preview-pane');
+    if (pane) observer.observe(pane, {childList:true, subtree:true});
+  }, 1000);
+})();
