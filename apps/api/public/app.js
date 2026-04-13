@@ -724,10 +724,23 @@ function openCompose(defaults = {}) {
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
   modal.classList.remove("hidden");
+  document.getElementById("compose-minimized").classList.add("hidden");
 }
 function closeCompose() {
   document.getElementById("compose-modal").classList.add("hidden");
+  document.getElementById("compose-minimized").classList.add("hidden");
   document.getElementById("compose-error").textContent = "";
+}
+function toggleComposeMinimize() {
+  const modal = document.getElementById("compose-modal");
+  const mini = document.getElementById("compose-minimized");
+  if (!modal.classList.contains("hidden")) {
+    modal.classList.add("hidden");
+    mini.classList.remove("hidden");
+  } else {
+    mini.classList.add("hidden");
+    modal.classList.remove("hidden");
+  }
 }
 
 function validateEmails(s) {
