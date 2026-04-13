@@ -1194,7 +1194,7 @@ function scrollToTop() {
     var targets = [document.querySelector('.messages-list'), document.querySelector('.preview-pane'), document.getElementById('tasks-view')];
     targets.forEach(function(el) { if (el && el.scrollTop > 300) scrolled = true; });
     if (window.scrollY > 300) scrolled = true;
-    btn.classList.toggle('visible', scrolled);
+    
   }
   setInterval(checkScroll, 500);
 })();
