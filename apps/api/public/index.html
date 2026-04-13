@@ -71,30 +71,24 @@
   <div class="resizer" id="resizer-1"></div>
 
   <main class="list-pane">
-    <div class="toolbar" style="flex-wrap:wrap;gap:4px">
-      <input id="search-input" type="search" placeholder="поиск..." oninput="debouncedSearch()" />
-      <select id="search-scope" onchange="refreshList()" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text);font-size:12px;max-width:120px">
-        <option value="all">Везде</option>
-        <option value="subject">Тема</option>
-        <option value="body">Текст</option>
-        <option value="from">Отправитель</option>
-        <option value="to">Получатель</option>
-      </select>
-      <select id="search-folder" onchange="refreshList()" style="padding:4px 6px;border-radius:5px;border:1px solid var(--border);background:var(--bg-alt);color:var(--text);font-size:12px;max-width:130px">
-        <option value="">Текущая папка</option>
-        <option value="all">Все папки</option>
-        <option value="inbox">Входящие</option>
-        <option value="sent">Отправленные</option>
-      </select>
-      <select id="status-filter" onchange="refreshList()">
-        <option value="all">все</option>
-        <option value="unread">непрочитанные</option>
-        <option value="read">прочитанные</option>
-      </select>
-      <input type="date" id="date-from" onchange="refreshList()" title="с" />
-      <input type="date" id="date-to" onchange="refreshList()" title="по" />
-      <button onclick="refreshList()">🔄</button>
-      <button onclick="openStats()" title="статистика">📊</button>
+    <div class="toolbar" style="padding:6px 10px;gap:6px">
+      <input id="search-input" type="search" placeholder="Поиск в почте..." oninput="debouncedSearch()" />
+      <button onclick="document.getElementById('search-adv').style.display=document.getElementById('search-adv').style.display==='block'?'none':'block'" title="Фильтры" style="padding:4px 8px;font-size:12px">▼</button>
+      <button onclick="refreshList()" style="padding:4px 8px">🔄</button>
+    </div>
+    <div id="search-adv" style="display:none;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--bg-alt)">
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 10px;font-size:12px;align-items:center;max-width:400px">
+        <span style="color:var(--text-muted)">От</span><input id="search-from-field" placeholder="отправитель" onchange="refreshList()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        <span style="color:var(--text-muted)">Кому</span><input id="search-to-field" placeholder="получатель" onchange="refreshList()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        <span style="color:var(--text-muted)">Тема</span><input id="search-subject-field" placeholder="тема" onchange="refreshList()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)">
+        <span style="color:var(--text-muted)">Дата</span><div style="display:flex;gap:4px"><input type="date" id="date-from" onchange="refreshList()" style="padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)"><input type="date" id="date-to" onchange="refreshList()" style="padding:3px 6px;font-size:11px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)"></div>
+        <span style="color:var(--text-muted)">Папка</span><select id="search-folder" onchange="refreshList()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)"><option value="">Текущая</option><option value="all">Все</option><option value="inbox">Входящие</option><option value="sent">Отправленные</option></select>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:6px">
+        <select id="status-filter" onchange="refreshList()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:var(--bg);color:var(--text)"><option value="all">все</option><option value="unread">непрочит.</option><option value="read">прочит.</option></select>
+        <button onclick="refreshList()" style="padding:4px 14px;background:var(--accent);color:white;border:none;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Поиск</button>
+      </div>
+      <select id="search-scope" style="display:none"><option value="all" selected>all</option></select>
     </div>
     <div id="messages-list" class="messages-list"></div>
   </main>
