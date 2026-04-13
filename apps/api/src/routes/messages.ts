@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { readFile } from "node:fs/promises";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
@@ -376,6 +377,18 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       });
       signatureOverride = p?.signature ?? undefined;
     }
+    // Load attachments from DB and read file contents
+    const dbAttachments = await prisma.attachment.findMany({ where: { messageId: id } });
+    const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+    for (const att of dbAttachments) {
+      try {
+        const buf = await readFile(att.storagePath);
+        attachments.push({ filename: att.filename, content: buf, contentType: att.mime });
+      } catch {
+        /* skip missing files */
+      }
+    }
+
     const result = await sendMessage(
       { mailbox: m.mailbox, decrypt: (b) => decrypt(b, m.mailbox.email) },
       {
@@ -385,6 +398,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         subject: m.subject,
         text: m.bodyText ?? "",
         html: m.bodyHtml ?? undefined,
+        attachments: attachments.length ? attachments : undefined,
         signatureOverride,
       },
     );

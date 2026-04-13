@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, access as fsAccess } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { join } from "node:path";
 import { prisma } from "@crm/db";
@@ -45,12 +45,26 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
     });
     if (!a) throw new NotFound();
     await assertMessageAccess(req.user!, a.message);
+
+    // Verify file exists on disk
+    try {
+      await fsAccess(a.storagePath);
+    } catch {
+      throw new NotFound("file not found on disk");
+    }
+
     reply.header("content-type", a.mime);
     // PDFs and images render inline so the browser can preview them in a new
     // tab without forcing a download. Other types still download.
     const inline = a.mime === "application/pdf" || a.mime.startsWith("image/");
     const disp = inline ? "inline" : "attachment";
-    reply.header("content-disposition", `${disp}; filename="${a.filename}"`);
-    return reply.send(createReadStream(a.storagePath));
+    // RFC 5987 encoding for non-ASCII filenames
+    const encodedFilename = encodeURIComponent(a.filename).replace(/'/g, "%27");
+    reply.header("content-disposition", `${disp}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
+    const stream = createReadStream(a.storagePath);
+    stream.on("error", () => {
+      if (!reply.sent) reply.status(500).send({ error: "read error" });
+    });
+    return reply.send(stream);
   });
 }

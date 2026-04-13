@@ -403,7 +403,13 @@ function renderList() {
       el.appendChild(h);
       lastGroup = g;
     }
-    const initial = (m.fromAddr || "?")[0].toUpperCase();
+    const isSentFolder = state.currentFolder === "__sent" || (state._globalSearch && m.folder?.kind === "sent");
+    const displayName = isSentFolder
+      ? "Кому: " + ((m.toAddrs && m.toAddrs.length) ? m.toAddrs[0] : "")
+      : (m.fromName || m.fromAddr || "");
+    const initial = isSentFolder
+      ? ((m.toAddrs && m.toAddrs.length) ? m.toAddrs[0] : "?")[0].toUpperCase()
+      : (m.fromAddr || "?")[0].toUpperCase();
     const date = formatListDate(m.receivedAt);
     const hasAttach = (m._count?.attachments || 0) > 0;
     const clip = hasAttach ? '<span class="msg-clip" title="есть вложения">📎</span>' : "";
@@ -419,7 +425,7 @@ function renderList() {
       <input type="checkbox" class="msg-check" ${checked} onclick="event.stopPropagation();toggleSelect('${m.id}')">
       <div class="msg-avatar">${escapeHtml(initial)}</div>
       <div class="msg-body">
-        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(m.fromName || m.fromAddr || "", q)}</div><div class="msg-date">${state._globalSearch ? (m.folder?.kind === 'sent' ? '📤 ' : m.folder?.kind === 'inbox' ? '📥 ' : '') : ''}${date}</div></div>
+        <div class="msg-head"><div class="msg-from">${prioBadge}${highlight(displayName, q)}</div><div class="msg-date">${state._globalSearch ? (m.folder?.kind === 'sent' ? '📤 ' : m.folder?.kind === 'inbox' ? '📥 ' : '') : ''}${date}</div></div>
         <div class="msg-subject">${star}${clip} ${highlight(m.subject || "(без темы)", q)}</div>
         <div class="msg-snippet">${highlight(snippet, q)}</div>
       </div>
@@ -773,11 +779,12 @@ function openCompose(defaults = {}) {
   loadSenderPersonas().then(() => {
     if (defaults.personaId) {
       form.personaId.value = defaults.personaId;
+    } else if (_personas.length) {
+      // Auto-select first persona if none specified
+      form.personaId.value = _personas[0].id;
     }
-    // Auto-insert default signature if no body text yet
-    if (!defaults.bodyText) {
-      setTimeout(updateComposeSignature, 100);
-    }
+    // Always insert signature (for new compose and replies)
+    setTimeout(updateComposeSignature, 100);
   });
 }
 function closeCompose() {
