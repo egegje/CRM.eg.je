@@ -45,6 +45,24 @@ function toggleSidebar() {
     ov?.remove();
   }
 }
+function toggleSidebarCollapse() {
+  const sb = document.getElementById("main-sidebar");
+  const app = document.getElementById("app");
+  sb.classList.toggle("collapsed");
+  const collapsed = sb.classList.contains("collapsed");
+  app.style.setProperty("--sidebar-w", collapsed ? "56px" : "220px");
+  localStorage.setItem("sidebar-collapsed", collapsed ? "1" : "");
+}
+// Restore sidebar state
+(function() {
+  if (localStorage.getItem("sidebar-collapsed") === "1") {
+    document.addEventListener("DOMContentLoaded", function() {
+      var sb = document.getElementById("main-sidebar");
+      if (sb) { sb.classList.add("collapsed"); document.getElementById("app").style.setProperty("--sidebar-w", "56px"); }
+    });
+  }
+})();
+
 function toggleTheme() {
   const cur = document.documentElement.getAttribute("data-theme") || "light";
   const next = cur === "light" ? "dark" : "light";
@@ -1753,7 +1771,7 @@ function exitTasksView() {
   // re-apply persisted resizer widths
   const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
   if (saved && window.innerWidth > 900) {
-    document.getElementById("app").style.gridTemplateColumns = `56px 220px 4px ${saved.list}px 4px 1fr`;
+    document.getElementById("app").style.gridTemplateColumns = `56px var(--sidebar-w, 220px) 4px ${saved.list}px 4px 1fr`;
   }
   // Update icon bar
   document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
@@ -2916,7 +2934,7 @@ window.addEventListener("online", () => {
   let listW = saved?.list ?? 380;
   function apply() {
     if (window.innerWidth <= 900) return;
-    app.style.gridTemplateColumns = `56px 220px 4px ${listW}px 4px 1fr`;
+    app.style.gridTemplateColumns = `56px var(--sidebar-w, 220px) 4px ${listW}px 4px 1fr`;
   }
   apply();
   window.addEventListener("resize", apply);

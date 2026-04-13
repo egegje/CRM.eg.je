@@ -37,7 +37,8 @@
     <div class="ib-item" onclick="logout()" title="Выйти"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg></div>
   </nav>
   <button class="burger" onclick="toggleSidebar()" aria-label="меню">☰</button>
-  <aside class="sidebar">
+  <aside class="sidebar" id="main-sidebar" style="position:relative">
+    <button class="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Свернуть/Развернуть">‹</button>
     <div class="brand">
       <span>METR <span id="outbox-badge" class="badge"></span></span>
       <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
