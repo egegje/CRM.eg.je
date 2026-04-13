@@ -62,12 +62,17 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
   background: var(--bg-alt); border-right: 1px solid var(--border);
   display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
   padding: 8px; z-index: 20; width: 56px;
+  transition: none;
 }
 .sidebar:hover, .sidebar.sidebar-expanded {
   width: 240px; padding: 12px;
   position: fixed; top: 0; bottom: 0; left: 56px;
   box-shadow: 4px 0 24px oklch(0 0 0 / 0.12);
+  background: var(--bg-alt);
+  border-right: 1px solid var(--border);
+  animation: sidebarIn 0.15s ease;
 }
+@keyframes sidebarIn { from { opacity: 0.8; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
 .sidebar .brand, .sidebar .compose-btn, .sidebar .folder-title,
 .sidebar .user-box, .sidebar .sidebar-label, .sidebar .folder-item .count,
 .sidebar #mailboxes-group { display: none; }
