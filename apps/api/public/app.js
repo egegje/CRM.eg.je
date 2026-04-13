@@ -576,11 +576,54 @@ function renderPreview(m) {
       </div>
     </div>
     ${aiHtml}
-    <div class="preview-body">${escapeHtml(body)}</div>
+    <div class="preview-body">${formatEmailChain(body)}</div>
     ${attachHtml ? `<div class="attachments">${attachHtml}</div>` : ""}
   `;
 }
 
+
+function formatEmailChain(body) {
+  // Split email body at quoted reply markers
+  const patterns = [
+    /^(.*?писал[аи]?:\s*>?\s*)$/m,
+    /^(-{3,}\s*Пересылаемое сообщение\s*-{3,})$/m,
+    /^(On .+ wrote:)$/m,
+    /^(>{1,}\s)$/m,
+    /^(-{2,}\s*\d{1,2}\.\d{1,2}\.\d{4}.+писал[аи]?:)$/m,
+  ];
+  
+  let mainBody = body;
+  let quotedParts = [];
+  
+  // Find first quote marker
+  let splitIdx = -1;
+  let splitLine = "";
+  const lines = body.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/писал[аи]?\s*:?\s*$/.test(line) || /wrote:\s*$/.test(line) || /^-{3,}\s*(Пересылаемое|Forwarded)/.test(line)) {
+      splitIdx = i;
+      splitLine = line;
+      break;
+    }
+    if (i > 0 && /^>\s/.test(line) && /^>\s/.test(lines[i-1] || "")) {
+      splitIdx = i - 1;
+      break;
+    }
+  }
+  
+  if (splitIdx >= 0) {
+    mainBody = lines.slice(0, splitIdx).join("\n");
+    const quotedText = lines.slice(splitIdx).join("\n");
+    const qid = "q_" + Math.random().toString(36).slice(2, 8);
+    return escapeHtml(mainBody.trim()) + 
+      '<div style="margin-top:12px;border-top:1px solid var(--border);padding-top:8px">' +
+      '<button onclick="var e=document.getElementById(\'' + qid + '\');e.style.display=e.style.display===\'none\'?\'block\':\'none\';this.textContent=e.style.display===\'none\'?\'··· Показать историю\':\'··· Скрыть историю\'" style="background:none;border:1px solid var(--border);border-radius:6px;padding:4px 12px;cursor:pointer;font-size:12px;color:var(--text-muted)">··· Показать историю</button>' +
+      '<div id="' + qid + '" style="display:none;margin-top:8px;padding:10px 12px;background:var(--bg-alt);border-radius:8px;font-size:13px;color:var(--text-muted);border-left:3px solid var(--border)">' + escapeHtml(quotedText.trim()) + '</div></div>';
+  }
+  
+  return escapeHtml(body);
+}
 function toggleMailMenu(btn) {
   const menu = btn.nextElementSibling;
   menu.style.display = menu.style.display === "none" ? "block" : "none";
