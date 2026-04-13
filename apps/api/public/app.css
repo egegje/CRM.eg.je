@@ -49,7 +49,7 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
 @media (max-width: 900px) { .resizer { display: none; } }
 
 /* icon bar */
-.icon-bar { background: #1e1e2e; display: flex; flex-direction: column; align-items: center; padding: 12px 0; gap: 4px; overflow-y: auto; }
+.icon-bar { background: #1e1e2e; display: flex; flex-direction: column; align-items: center; padding: 62px 0 12px; gap: 4px; overflow-y: auto; }
 .icon-bar .ib-item { width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; font-size: 20px; color: #8888aa; transition: background 0.15s, color 0.15s; position: relative; }
 .icon-bar .ib-item:hover { background: #2a2a3e; color: #ccc; }
 .icon-bar .ib-item.active { background: var(--accent); color: white; }
@@ -272,3 +272,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   .tabbar button:active { background: var(--bg-hover); }
   .tabbar button.mtab-active { color: var(--accent); }
 }
+
+/* Collapsible sidebar sections */
+.collapsed-group > :not(.folder-title) { display: none !important; }
+.collapsed-group > .folder-title::after { content: ''; }
