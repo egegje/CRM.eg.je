@@ -534,7 +534,8 @@ function renderPreview(m) {
       </div>`;
     })
     .join("");
-  const body = m.bodyText || stripHtml(m.bodyHtml || "");
+  const rawBody = m.bodyText || stripHtml(m.bodyHtml || "");
+  const body = rawBody.replace(/\n{3,}/g, "\n\n").replace(/(\r?\n\s*){3,}/g, "\n\n");
   const aiActions = (m.aiActions || []).filter((a) => !a.startsWith("_"));
   const aiHtml = !state.aiSummaryEnabled ? "" : m.aiSummary
     ? `<div class="ai-block"><div class="ai-label">AI · суть</div>${escapeHtml(m.aiSummary)}${
@@ -583,6 +584,7 @@ function renderPreview(m) {
 
 
 function formatEmailChain(body) {
+  if (!body) return "";
   // Split email body at quoted reply markers
   const patterns = [
     /^(.*?писал[аи]?:\s*>?\s*)$/m,
