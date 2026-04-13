@@ -27,7 +27,7 @@
 
 <div id="app" class="hidden">
   <nav class="icon-bar" id="icon-bar">
-    <div class="ib-logo" style="font-size:11px;letter-spacing:3px;font-weight:800;line-height:1">M<br><span style="font-size:7px;letter-spacing:1.5px;opacity:0.5">ETR</span></div>
+    
     <div class="ib-item active" data-section="mail" onclick="switchSection('mail')" title="Почта"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 7l10 7 10-7"/></svg></div>
     <div class="ib-item" data-section="tasks" onclick="switchSection('tasks')" title="Задачи"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3 8-8"/><path d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h9"/></svg></div>
     <div class="ib-item" id="ib-finance" style="display:none" data-section="finance" onclick="switchSection('finance')" title="Финансы"><svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
@@ -40,7 +40,7 @@
   <aside class="sidebar" id="main-sidebar" style="position:relative">
     
     <div class="brand">
-      <span>METR <span id="outbox-badge" class="badge"></span></span>
+      <span><span id="outbox-badge" class="badge"></span></span>
       <button class="sidebar-close" onclick="toggleSidebar()" aria-label="закрыть">←</button>
     </div>
     <div class="compose-wrap" style="padding:0 0 10px">
