@@ -4,7 +4,7 @@ const state = {
   user: null,
   mailboxes: [],
   folders: [],
-  currentFolder: null,
+  currentFolder: '__inbox',
   currentMailbox: null,
   messages: [],
   selectedId: null,
@@ -506,6 +506,7 @@ function renderPreview(m) {
         <button onclick="deleteMsg('${m.id}')" title="Удалить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})" title="${m.isStarred ? 'Снять' : 'Важное'}"><svg width="18" height="18" fill="${m.isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg></button>
         <button onclick="markUnread('${m.id}')" title="Непрочитано"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="3"/><path d="M2 7l10 7 10-7"/></svg></button>
+        <button onclick="printEmail('${m.id}')" title="Печать"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg></button>
         <div style="position:relative;display:inline-block">
           <button onclick="toggleMailMenu(this)" title="Ещё" style="font-size:18px;line-height:1;padding:6px 8px">⋮</button>
           <div class="mail-menu" style="display:none;position:absolute;right:0;top:100%;background:var(--bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:50;min-width:200px;padding:6px 0">
@@ -1037,6 +1038,17 @@ function navigateViewer(dir) {
   renderFileViewer();
 }
 
+
+async function printEmail(id) {
+  const m = await api("/messages/" + id);
+  const w = window.open('', '_blank');
+  const date = m.receivedAt ? new Date(m.receivedAt).toLocaleString("ru") : "";
+  const fromDisplay = m.fromName ? m.fromName + ' <' + m.fromAddr + '>' : m.fromAddr;
+  const body = m.bodyHtml || ('<pre style="white-space:pre-wrap;font-family:inherit">' + escapeHtml(m.bodyText || '') + '</pre>');
+  w.document.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escapeHtml(m.subject || '') + '</title><style>body{font-family:Arial,sans-serif;max-width:800px;margin:40px auto;color:#333;line-height:1.6}.header{border-bottom:2px solid #333;padding-bottom:16px;margin-bottom:20px}.field{font-size:14px;margin:4px 0}.field b{min-width:60px;display:inline-block}h1{font-size:20px;margin:0 0 12px}.body{font-size:14px}@media print{body{margin:20px}}</style></head><body><div class="header"><div style="font-size:12px;color:#888">' + escapeHtml(date) + '</div><h1>' + escapeHtml(m.subject || '(без темы)') + '</h1><div class="field"><b>От:</b> ' + escapeHtml(fromDisplay) + '</div><div class="field"><b>Кому:</b> ' + escapeHtml((m.toAddrs||[]).join(', ')) + '</div>' + ((m.ccAddrs||[]).length ? '<div class="field"><b>Копия:</b> ' + escapeHtml(m.ccAddrs.join(', ')) + '</div>' : '') + '</div><div class="body">' + body + '</div></body></html>');
+  w.document.close();
+  setTimeout(function() { w.print(); }, 500);
+}
 function closeFileViewer() {
   const overlay = document.getElementById('file-viewer-overlay');
   if (overlay) {
@@ -1741,7 +1753,7 @@ function exitTasksView() {
   // re-apply persisted resizer widths
   const saved = JSON.parse(localStorage.getItem("crm-cols") || "null");
   if (saved && window.innerWidth > 900) {
-    document.getElementById("app").style.gridTemplateColumns = `56px 56px 4px ${saved.list}px 4px 1fr`;
+    document.getElementById("app").style.gridTemplateColumns = `56px 220px 4px ${saved.list}px 4px 1fr`;
   }
   // Update icon bar
   document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
@@ -2904,7 +2916,7 @@ window.addEventListener("online", () => {
   let listW = saved?.list ?? 380;
   function apply() {
     if (window.innerWidth <= 900) return;
-    app.style.gridTemplateColumns = `56px 56px 4px ${listW}px 4px 1fr`;
+    app.style.gridTemplateColumns = `56px 220px 4px ${listW}px 4px 1fr`;
   }
   apply();
   window.addEventListener("resize", apply);
