@@ -64,7 +64,7 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
   padding: 12px; z-index: 20; transition: width 0.2s ease, padding 0.2s ease;
 }
 .sidebar.collapsed { width: 56px; min-width: 56px; padding: 8px; }
-.sidebar.collapsed .brand, .sidebar.collapsed .compose-btn, .sidebar.collapsed .folder-title,
+.sidebar.collapsed .brand { min-height: 0; margin-bottom: 8px; } .sidebar.collapsed .brand, .sidebar.collapsed .compose-btn, .sidebar.collapsed .folder-title,
 .sidebar.collapsed .user-box, .sidebar.collapsed .sidebar-label, .sidebar.collapsed .folder-item .count,
 .sidebar.collapsed #mailboxes-group, .sidebar.collapsed #sheets-group, .sidebar.collapsed .folder-label { display: none; }
 .sidebar .folder-item { white-space: nowrap; overflow: hidden; border-radius: 8px; padding: 8px 10px; }
