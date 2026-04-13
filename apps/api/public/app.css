@@ -57,15 +57,28 @@ html, body { margin: 0; padding: 0; height: 100%; font-family: 'Manrope', -apple
 .icon-bar .ib-logo { font-size: 22px; font-weight: 800; color: white; margin-bottom: 12px; cursor: default; }
 @media (max-width: 900px) { .icon-bar { display: none; } }
 
-/* sidebar */
-.sidebar { background: var(--bg-alt); border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden; padding: 8px 6px; z-index: 20; transition: width 0.2s ease, padding 0.2s ease, box-shadow 0.2s ease; width: 56px; }
-.sidebar:hover, .sidebar.sidebar-expanded { width: 240px; padding: 16px; position: absolute; top: 0; bottom: 0; left: 56px; box-shadow: 4px 0 20px rgba(0,0,0,0.1); }
-.sidebar .brand, .sidebar .compose-btn, .sidebar .folder-title, .sidebar .user-box, .sidebar .sidebar-label, .sidebar .folder-item .count { opacity: 0; height: 0; overflow: hidden; margin: 0; padding: 0; transition: opacity 0.15s, height 0.2s; white-space: nowrap; }
-.sidebar .folder-item span { overflow: hidden; }
-.sidebar:hover .brand, .sidebar:hover .compose-btn, .sidebar:hover .folder-title, .sidebar:hover .user-box, .sidebar:hover .sidebar-label, .sidebar:hover .folder-item .count,
-.sidebar.sidebar-expanded .brand, .sidebar.sidebar-expanded .compose-btn, .sidebar.sidebar-expanded .folder-title, .sidebar.sidebar-expanded .user-box, .sidebar.sidebar-expanded .sidebar-label, .sidebar.sidebar-expanded .folder-item .count { opacity: 1; height: auto; overflow: visible; margin: revert; padding: revert; }
+/* sidebar — collapsed = icons only, hover = full overlay */
+.sidebar {
+  background: var(--bg-alt); border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; overflow-y: auto; overflow-x: hidden;
+  padding: 8px; z-index: 20; width: 56px;
+}
+.sidebar:hover, .sidebar.sidebar-expanded {
+  width: 240px; padding: 12px;
+  position: absolute; top: 0; bottom: 0; left: 56px;
+  box-shadow: 4px 0 24px oklch(0 0 0 / 0.12);
+  transition: box-shadow 0.2s;
+}
+.sidebar .brand, .sidebar .compose-btn, .sidebar .folder-title,
+.sidebar .user-box, .sidebar .sidebar-label, .sidebar .folder-item .count,
 .sidebar #mailboxes-group { display: none; }
-.sidebar:hover #mailboxes-group, .sidebar.sidebar-expanded #mailboxes-group { display: block; }
+.sidebar:hover .brand, .sidebar:hover .compose-btn, .sidebar:hover .folder-title,
+.sidebar:hover .user-box, .sidebar:hover .sidebar-label, .sidebar:hover .folder-item .count,
+.sidebar:hover #mailboxes-group,
+.sidebar.sidebar-expanded .brand, .sidebar.sidebar-expanded .compose-btn,
+.sidebar.sidebar-expanded .folder-title, .sidebar.sidebar-expanded .user-box,
+.sidebar.sidebar-expanded .sidebar-label, .sidebar.sidebar-expanded .folder-item .count,
+.sidebar.sidebar-expanded #mailboxes-group { display: revert; }
 .sidebar .folder-item { white-space: nowrap; overflow: hidden; border-radius: 8px; padding: 8px 10px; }
 .sidebar .folder-item svg { flex-shrink: 0; }
 .sidebar .folder-label { display: none; }

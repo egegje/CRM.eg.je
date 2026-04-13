@@ -1,5 +1,5 @@
 // Minimal service worker — network-first for HTML/JS/CSS, cache fallback.
-const CACHE = "crm-v78";
+const CACHE = "crm-v79";
 const SHELL = ["/", "/app.js", "/app.css", "/manifest.json"];
 
 self.addEventListener("install", (e) => {

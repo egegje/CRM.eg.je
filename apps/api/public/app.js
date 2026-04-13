@@ -442,6 +442,10 @@ function renderPreview(m) {
       if (isImg) {
         return `<div style="display:inline-block;margin:6px 8px 6px 0;vertical-align:top"><img src="/attachments/${a.id}" alt="${escapeHtml(a.filename)}" style="max-width:240px;max-height:240px;border-radius:6px;border:1px solid var(--border);display:block"><a class="attachment" href="/attachments/${a.id}" download style="display:block;margin-top:4px;font-size:11px">⬇ ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a></div>`;
       }
+      const isPdf = /\.pdf$/i.test(a.filename || "") || (a.mime || "").includes("pdf");
+      if (isPdf) {
+        return `<div style="margin:8px 0"><div style="border:1px solid var(--border);border-radius:10px;overflow:hidden"><iframe src="/attachments/${a.id}#toolbar=1" style="width:100%;height:min(500px,50vh);border:none;display:block"></iframe></div><div style="display:flex;align-items:center;gap:8px;margin-top:6px"><span style="font-size:12px;color:var(--text-muted)">📄 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</span><a href="/attachments/${a.id}" download style="font-size:11px;color:var(--accent);text-decoration:none">⬇ Скачать</a></div></div>`;
+      }
       return `<a class="attachment" href="/attachments/${a.id}" download>📎 ${escapeHtml(a.filename)} (${fmtSize(a.size)})</a>`;
     })
     .join("");
