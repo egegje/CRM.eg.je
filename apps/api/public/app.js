@@ -559,7 +559,7 @@ function renderPreview(m) {
       <div class="preview-actions" style="align-items:center">
         <button class="mobile-back" onclick="closePreview()" title="Назад"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
         <button onclick="replyTo('${m.id}')" title="Ответить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M4 12h12a4 4 0 014 4v1"/></svg></button>
-        <button onclick="aiReply('${m.id}')" title="AI ответ"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7z"/></svg></button>
+        <button onclick="aiReply('${m.id}')" title="AI ответ"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M12.2 11.8L11 13M12.2 6.2L11 5"/><path d="M15 9l-6 11"/></svg></button>
         <button onclick="forwardMsg('${m.id}')" title="Переслать"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 17l5-5-5-5"/><path d="M20 12H8a4 4 0 00-4 4v1"/></svg></button>
         <button onclick="deleteMsg('${m.id}')" title="Удалить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button>
         <button onclick="toggleStar('${m.id}', ${m.isStarred})" title="${m.isStarred ? 'Снять' : 'Важное'}"><svg width="18" height="18" fill="${m.isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01z"/></svg></button>
@@ -770,7 +770,7 @@ async function replyTo(id) {
     .split("\n")
     .map((line) => (line.length ? "> " + line : ">"))
     .join("\n");
-  openCompose({
+  openCompose({ _composeTitle: "Ответить отправителю",
     to: m.fromAddr,
     subject: m.subject.startsWith("Re:") ? m.subject : "Re: " + m.subject,
     bodyText: "\n\n--- " + new Date(m.receivedAt || Date.now()).toLocaleString("ru") + ", " + (m.fromAddr || "") + " писал:\n" + quoted,
@@ -780,7 +780,7 @@ async function replyTo(id) {
 
 async function forwardMsg(id) {
   const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
-  openCompose({
+  openCompose({ _composeTitle: "Переслать письмо",
     subject: m.subject.startsWith("Fwd:") ? m.subject : "Fwd: " + m.subject,
     bodyText: `\n\n---------- Пересылаемое сообщение ----------\nОт: ${m.fromAddr}\nТема: ${m.subject}\n\n${m.bodyText || ""}`,
     mailboxId: m.mailboxId,
@@ -877,6 +877,7 @@ function openCompose(defaults = {}) {
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
   modal.classList.remove("hidden");
+  var ct = document.getElementById("compose-modal-title"); if (ct) ct.textContent = defaults._composeTitle || "Новое письмо";
   document.getElementById("compose-minimized").classList.add("hidden");
   // Load personas and auto-insert signature
   loadSenderPersonas().then(() => {
@@ -904,6 +905,7 @@ function toggleComposeMinimize() {
   } else {
     mini.classList.add("hidden");
     modal.classList.remove("hidden");
+  var ct = document.getElementById("compose-modal-title"); if (ct) ct.textContent = defaults._composeTitle || "Новое письмо";
   }
 }
 
