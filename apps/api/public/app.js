@@ -3355,20 +3355,26 @@ bootApp().catch(() => showLogin());
 
 
 
-/* Unified scroll-to-top buttons — injected into scrollable panels */
+/* Unified scroll-to-top buttons */
 (function() {
   function addScrollBtn(panel) {
-    if (!panel || panel.querySelector('.scroll-top-panel')) return;
-    panel.style.position = 'relative';
+    if (!panel || panel._scrollBtn) return;
     var btn = document.createElement('button');
     btn.className = 'scroll-top-panel';
     btn.title = 'Наверх';
     btn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M18 15l-6-6-6 6"/></svg>';
-    btn.onclick = function(e) { e.stopPropagation(); panel.scrollTo({top:0, behavior:'smooth'}); };
-    panel.appendChild(btn);
-    panel.addEventListener('scroll', function() {
-      btn.classList.toggle('show', panel.scrollTop > 200);
-    });
+    btn.style.cssText = 'position:fixed;width:32px;height:32px;border-radius:50%;background:var(--bg);color:var(--text-muted);border:1px solid var(--border);cursor:pointer;display:none;align-items:center;justify-content:center;z-index:100;box-shadow:0 2px 8px rgba(0,0,0,0.12)';
+    btn.onclick = function(e) { e.stopPropagation(); panel.scrollTo({top:0, behavior:"smooth"}); };
+    document.body.appendChild(btn);
+    panel._scrollBtn = btn;
+    function updatePos() {
+      var r = panel.getBoundingClientRect();
+      btn.style.bottom = (window.innerHeight - r.bottom + 12) + 'px';
+      btn.style.left = (r.right - 44) + 'px';
+      btn.style.display = panel.scrollTop > 200 ? 'flex' : 'none';
+    }
+    panel.addEventListener('scroll', updatePos);
+    window.addEventListener('resize', updatePos);
   }
   setTimeout(function() {
     addScrollBtn(document.querySelector('.messages-list'));
