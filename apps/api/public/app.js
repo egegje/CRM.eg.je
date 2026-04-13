@@ -3351,3 +3351,20 @@ function checkResetParam() {
 initTheme();
 checkResetParam();
 bootApp().catch(() => showLogin());
+
+/* Show scroll-top buttons only when scrolled */
+(function() {
+  function watchScroll(panelSelector, btnSelector) {
+    var panel = document.querySelector(panelSelector);
+    var btn = document.querySelector(btnSelector);
+    if (!panel || !btn) return;
+    panel.addEventListener('scroll', function() {
+      btn.classList.toggle('show', panel.scrollTop > 200);
+    });
+  }
+  setTimeout(function() {
+    watchScroll('.messages-list', '.messages-list + .scroll-top-panel');
+    watchScroll('.preview-pane', '.preview-scroll-btn');
+    watchScroll('#main-sidebar', '.sidebar-scroll-btn');
+  }, 1000);
+})();

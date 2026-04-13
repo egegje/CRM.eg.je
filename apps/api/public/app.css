@@ -297,5 +297,6 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .sidebar .folder-item.drag-over { border-top: 2px solid var(--accent); }
 
 /* Panel scroll-to-top buttons */
-.scroll-top-panel { position:sticky; bottom:8px; left:50%; transform:translateX(-50%); width:36px; height:36px; border-radius:50%; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); cursor:pointer; display:flex; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 8px oklch(0 0 0/0.12); margin-top:-44px; float:right; margin-right:8px; }
+.scroll-top-panel { position:sticky; bottom:10px; width:32px; height:32px; border-radius:50%; background:var(--bg); color:var(--text-muted); border:1px solid var(--border); cursor:pointer; display:none; align-items:center; justify-content:center; z-index:10; box-shadow:0 2px 8px oklch(0 0 0/0.12); margin:0 auto; }
 .scroll-top-panel:hover { color:var(--accent); border-color:var(--accent); }
+.scroll-top-panel.show { display:flex; }
