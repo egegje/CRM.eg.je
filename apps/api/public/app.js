@@ -812,12 +812,10 @@ function updateAttachList() {
     var f = files[i];
     var size = f.size < 1024 ? f.size + " Б" : f.size < 1048576 ? Math.round(f.size/1024) + " КБ" : (f.size/1048576).toFixed(1) + " МБ";
     var icon = /^image\//.test(f.type) ? "🖼" : /pdf/.test(f.type) ? "📄" : "📎";
-    html += '<div id="attach-item-' + i + '" style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:12px">';
-    html += '<span class="attach-status" style="font-size:10px">🟡</span>';
-    html += '<span>' + icon + '</span>';
-    html += '<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>';
-    html += '<span style="color:var(--text-muted)">' + size + '</span>';
-    html += '<button type="button" onclick="removeAttach(' + i + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 2px">✕</button>';
+    html += '<div id="attach-item-' + i + '" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:13px">';
+    html += '<div style="flex:1;min-width:0"><div style="display:flex;justify-content:space-between"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span><span style="color:var(--text-muted);font-size:11px;white-space:nowrap;margin-left:8px">(' + size + ')</span></div>';
+    html += '<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div class="attach-progress" style="height:100%;width:0%;background:var(--accent);border-radius:2px;transition:width 0.3s"></div></div></div>';
+    html += '<button type="button" onclick="removeAttach(' + i + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 2px;flex-shrink:0">×</button>';
     html += '</div>';
   }
   list.innerHTML = html;
@@ -1048,13 +1046,14 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     const progress = document.getElementById("upload-progress");
     if (files && files.length) {
       for (let i = 0; i < files.length; i++) {
-        const statusEl = document.querySelector('#attach-item-' + i + ' .attach-status');
-        if (statusEl) statusEl.textContent = '⏳';
+        const bar = document.querySelector('#attach-item-' + i + ' .attach-progress');
         try {
-          await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(){});
-          if (statusEl) statusEl.textContent = '🟢';
+          await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(pct) {
+            if (bar) bar.style.width = pct + '%';
+          });
+          if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.18 155)'; }
         } catch (uploadErr) {
-          if (statusEl) statusEl.textContent = '🔴';
+          if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.2 25)'; }
           throw uploadErr;
         }
       }
