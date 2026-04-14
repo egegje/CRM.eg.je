@@ -310,8 +310,9 @@ async function refreshList() {
     const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
     const sysKind = sysMap[state.currentFolder];
     if (sysKind) {
-      const ids = state.folders.filter((f) => f.kind === sysKind).map((f) => f.id);
+      const ids = state.folders.filter((f) => f.kind === sysKind && (!state.currentMailbox || f.mailboxId === state.currentMailbox)).map((f) => f.id);
       if (ids.length === 1) params.set("folderId", ids[0]);
+      else if (ids.length > 1) params.set("folderKind", sysKind);
     } else if (state.currentFolder === "__trash") {
       params.set("trash", "true");
     } else if (state.currentFolder === "__starred") {
