@@ -254,7 +254,7 @@
         <input name="subject" placeholder="Тема письма" />
       </div>
       <div class="compose-attach-bar">
-        <label class="compose-attach-btn">📎 Прикрепить файл <input type="file" id="compose-files" multiple style="display:none" onchange="updateAttachList()" /></label>
+        <label class="compose-attach-btn">📎 Прикрепить файл <input type="file" id="compose-files" multiple style="display:none" onchange="updateAttachList();uploadAttachNow()" /></label>
         <select id="template-select" onchange="applyTemplate(this.value);this.value=''">
           <option value="">📋 Шаблон...</option>
         </select>

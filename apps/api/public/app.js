@@ -801,6 +801,39 @@ async function loadTemplates() {
 }
 
 
+let _composeDraftId = null;
+
+async function ensureDraft() {
+  if (_composeDraftId) return _composeDraftId;
+  var f = document.getElementById("compose-form");
+  var mailboxId = f.mailboxId ? f.mailboxId.value : "";
+  var draft = await api("/messages", {
+    method: "POST",
+    body: JSON.stringify({ mailboxId: mailboxId, to: [], cc: [], subject: "", bodyText: "" }),
+  });
+  _composeDraftId = draft.id;
+  return draft.id;
+}
+
+async function uploadAttachNow() {
+  var input = document.getElementById("compose-files");
+  if (!input || !input.files.length) return;
+  var draftId = await ensureDraft();
+  var files = input.files;
+  for (var i = 0; i < files.length; i++) {
+    var bar = document.querySelector("#attach-item-" + i + " .attach-progress");
+    if (bar && bar.style.width === "100%") continue; // already uploaded
+    try {
+      await uploadFile("/messages/" + draftId + "/attachments", files[i], function(pct) {
+        if (bar) bar.style.width = pct + "%";
+      });
+      if (bar) { bar.style.width = "100%"; bar.style.background = "oklch(0.6 0.18 155)"; }
+    } catch (err) {
+      if (bar) { bar.style.width = "100%"; bar.style.background = "oklch(0.6 0.2 25)"; }
+    }
+  }
+}
+
 function updateAttachList() {
   var input = document.getElementById("compose-files");
   var list = document.getElementById("compose-attachments");
@@ -924,6 +957,7 @@ function openCompose(defaults = {}) {
   });
 }
 function closeCompose() {
+  _composeDraftId = null;
   document.getElementById("compose-modal").classList.add("hidden");
   document.getElementById("compose-minimized").classList.add("hidden");
   document.getElementById("compose-error").textContent = "";
@@ -1025,15 +1059,25 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     return;
   }
   try {
-    const draft = await api("/messages", {
-      method: "POST",
-      body: JSON.stringify({
-        mailboxId: f.get("mailboxId"),
-        to, cc,
-        subject: f.get("subject") || "",
-        bodyText: f.get("bodyText") || "",
-      }),
-    });
+    let draft;
+    if (_composeDraftId) {
+      // Update existing draft with final content
+      await api("/messages/" + _composeDraftId, {
+        method: "PATCH",
+        body: JSON.stringify({ to, cc, subject: f.get("subject") || "", bodyText: f.get("bodyText") || "", mailboxId: f.get("mailboxId") }),
+      });
+      draft = { id: _composeDraftId };
+    } else {
+      draft = await api("/messages", {
+        method: "POST",
+        body: JSON.stringify({
+          mailboxId: f.get("mailboxId"),
+          to, cc,
+          subject: f.get("subject") || "",
+          bodyText: f.get("bodyText") || "",
+        }),
+      });
+    }
     const personaId = f.get("personaId");
     if (personaId) {
       await api("/messages/" + draft.id, {
@@ -1041,20 +1085,21 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
         body: JSON.stringify({ personaId }),
       });
     }
-    // upload attachments with progress
-    const files = document.getElementById("compose-files").files;
-    const progress = document.getElementById("upload-progress");
-    if (files && files.length) {
-      for (let i = 0; i < files.length; i++) {
-        const bar = document.querySelector('#attach-item-' + i + ' .attach-progress');
-        try {
-          await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(pct) {
-            if (bar) bar.style.width = pct + '%';
-          });
-          if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.18 155)'; }
-        } catch (uploadErr) {
-          if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.2 25)'; }
-          throw uploadErr;
+    // Files already uploaded via uploadAttachNow — skip if draft exists
+    if (!_composeDraftId) {
+      const files = document.getElementById("compose-files").files;
+      if (files && files.length) {
+        for (let i = 0; i < files.length; i++) {
+          const bar = document.querySelector('#attach-item-' + i + ' .attach-progress');
+          try {
+            await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(pct) {
+              if (bar) bar.style.width = pct + '%';
+            });
+            if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.18 155)'; }
+          } catch (uploadErr) {
+            if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.2 25)'; }
+            throw uploadErr;
+          }
         }
       }
     }
