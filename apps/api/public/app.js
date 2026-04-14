@@ -1095,7 +1095,7 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
             await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(pct) {
               if (bar) bar.style.width = pct + '%';
             });
-            if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.18 155)'; }
+            if (bar) { bar.parentElement.style.display = 'none'; }
           } catch (uploadErr) {
             if (bar) { bar.style.width = '100%'; bar.style.background = 'oklch(0.6 0.2 25)'; }
             throw uploadErr;
