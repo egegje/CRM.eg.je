@@ -296,17 +296,17 @@ async function refreshList() {
   const dt = document.getElementById("date-to").value;
   if (df) params.set("dateFrom", df);
   if (dt) params.set("dateTo", dt);
-  // Global search folder override
+  // Folder/mailbox filtering
   state._globalSearch = false;
-  if (searchFolder === "all") {
+  if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
+  if (searchFolder === "all" && !state.currentMailbox) {
     params.set("folderKind", "all");
     state._globalSearch = true;
-  } else if (searchFolder === "inbox" || searchFolder === "sent") {
+  } else if ((searchFolder === "inbox" || searchFolder === "sent") && !state.currentMailbox) {
     params.set("folderKind", searchFolder);
     state._globalSearch = true;
   } else {
     // Normal folder-based browsing
-    if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
     const sysMap = { __sent: "sent", __drafts: "drafts", __inbox: "inbox" };
     const sysKind = sysMap[state.currentFolder];
     if (sysKind) {
