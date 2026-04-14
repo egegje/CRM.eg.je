@@ -812,7 +812,8 @@ function updateAttachList() {
     var f = files[i];
     var size = f.size < 1024 ? f.size + " Б" : f.size < 1048576 ? Math.round(f.size/1024) + " КБ" : (f.size/1048576).toFixed(1) + " МБ";
     var icon = /^image\//.test(f.type) ? "🖼" : /pdf/.test(f.type) ? "📄" : "📎";
-    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:12px">';
+    html += '<div id="attach-item-' + i + '" style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:12px">';
+    html += '<span class="attach-status" style="font-size:10px">🟡</span>';
     html += '<span>' + icon + '</span>';
     html += '<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>';
     html += '<span style="color:var(--text-muted)">' + size + '</span>';
@@ -1046,13 +1047,17 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     const files = document.getElementById("compose-files").files;
     const progress = document.getElementById("upload-progress");
     if (files && files.length) {
-      progress.classList.remove("hidden");
       for (let i = 0; i < files.length; i++) {
-        await uploadFile("/messages/" + draft.id + "/attachments", files[i], (pct) => {
-          progress.value = ((i + pct / 100) / files.length) * 100;
-        });
+        const statusEl = document.querySelector('#attach-item-' + i + ' .attach-status');
+        if (statusEl) statusEl.textContent = '⏳';
+        try {
+          await uploadFile('/messages/' + draft.id + '/attachments', files[i], function(){});
+          if (statusEl) statusEl.textContent = '🟢';
+        } catch (uploadErr) {
+          if (statusEl) statusEl.textContent = '🔴';
+          throw uploadErr;
+        }
       }
-      progress.classList.add("hidden");
     }
     const sendBtn = document.querySelector(".compose-btn-send");
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Отправка..."; }
