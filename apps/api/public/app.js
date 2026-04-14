@@ -800,6 +800,37 @@ async function loadTemplates() {
   } catch {}
 }
 
+
+function updateAttachList() {
+  var input = document.getElementById("compose-files");
+  var list = document.getElementById("compose-attachments");
+  if (!input || !list) return;
+  var files = input.files;
+  if (!files.length) { list.innerHTML = ""; return; }
+  var html = "";
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var size = f.size < 1024 ? f.size + " Б" : f.size < 1048576 ? Math.round(f.size/1024) + " КБ" : (f.size/1048576).toFixed(1) + " МБ";
+    var icon = /^image\//.test(f.type) ? "🖼" : /pdf/.test(f.type) ? "📄" : "📎";
+    html += '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:12px">';
+    html += '<span>' + icon + '</span>';
+    html += '<span style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + f.name + '</span>';
+    html += '<span style="color:var(--text-muted)">' + size + '</span>';
+    html += '<button type="button" onclick="removeAttach(' + i + ')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:14px;padding:0 2px">✕</button>';
+    html += '</div>';
+  }
+  list.innerHTML = html;
+}
+
+function removeAttach(idx) {
+  var input = document.getElementById("compose-files");
+  var dt = new DataTransfer();
+  for (var i = 0; i < input.files.length; i++) {
+    if (i !== idx) dt.items.add(input.files[i]);
+  }
+  input.files = dt.files;
+  updateAttachList();
+}
 function applyTemplate(id) {
   if (!id) return;
   if (id === "__delete") {
