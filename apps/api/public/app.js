@@ -1054,6 +1054,8 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
       }
       progress.classList.add("hidden");
     }
+    const sendBtn = document.querySelector(".compose-btn-send");
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Отправка..."; }
     const sendAt = f.get("sendAt");
     await api("/messages/" + draft.id + "/send", {
       method: "POST",
@@ -1077,9 +1079,12 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
       }
     }
     closeCompose();
+    showToast("Сообщение отправлено", null);
     refreshList();
   } catch (err) {
     document.getElementById("compose-error").textContent = "Ошибка: " + err.message;
+    var sb = document.querySelector(".compose-btn-send");
+    if (sb) { sb.disabled = false; sb.textContent = "Отправить"; }
   }
 });
 
