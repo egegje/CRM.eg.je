@@ -245,12 +245,14 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 
 /* mobile */
 @media (max-width: 900px) {
-  #app { grid-template-columns: 1fr; position: relative; }
+  #app { display: flex; flex-direction: column; grid-template-columns: none; position: relative; }
   .burger {
     display: block; position: fixed; top: 10px; left: 10px; z-index: 50;
     width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--bg); color: var(--text); font-size: 20px; cursor: pointer;
   }
+  .icon-bar { display: none; }
+  .resizer { display: none; }
   .sidebar {
     position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
     transform: translateX(-100%); transition: transform 0.2s; z-index: 60;
@@ -258,7 +260,8 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   }
   #app.show-sidebar .sidebar { transform: translateX(0); }
   #sidebar-overlay { position: fixed; top: 0; right: 0; bottom: 0; left: 280px; background: rgba(0,0,0,0.45); z-index: 55; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .toolbar { padding-left: 60px; }
+  .list-pane { flex: 1; width: 100%; border-right: none; }
+  .toolbar { padding-left: 60px; padding-top: 8px; }
   .preview-pane { display: none; }
   #app.show-preview .list-pane { display: none; }
   #app.show-preview .preview-pane { display: block; }
