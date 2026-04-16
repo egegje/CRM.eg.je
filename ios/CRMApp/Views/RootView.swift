@@ -58,6 +58,10 @@ struct MoreView: View {
     @EnvironmentObject var auth: AuthStore
     @State private var showTeam = false
 
+    private var isAdmin: Bool {
+        auth.user?.role == "owner" || auth.user?.role == "admin"
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -68,56 +72,42 @@ struct MoreView: View {
                         LabeledContent("Роль", value: u.role)
                     }
                 }
-                if auth.user?.role == "owner" || auth.user?.role == "admin" {
-                    Section("Управление") {
+                if isAdmin {
+                    Section("Команда") {
                         Button {
                             showTeam = true
                         } label: {
-                            Label("Команда", systemImage: "person.3")
+                            Label("Дашборд команды", systemImage: "person.3")
                         }
-                        NavigationLink {
-                            AdminContactsView()
-                        } label: {
+                    }
+                    Section("Администрирование") {
+                        NavigationLink { AdminContactsView() } label: {
                             Label("Контакты", systemImage: "person.crop.rectangle.stack")
                         }
-                        NavigationLink {
-                            AdminUsersView()
-                        } label: {
+                        NavigationLink { AdminUsersView() } label: {
                             Label("Пользователи", systemImage: "person.badge.key")
                         }
-                        NavigationLink {
-                            AdminMailboxesView()
-                        } label: {
+                        NavigationLink { AdminMailboxesView() } label: {
                             Label("Почтовые ящики", systemImage: "tray.2")
                         }
-                        NavigationLink {
-                            AdminPersonasView()
-                        } label: {
+                        NavigationLink { AdminPersonasView() } label: {
                             Label("Персоны (подписи)", systemImage: "person.text.rectangle")
                         }
-                        NavigationLink {
-                            AdminRulesView()
-                        } label: {
+                        NavigationLink { AdminRulesView() } label: {
                             Label("Правила почты", systemImage: "line.3.horizontal.decrease")
                         }
-                        NavigationLink {
-                            AdminTaskSettingsView()
-                        } label: {
+                    }
+                    Section("Настройки и аналитика") {
+                        NavigationLink { AdminTaskSettingsView() } label: {
                             Label("Настройки задач", systemImage: "gear")
                         }
-                        NavigationLink {
-                            AdminTelegramView()
-                        } label: {
+                        NavigationLink { AdminTelegramView() } label: {
                             Label("Telegram", systemImage: "paperplane.circle")
                         }
-                        NavigationLink {
-                            AdminAuditView()
-                        } label: {
+                        NavigationLink { AdminAuditView() } label: {
                             Label("Журнал", systemImage: "list.bullet.clipboard")
                         }
-                        NavigationLink {
-                            AdminAnalyticsView()
-                        } label: {
+                        NavigationLink { AdminAnalyticsView() } label: {
                             Label("Аналитика", systemImage: "chart.bar")
                         }
                     }
