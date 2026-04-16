@@ -236,6 +236,7 @@ struct MailDetailView: View {
     let message: MailMessage
     var onReply: (() -> Void)?
     @State private var fullMessage: MailMessage?
+    @State private var previewAttachment: MailAttachment?
 
     var body: some View {
         let msg = fullMessage ?? message
@@ -276,7 +277,7 @@ struct MailDetailView: View {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Вложения (\(atts.count))").font(.caption).foregroundStyle(.secondary)
                         ForEach(atts) { att in
-                            Link(destination: URL(string: "https://crm.eg.je/attachments/\(att.id)")!) {
+                            Button { previewAttachment = att } label: {
                                 HStack {
                                     Image(systemName: att.mime.contains("pdf") ? "doc.fill" : att.mime.contains("image") ? "photo" : "paperclip")
                                     Text(att.filename).lineLimit(1)
@@ -289,6 +290,7 @@ struct MailDetailView: View {
                                 .background(Color(.tertiarySystemBackground))
                                 .cornerRadius(6)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                 }
@@ -351,6 +353,9 @@ struct MailDetailView: View {
         }
         .navigationTitle("Письмо")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $previewAttachment) { att in
+            AttachmentPreviewView(attachmentId: att.id, filename: att.filename)
+        }
         .task { await loadFull() }
     }
 

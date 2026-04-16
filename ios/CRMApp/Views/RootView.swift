@@ -75,6 +75,51 @@ struct MoreView: View {
                         } label: {
                             Label("Команда", systemImage: "person.3")
                         }
+                        NavigationLink {
+                            AdminContactsView()
+                        } label: {
+                            Label("Контакты", systemImage: "person.crop.rectangle.stack")
+                        }
+                        NavigationLink {
+                            AdminUsersView()
+                        } label: {
+                            Label("Пользователи", systemImage: "person.badge.key")
+                        }
+                        NavigationLink {
+                            AdminMailboxesView()
+                        } label: {
+                            Label("Почтовые ящики", systemImage: "tray.2")
+                        }
+                        NavigationLink {
+                            AdminPersonasView()
+                        } label: {
+                            Label("Персоны (подписи)", systemImage: "person.text.rectangle")
+                        }
+                        NavigationLink {
+                            AdminRulesView()
+                        } label: {
+                            Label("Правила почты", systemImage: "line.3.horizontal.decrease")
+                        }
+                        NavigationLink {
+                            AdminTaskSettingsView()
+                        } label: {
+                            Label("Настройки задач", systemImage: "gear")
+                        }
+                        NavigationLink {
+                            AdminTelegramView()
+                        } label: {
+                            Label("Telegram", systemImage: "paperplane.circle")
+                        }
+                        NavigationLink {
+                            AdminAuditView()
+                        } label: {
+                            Label("Журнал", systemImage: "list.bullet.clipboard")
+                        }
+                        NavigationLink {
+                            AdminAnalyticsView()
+                        } label: {
+                            Label("Аналитика", systemImage: "chart.bar")
+                        }
                     }
                 }
                 Section("Безопасность") {
