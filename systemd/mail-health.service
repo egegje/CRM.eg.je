@@ -1,0 +1,12 @@
+[Unit]
+Description=CRM mail health watchdog
+After=crm-api.service crm-workers.service
+
+[Service]
+Type=oneshot
+User=ubuntu
+EnvironmentFile=/etc/crm/secrets.env
+WorkingDirectory=/opt/crm.eg.je
+ExecStart=/usr/bin/node /opt/crm.eg.je/scripts/mail-health.mjs
+StandardOutput=append:/var/log/crm-mail-health.log
+StandardError=append:/var/log/crm-mail-health.log
