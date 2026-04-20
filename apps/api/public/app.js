@@ -3827,12 +3827,14 @@ async function loadBriefing() {
 // Escapes first, then wraps <b class="bi-*"> around whole-phrase matches
 // (number + adjective + optional trailing noun).
 function styleBriefing(raw) {
-  let s = esc(raw);
+  // Strip markdown bold/italics the LLM sometimes emits.
+  let s = esc(raw).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1");
 
   // Russian unicode word = letters + dash; standard \w misses Cyrillic in some engines,
-  // so use explicit [А-Яа-яЁё] ranges.
+  // so use explicit [А-Яа-яЁё] ranges. "+" = greedy, matches the full suffix.
   const RU = "[А-Яа-яЁё\\-]+";
-  const months = "(?:янв|фев|мар|апр|ма(?:я|й)|июн|июл|авг|сен|окт|ноя|дек)" + RU + "?";
+  // months: stem + optional full suffix ("апрел" + "я", "марта" etc). Greedy.
+  const months = "(?:январ|феврал|март|апрел|ма(?:й|я)|июн|июл|август|сентябр|октябр|ноябр|декабр|янв|фев|мар|апр|июн|июл|авг|сен|окт|ноя|дек)[А-Яа-яЁё]*";
 
   // overdue: "11 просроченных задач" / "11 просроченных" / "просрочено 3"
   s = s.replace(new RegExp(`(\\b\\d+)\\s+(просроченн${RU})(\\s+задач${RU})?`, "gi"),
