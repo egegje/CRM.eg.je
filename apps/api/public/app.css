@@ -368,9 +368,9 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .home-scroll { max-width: 1280px; margin: 0 auto; padding: 32px 36px 60px; }
 .home-loading, .home-err { padding: 60px 40px; color: var(--text-muted); text-align: center; }
 
-.home-head { margin-bottom: 28px; }
-.home-day { font-size: 11px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 6px; }
-.home-title { font-size: 34px; font-weight: 700; letter-spacing: -0.7px; margin: 0; color: var(--text); line-height: 1.15; }
+.home-head { margin-bottom: 22px; }
+.home-day { font-size: 10.5px; font-weight: 700; letter-spacing: 0.12em; color: var(--text-faint); text-transform: uppercase; margin-bottom: 4px; }
+.home-title { font-size: 22px; font-weight: 600; letter-spacing: -0.4px; margin: 0; color: var(--text); line-height: 1.2; }
 
 .home-ai {
   background: linear-gradient(135deg, rgba(99,102,241,0.07), rgba(139,92,246,0.05));
@@ -471,7 +471,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 }
 @media (max-width: 640px) {
   .home-scroll { padding: 20px 16px 80px; }
-  .home-title { font-size: 26px; }
+  .home-title { font-size: 19px; }
   .home-stats { gap: 8px; }
   .home-stat { padding: 12px 14px; }
   .home-stat-value { font-size: 22px; }
