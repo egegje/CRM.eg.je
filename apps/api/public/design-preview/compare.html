@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<title>CRM Desktop — сравнение версий</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0B0B0E;
+    --panel: #16161A;
+    --border: rgba(255,255,255,0.09);
+    --label: #F0F0F2;
+    --sec: #A1A1AA;
+    --ter: #71717A;
+  }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--label); font-family: 'Inter Tight', -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+  body { padding: 24px; min-height: 100vh; box-sizing: border-box; }
+
+  .head { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 18px; gap: 24px; flex-wrap: wrap; }
+  .head h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .head p { margin: 0; color: var(--sec); font-size: 13.5px; max-width: 680px; }
+
+  .controls { display: flex; gap: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+  .controls button {
+    appearance: none; border: 0; background: transparent; color: var(--sec);
+    font: inherit; font-size: 12.5px; padding: 6px 12px; border-radius: 7px; cursor: pointer;
+  }
+  .controls button.on { background: rgba(255,255,255,0.08); color: var(--label); }
+  .controls button:hover:not(.on) { color: var(--label); }
+
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .card-head {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .title h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+  .title span { color: var(--ter); font-size: 12px; }
+  .open {
+    color: var(--sec); font-size: 12px; padding: 4px 10px;
+    border: 1px solid var(--border); border-radius: 6px;
+    text-decoration: none; white-space: nowrap;
+  }
+  .open:hover { color: var(--label); border-color: rgba(255,255,255,0.22); }
+
+  .frame-wrap {
+    position: relative;
+    background: #000;
+    overflow: hidden;
+    /* height set via JS to match scaled 1440x900 */
+  }
+  .frame-wrap iframe {
+    border: 0;
+    width: 1440px;
+    height: 900px;
+    transform-origin: top left;
+    background: #fff;
+    display: block;
+  }
+
+  .meta { padding: 10px 14px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--sec); border-top: 1px solid var(--border); }
+  .swatches { display: flex; gap: 4px; }
+  .swatches i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(255,255,255,0.08); }
+
+  /* Fallback: if screen gets narrow, drop to single column */
+  @media (max-width: 1200px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1>CRM Desktop — три палитры</h1>
+    <p>Все три — одно и то же приложение в живом iframe. Палитра, типографика и акцент отличаются. Кликни «Открыть ↗», чтобы увидеть версию в полный размер.</p>
+  </div>
+  <div class="controls" id="controls">
+    <button data-section="home">Главная</button>
+    <button data-section="mail" class="on">Почта</button>
+    <button data-section="tasks">Задачи</button>
+    <button data-section="finance">Финансы</button>
+  </div>
+</div>
+
+<div class="grid" id="grid"></div>
+
+<script>
+const V = [
+  {
+    name: 'Original',
+    subtitle: 'Яркий индиго',
+    file: 'CRM Desktop.html',
+    storagePrefix: 'crm-desk',
+    accent: '#6366F1',
+    swatches: ['#6366F1', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6'],
+  },
+  {
+    name: 'Muted',
+    subtitle: 'Приглушённая',
+    file: 'CRM Desktop Muted.html',
+    storagePrefix: 'crm-desk-muted',
+    accent: '#5B5FD6',
+    swatches: ['#5B5FD6', '#4F8C6F', '#B47A3A', '#B4514A', '#7A6BA8'],
+  },
+  {
+    name: 'Calm',
+    subtitle: 'Office-style',
+    file: 'CRM Desktop Calm.html',
+    storagePrefix: 'crm-desk-calm',
+    accent: '#0F6CBD',
+    swatches: ['#0F6CBD', '#107C41', '#C06B0F', '#C5372C', '#6E3CBC'],
+  },
+];
+
+// Pre-seed section in localStorage so each iframe opens on the same tab.
+function seedSection(section) {
+  V.forEach(v => {
+    try { localStorage.setItem(v.storagePrefix + '-section', section); } catch(e) {}
+  });
+}
+
+const grid = document.getElementById('grid');
+V.forEach(v => {
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="card-head">
+      <div class="title">
+        <span class="swatch" style="background:${v.accent}"></span>
+        <h3>${v.name}</h3>
+        <span>${v.subtitle}</span>
+      </div>
+      <a class="open" href="${encodeURI(v.file)}" target="_blank" rel="noopener">Открыть ↗</a>
+    </div>
+    <div class="frame-wrap">
+      <iframe data-file="${v.file}" title="${v.name}" loading="lazy"></iframe>
+    </div>
+    <div class="meta">
+      <span>Акцент <b style="color:var(--label)">${v.accent}</b></span>
+      <span class="swatches">${v.swatches.map(c => `<i style="background:${c}"></i>`).join('')}</span>
+    </div>
+  `;
+  grid.appendChild(card);
+});
+
+// Scale each iframe to fit its column. Target: 1440×900 virtual viewport.
+function rescale() {
+  document.querySelectorAll('.frame-wrap').forEach(w => {
+    const iframe = w.querySelector('iframe');
+    const width = w.getBoundingClientRect().width;
+    const scale = width / 1440;
+    iframe.style.transform = `scale(${scale})`;
+    w.style.height = (900 * scale) + 'px';
+  });
+}
+
+function loadFrames() {
+  document.querySelectorAll('.frame-wrap iframe').forEach(iframe => {
+    const file = iframe.dataset.file;
+    // Cache-bust so the iframe re-reads localStorage section on reload.
+    iframe.src = encodeURI(file) + '?t=' + Date.now();
+  });
+}
+
+// Section switcher
+const controls = document.getElementById('controls');
+let currentSection = 'mail';
+try { currentSection = localStorage.getItem('crm-compare-section') || 'mail'; } catch(e) {}
+controls.querySelectorAll('button').forEach(b => {
+  b.classList.toggle('on', b.dataset.section === currentSection);
+  b.addEventListener('click', () => {
+    const sec = b.dataset.section;
+    if (sec === currentSection) return;
+    currentSection = sec;
+    try { localStorage.setItem('crm-compare-section', sec); } catch(e) {}
+    controls.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.section === sec));
+    seedSection(sec);
+    loadFrames();
+  });
+});
+
+// Initial load
+seedSection(currentSection);
+rescale();
+loadFrames();
+window.addEventListener('resize', rescale);
+</script>
+
+</body>
+</html>

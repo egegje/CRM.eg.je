@@ -20,6 +20,7 @@ import { tgBindingRoutes } from "./routes/tg-bindings.js";
 import { financeRoutes } from "./routes/finance.js";
 import { sberRoutes } from "./routes/sber.js";
 import { trackingRoutes } from "./routes/tracking.js";
+import { homeRoutes } from "./routes/home.js";
 
 export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnType<typeof loadConfig> }> {
   const cfg = loadConfig();
@@ -74,6 +75,7 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
   await app.register(financeRoutes);
   await app.register(sberRoutes);
   await app.register(trackingRoutes);
+  await app.register(homeRoutes);
 
   return { app, cfg };
 }

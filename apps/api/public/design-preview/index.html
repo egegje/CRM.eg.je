@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1280">
+<title>CRM Design Preview</title>
+<style>
+body { margin: 0; padding: 2rem; background: #18181b; color: #e4e4e7; font-family: -apple-system, system-ui, sans-serif; line-height: 1.5; }
+h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+p { color: #a1a1aa; max-width: 60ch; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; margin-top: 2rem; max-width: 1100px; }
+.card { background: #27272a; border: 1px solid #3f3f46; border-radius: 12px; padding: 1.25rem; text-decoration: none; color: inherit; transition: border-color .15s, transform .15s; }
+.card:hover { border-color: #2563eb; transform: translateY(-2px); }
+.card h2 { margin: 0 0 .35rem; font-size: 1rem; }
+.card p { margin: 0; font-size: .85rem; }
+.tag { display: inline-block; font-size: .65rem; padding: .1rem .4rem; border-radius: 3px; background: #3f3f46; color: #e4e4e7; margin-right: .3rem; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+.tag.blue { background: #2563eb; color: white; }
+</style>
+</head>
+<body>
+<h1>CRM — варианты нового дизайна</h1>
+<p>Три варианта одной системы. Тыкни в любой, покрути, посмотри в темной/светлой теме.</p>
+<div class="grid">
+  <a class="card" href="compare.html">
+    <span class="tag blue">Сравнение</span>
+    <h2>Все три рядом</h2>
+    <p>Original / Muted / Calm — в одном окне, для быстрого выбора.</p>
+  </a>
+  <a class="card" href="desktop-original.html">
+    <span class="tag">Original</span>
+    <h2>Яркий индиго</h2>
+    <p>Основной вариант: акцент #2563EB, контраст, активные эмодзи.</p>
+  </a>
+  <a class="card" href="desktop-muted.html">
+    <span class="tag">Muted</span>
+    <h2>Приглушённый</h2>
+    <p>Минималистичная палитра, меньше цвета, больше тишины.</p>
+  </a>
+  <a class="card" href="desktop-calm.html">
+    <span class="tag">Calm</span>
+    <h2>Office-style</h2>
+    <p>Синий Microsoft #0F6CBD, тёплые серые, выверенная типографика.</p>
+  </a>
+  <a class="card" href="ios.html">
+    <span class="tag">iOS</span>
+    <h2>Мобилка</h2>
+    <p>Экраны для SwiftUI (Dashboard / Mail / Tasks / Finance / Profile).</p>
+  </a>
+</div>
+</body>
+</html>

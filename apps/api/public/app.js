@@ -164,7 +164,10 @@ async function bootApp() {
   setTimeout(restoreSidebarItemOrder, 100);
   initSubnavDrag();
   setTimeout(initSidebarDrag, 500);
-  await refreshList();
+  // Refresh mail list in background so it's ready when user clicks Mail,
+  // but land on the Home dashboard by default.
+  refreshList().catch(() => {});
+  switchSection("home");
 }
 
 async function loadQuickLinks() {
@@ -1472,7 +1475,9 @@ function switchSection(section) {
   document.querySelectorAll(".icon-bar .ib-item").forEach((el) => {
     el.classList.toggle("active", el.dataset.section === section);
   });
-  if (section === "mail") {
+  if (section === "home") {
+    showHomeView();
+  } else if (section === "mail") {
     exitTasksView();
   } else if (section === "tasks") {
     const saved = tasksFilter || localStorage.getItem("crm-tasks-filter") || "me";
@@ -2100,7 +2105,7 @@ function exitTasksView() {
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("admin-view")?.classList.add("hidden");
-  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
   document.querySelector(".sidebar").classList.remove("hidden");
   document.querySelector(".list-pane").classList.remove("hidden");
   document.querySelector(".preview-pane").classList.remove("hidden");
@@ -3468,3 +3473,248 @@ bootApp().catch(() => showLogin());
     addScrollBtn(document.getElementById('main-sidebar'));
   }, 1500);
 })();
+
+/* ────────────────────── Home dashboard ────────────────────── */
+let _homeCache = null;
+
+async function showHomeView() {
+  document.querySelector(".sidebar").classList.add("hidden");
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("home-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
+  await renderHome();
+}
+
+function fmtMoney(n) {
+  return (Math.round(n)).toLocaleString("ru-RU") + " ₽";
+}
+function fmtDate(d) {
+  if (!d) return "";
+  const dt = new Date(d);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const that = new Date(dt); that.setHours(0,0,0,0);
+  const diff = (that - today) / 86400000;
+  if (diff === 0) return "сегодня";
+  if (diff === 1) return "завтра";
+  if (diff === -1) return "вчера";
+  return dt.toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+function fmtTime(d) {
+  if (!d) return "";
+  return new Date(d).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+}
+function fmtGreeting() {
+  const h = new Date().getHours();
+  if (h >= 5 && h < 12) return "Доброе утро";
+  if (h >= 12 && h < 18) return "Добрый день";
+  if (h >= 18 && h < 23) return "Добрый вечер";
+  return "Доброй ночи";
+}
+function esc(s) { return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+async function renderHome() {
+  const root = document.getElementById("home-view");
+  root.innerHTML = `<div class="home-loading">Загрузка…</div>`;
+  try {
+    const data = await api("/home/summary");
+    _homeCache = data;
+    root.innerHTML = buildHomeHtml(data);
+    attachHomeHandlers();
+    loadBriefing();
+  } catch (e) {
+    root.innerHTML = `<div class="home-err">Не получилось загрузить: ${esc(e.message || "ошибка")}</div>`;
+  }
+}
+
+function buildHomeHtml(d) {
+  const name = (state.user?.email?.split("@")[0] || "").replace(/\..*/, "");
+  const greeting = fmtGreeting() + (name ? ", " + name.charAt(0).toUpperCase() + name.slice(1) : "");
+  const today = new Date();
+  const dayName = today.toLocaleDateString("ru-RU", { weekday: "long", day: "numeric", month: "long" });
+
+  const counters = d.counters || {};
+  const stats = [
+    { key: "unread", label: "Непрочитано", value: counters.unread ?? 0, sub: counters.unread ? "новых писем" : "всё прочитано", icon: svgMail(), onclick: "switchSection('mail')" },
+    { key: "open", label: "Открытых задач", value: counters.openTasks ?? 0, sub: counters.overdueTasks ? `${counters.overdueTasks} просрочено` : "без просрочек", icon: svgCheck(), onclick: "switchSection('tasks')", warn: counters.overdueTasks > 0 },
+    { key: "balance", label: "Баланс", value: fmtMoney(counters.balance || 0), sub: "на всех счетах", icon: svgWallet(), onclick: "switchSection('finance')" },
+    { key: "objects", label: "Компаний", value: counters.objects ?? 0, sub: "в работе", icon: svgBuilding(), onclick: "switchSection('admin')" },
+  ];
+
+  const urgentBlock = buildUrgentBlock(d.urgentTasks || []);
+  const unreadBlock = buildUnreadBlock(d.unreadMessages || []);
+  const paymentsBlock = buildPaymentsBlock(d.recentPayments || []);
+  const calendarBlock = buildCalendarBlock(d.week || {}, d.weekStart);
+
+  return `
+  <div class="home-scroll">
+    <div class="home-head">
+      <div class="home-day">${esc(dayName.toUpperCase())}</div>
+      <h1 class="home-title">${esc(greeting)}.</h1>
+    </div>
+
+    <div class="home-ai" id="home-ai">
+      <div class="home-ai-label">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/></svg>
+        AI-брифинг дня
+      </div>
+      <div class="home-ai-text" id="home-ai-text">Готовлю сводку…</div>
+      <div class="home-ai-actions">
+        ${counters.overdueTasks > 0 ? `<button class="home-chip" data-jump="overdue">→ К просроченным</button>` : ""}
+        ${counters.unread > 0 ? `<button class="home-chip" data-jump="unread">→ Открыть непрочитанные</button>` : ""}
+      </div>
+    </div>
+
+    <div class="home-stats">
+      ${stats.map((s) => `
+        <div class="home-stat ${s.warn ? "warn" : ""}" onclick="${s.onclick}">
+          <div class="home-stat-head">
+            <span class="home-stat-icon">${s.icon}</span>
+            <span class="home-stat-label">${esc(s.label)}</span>
+          </div>
+          <div class="home-stat-value">${typeof s.value === "number" ? s.value.toLocaleString("ru-RU") : esc(s.value)}</div>
+          <div class="home-stat-sub">${esc(s.sub)}</div>
+        </div>
+      `).join("")}
+    </div>
+
+    <div class="home-grid-3">
+      ${urgentBlock}
+      ${unreadBlock}
+      ${paymentsBlock}
+    </div>
+
+    ${calendarBlock}
+  </div>`;
+}
+
+function buildUrgentBlock(tasks) {
+  if (!tasks.length) return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>Срочно</h3></div>
+      <div class="home-empty">Ничего срочного. Можно выдохнуть.</div>
+    </div>`;
+  return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>🔥 Срочно</h3><a class="home-block-all" onclick="switchSection('tasks')">Все →</a></div>
+      <ul class="home-list">
+        ${tasks.slice(0, 5).map((t) => `
+          <li class="home-row" onclick="switchSection('tasks')">
+            <span class="home-row-dot ${t.overdue ? "overdue" : (t.priority === "urgent" ? "urgent" : "high")}"></span>
+            <div class="home-row-main">
+              <div class="home-row-title">${esc(t.title)}</div>
+              <div class="home-row-sub">${t.project ? esc(t.project.name) : "Без проекта"}</div>
+            </div>
+            <div class="home-row-date ${t.overdue ? "overdue" : ""}">${t.dueDate ? fmtDate(t.dueDate) : "—"}</div>
+          </li>
+        `).join("")}
+      </ul>
+    </div>`;
+}
+
+function buildUnreadBlock(msgs) {
+  if (!msgs.length) return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>Непрочитанные</h3></div>
+      <div class="home-empty">Всё прочитано 🎉</div>
+    </div>`;
+  return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>✉ Непрочитанные</h3><a class="home-block-all" onclick="switchSection('mail')">Все →</a></div>
+      <ul class="home-list">
+        ${msgs.map((m) => `
+          <li class="home-row" onclick="switchSection('mail')">
+            <span class="home-row-dot unread"></span>
+            <div class="home-row-main">
+              <div class="home-row-title">${esc(m.subject || "(без темы)")}</div>
+              <div class="home-row-sub">${esc(m.fromAddr || "")}</div>
+            </div>
+            <div class="home-row-date">${fmtTime(m.receivedAt)}</div>
+          </li>
+        `).join("")}
+      </ul>
+    </div>`;
+}
+
+function buildPaymentsBlock(payments) {
+  if (!payments.length) return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>Последние платежи</h3></div>
+      <div class="home-empty">Поступлений пока нет.</div>
+    </div>`;
+  return `
+    <div class="home-block">
+      <div class="home-block-head"><h3>💳 Последние платежи</h3><a class="home-block-all" onclick="switchSection('finance')">Все →</a></div>
+      <ul class="home-list">
+        ${payments.map((p) => `
+          <li class="home-row" onclick="switchSection('finance')">
+            <span class="home-row-dot credit">↑</span>
+            <div class="home-row-main">
+              <div class="home-row-title">${esc(p.counterparty || "—")}</div>
+              <div class="home-row-sub">${esc((p.purpose || "").slice(0, 80))}</div>
+            </div>
+            <div class="home-row-amount credit">+${fmtMoney(p.amount)}</div>
+          </li>
+        `).join("")}
+      </ul>
+    </div>`;
+}
+
+function buildCalendarBlock(week, weekStart) {
+  const days = ["ПН","ВТ","СР","ЧТ","ПТ","СБ","ВС"];
+  const startDate = weekStart ? new Date(weekStart + "T00:00:00") : new Date();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const cells = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startDate); d.setDate(startDate.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const tasks = (week[key] || []).slice(0, 3);
+    const isToday = d.getTime() === today.getTime();
+    cells.push(`
+      <div class="home-cal-day ${isToday ? "today" : ""}">
+        <div class="home-cal-date"><span class="home-cal-dow">${days[i]}</span> <span class="home-cal-n">${d.getDate()}</span></div>
+        <div class="home-cal-tasks">
+          ${tasks.map((t) => `<div class="home-cal-task prio-${t.priority}">${esc(t.title)}</div>`).join("")}
+          ${(week[key]?.length || 0) > 3 ? `<div class="home-cal-more">+${week[key].length - 3}</div>` : ""}
+        </div>
+      </div>`);
+  }
+  return `
+    <div class="home-block home-block-wide">
+      <div class="home-block-head"><h3>📅 Календарь недели</h3></div>
+      <div class="home-calendar">${cells.join("")}</div>
+    </div>`;
+}
+
+function attachHomeHandlers() {
+  document.querySelectorAll("#home-view [data-jump]").forEach((el) => {
+    el.onclick = () => {
+      const j = el.dataset.jump;
+      if (j === "overdue") switchSection("tasks");
+      else if (j === "unread") switchSection("mail");
+    };
+  });
+}
+
+async function loadBriefing() {
+  const target = document.getElementById("home-ai-text");
+  if (!target) return;
+  try {
+    const r = await api("/home/briefing");
+    target.textContent = r.text || "Нет данных для брифинга.";
+  } catch (e) {
+    target.innerHTML = `<span style="color:var(--text-faint)">AI-брифинг недоступен (${esc(e.message || "ошибка")}). Всё остальное работает.</span>`;
+  }
+}
+
+/* tiny icon helpers for stat cards */
+function svgMail() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>`; }
+function svgCheck() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="m9 12 2 2 4-4"/></svg>`; }
+function svgWallet() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>`; }
+function svgBuilding() { return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>`; }
