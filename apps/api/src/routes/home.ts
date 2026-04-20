@@ -83,6 +83,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
         select: {
           id: true, operationDate: true, amount: true,
           counterpartyName: true, paymentPurpose: true,
+          accountNumber: true,
         },
       }),
       prisma.task.findMany({
@@ -139,6 +140,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
         amount: Number(p.amount),
         counterparty: p.counterpartyName,
         purpose: p.paymentPurpose,
+        accountNumber: p.accountNumber,
       })),
       week,
       weekStart: weekStart.toISOString().slice(0, 10),

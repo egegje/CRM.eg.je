@@ -1687,7 +1687,7 @@ async function loadLocalStatement(accountNumber) {
           const isDebit = t.direction === "DEBIT";
           const amt = parseFloat(t.amount) || 0;
           const dt = (t.operationDate || "").slice(0, 10);
-          return `<tr style="border-bottom:1px solid var(--border)">
+          return `<tr data-tx-id="${t.id}" style="border-bottom:1px solid var(--border)">
             <td style="padding:6px;white-space:nowrap">${dt}</td>
             <td style="padding:6px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(t.counterpartyName || "")}">${escapeHtml(t.counterpartyName || "—")}</td>
             <td style="padding:6px;color:var(--text-muted);max-width:350px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(t.paymentPurpose || "")}">${escapeHtml((t.paymentPurpose || "").slice(0, 120))}</td>
@@ -3659,7 +3659,7 @@ function buildPaymentsBlock(payments) {
       <div class="home-block-head"><h3>💳 Последние платежи</h3><a class="home-block-all" onclick="switchSection('finance')">Все →</a></div>
       <ul class="home-list">
         ${payments.map((p) => `
-          <li class="home-row" onclick="switchSection('finance')">
+          <li class="home-row" onclick="homeOpenPayment('${p.accountNumber || ""}','${p.id}')">
             <span class="home-row-dot credit">↑</span>
             <div class="home-row-main">
               <div class="home-row-title">${esc(p.counterparty || "—")}</div>
@@ -3727,6 +3727,28 @@ function homeGoTasks(filter) {
     // TasksView accepts filter in URL/localStorage; just open "me" and let overdue
     // appear at top via existing sort order.
   }
+}
+async function homeOpenPayment(accountNumber, txId) {
+  switchSection("finance");
+  // Wait for finance view + Sber accounts to render, then open the statement
+  // for the right account and scroll to the transaction.
+  if (!accountNumber || !txId) return;
+  await new Promise((r) => setTimeout(r, 150));
+  if (typeof openStatement === "function") {
+    await openStatement(accountNumber);
+    setTimeout(() => highlightTx(txId), 120);
+  }
+}
+function highlightTx(id) {
+  const row = document.querySelector(`tr[data-tx-id="${CSS.escape(id)}"]`);
+  if (!row) return;
+  row.scrollIntoView({ behavior: "smooth", block: "center" });
+  const prev = row.style.transition;
+  row.style.transition = "background .2s";
+  const prevBg = row.style.backgroundColor;
+  row.style.backgroundColor = "var(--accent-soft)";
+  setTimeout(() => { row.style.backgroundColor = prevBg; }, 1600);
+  setTimeout(() => { row.style.transition = prev; }, 2200);
 }
 
 async function loadBriefing() {
