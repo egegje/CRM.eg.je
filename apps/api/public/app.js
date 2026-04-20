@@ -3608,10 +3608,10 @@ function buildUrgentBlock(tasks) {
     </div>`;
   return `
     <div class="home-block">
-      <div class="home-block-head"><h3>🔥 Срочно</h3><a class="home-block-all" onclick="switchSection('tasks')">Все →</a></div>
+      <div class="home-block-head"><h3>🔥 Срочно</h3><a class="home-block-all" onclick="homeGoTasks()">Все →</a></div>
       <ul class="home-list">
         ${tasks.slice(0, 5).map((t) => `
-          <li class="home-row" onclick="switchSection('tasks')">
+          <li class="home-row" onclick="homeOpenTask('${t.id}')">
             <span class="home-row-dot ${t.overdue ? "overdue" : (t.priority === "urgent" ? "urgent" : "high")}"></span>
             <div class="home-row-main">
               <div class="home-row-title">${esc(t.title)}</div>
@@ -3635,7 +3635,7 @@ function buildUnreadBlock(msgs) {
       <div class="home-block-head"><h3>✉ Непрочитанные</h3><a class="home-block-all" onclick="switchSection('mail')">Все →</a></div>
       <ul class="home-list">
         ${msgs.map((m) => `
-          <li class="home-row" onclick="switchSection('mail')">
+          <li class="home-row" onclick="homeOpenMessage('${m.id}')">
             <span class="home-row-dot unread"></span>
             <div class="home-row-main">
               <div class="home-row-title">${esc(m.subject || "(без темы)")}</div>
@@ -3686,7 +3686,7 @@ function buildCalendarBlock(week, weekStart) {
       <div class="home-cal-day ${isToday ? "today" : ""}">
         <div class="home-cal-date"><span class="home-cal-dow">${days[i]}</span> <span class="home-cal-n">${d.getDate()}</span></div>
         <div class="home-cal-tasks">
-          ${tasks.map((t) => `<div class="home-cal-task prio-${t.priority}">${esc(t.title)}</div>`).join("")}
+          ${tasks.map((t) => `<div class="home-cal-task prio-${t.priority}" onclick="event.stopPropagation();homeOpenTask('${t.id}')" title="${esc(t.title)}">${esc(t.title)}</div>`).join("")}
           ${(week[key]?.length || 0) > 3 ? `<div class="home-cal-more">+${week[key].length - 3}</div>` : ""}
         </div>
       </div>`);
@@ -3702,10 +3702,31 @@ function attachHomeHandlers() {
   document.querySelectorAll("#home-view [data-jump]").forEach((el) => {
     el.onclick = () => {
       const j = el.dataset.jump;
-      if (j === "overdue") switchSection("tasks");
+      if (j === "overdue") homeGoTasks("overdue");
       else if (j === "unread") switchSection("mail");
     };
   });
+}
+
+// Home row click-through: switch to section and open specific item.
+function homeOpenTask(id) {
+  switchSection("tasks");
+  setTimeout(() => {
+    if (typeof openTaskForm === "function") openTaskForm(id);
+  }, 50);
+}
+function homeOpenMessage(id) {
+  switchSection("mail");
+  setTimeout(() => {
+    if (typeof selectMessage === "function") selectMessage(id);
+  }, 80);
+}
+function homeGoTasks(filter) {
+  switchSection("tasks");
+  if (filter === "overdue") {
+    // TasksView accepts filter in URL/localStorage; just open "me" and let overdue
+    // appear at top via existing sort order.
+  }
 }
 
 async function loadBriefing() {
