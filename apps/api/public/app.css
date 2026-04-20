@@ -477,3 +477,13 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   .home-stat-value { font-size: 22px; }
   .home-calendar { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Briefing highlights */
+.home-ai-text .bi-danger { color: var(--danger); font-weight: 700; }
+.home-ai-text .bi-warning { color: var(--warning); font-weight: 700; }
+.home-ai-text .bi-accent { color: var(--accent); font-weight: 700; }
+.home-ai-text .bi-ok { color: var(--success); font-weight: 700; }
+.home-ai-text .bi-muted { color: var(--text-muted); font-weight: 600; }
+.home-ai-text .bi-date { color: var(--text); font-weight: 700; background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; }
+.home-ai-text .bi-money { color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums; }
+.home-ai-text .bi-pct { color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums; }

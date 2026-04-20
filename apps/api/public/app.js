@@ -3817,10 +3817,37 @@ async function loadBriefing() {
   if (!target) return;
   try {
     const r = await api("/home/briefing");
-    target.textContent = r.text || "Нет данных для брифинга.";
+    target.innerHTML = styleBriefing(r.text || "Нет данных для брифинга.");
   } catch (e) {
     target.innerHTML = `<span style="color:var(--text-faint)">Брифинг недоступен (${esc(e.message || "ошибка")}). Всё остальное работает.</span>`;
   }
+}
+
+// Highlight key phrases (numbers, dates, priorities, statuses) in briefing text.
+// Escapes first, then wraps with <b class="bi-*"> around matched patterns.
+function styleBriefing(raw) {
+  let s = esc(raw);
+  // overdue: "11 просроченных", "просрочено 3" — red
+  s = s.replace(/(\b\d+)\s+(просроченн\w*)/gi, '<b class="bi-danger">$1 $2</b>');
+  s = s.replace(/(просрочено)\s+(\d+)/gi, '<b class="bi-danger">$1 $2</b>');
+  // unread: "2 непрочитанных" — accent blue/indigo
+  s = s.replace(/(\b\d+)\s+(непрочитанн\w*|непрочит\w*)/gi, '<b class="bi-accent">$1 $2</b>');
+  // open tasks: "13 открытых задач" — accent
+  s = s.replace(/(\b\d+)\s+(открыт\w*\s+задач\w*)/gi, '<b class="bi-accent">$1 $2</b>');
+  // high priority / urgent — orange
+  s = s.replace(/(\b(?:высок\w*\s+приоритет\w*|срочн\w+|важно))/gi, '<b class="bi-warning">$1</b>');
+  // low priority — muted
+  s = s.replace(/(\b(?:низк\w*\s+приоритет\w*))/gi, '<b class="bi-muted">$1</b>');
+  // dates like "к 21 апреля", "21 апреля", "до 23 марта"
+  const months = "(?:янв\\w*|фев\\w*|мар\\w*|апр\\w*|ма(?:я|й)|июн\\w*|июл\\w*|авг\\w*|сен\\w*|окт\\w*|ноя\\w*|дек\\w*)";
+  s = s.replace(new RegExp(`(\\b(?:к|до|от|на)\\s+)?(\\d{1,2}\\s+${months})`, "gi"), (m, prep, date) => `${prep || ""}<b class="bi-date">${date}</b>`);
+  // money in rubles
+  s = s.replace(/([+\-]?\s?\d[\d\s.,]*\s?₽)/g, '<b class="bi-money">$1</b>');
+  // percentages
+  s = s.replace(/([+\-]?\d+(?:[.,]\d+)?\s?%)/g, '<b class="bi-pct">$1</b>');
+  // done: "выполнено N", "готово"
+  s = s.replace(/(\b\d+)\s+(выполнен\w*|готов\w*|закрыт\w*)/gi, '<b class="bi-ok">$1 $2</b>');
+  return s;
 }
 
 /* tiny icon helpers for stat cards */
