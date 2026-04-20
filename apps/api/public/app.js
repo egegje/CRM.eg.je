@@ -1504,6 +1504,7 @@ async function showAdminView() {
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("admin-view").classList.remove("hidden");
@@ -1516,6 +1517,9 @@ async function showFinanceView() {
   document.querySelector(".list-pane").classList.add("hidden");
   document.querySelector(".preview-pane").classList.add("hidden");
   document.getElementById("tasks-view").classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("finance-view").classList.remove("hidden");
@@ -1831,6 +1835,7 @@ async function showTasksView(filter) {
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
@@ -2090,6 +2095,7 @@ async function showKanbanView() {
   document.getElementById("finance-view").classList.add("hidden");
   document.getElementById("team-view")?.classList.add("hidden");
   document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
   document.getElementById("resizer-1").style.display = "none";
   document.getElementById("resizer-2").style.display = "none";
   document.getElementById("tasks-view").classList.remove("hidden");
