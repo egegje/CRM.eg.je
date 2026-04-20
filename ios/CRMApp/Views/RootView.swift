@@ -21,35 +21,42 @@ struct MainTabs: View {
 
     var body: some View {
         TabView(selection: $tab) {
-            TaskListView()
+            DashboardView(onNavigate: { tab = $0 })
                 .tag(0)
                 .tabItem {
-                    Image(systemName: tab == 0 ? "checkmark.circle.fill" : "checkmark.circle")
+                    Image(systemName: tab == 0 ? "house.fill" : "house")
+                    Text("Главная")
+                }
+
+            TaskListView()
+                .tag(1)
+                .tabItem {
+                    Image(systemName: tab == 1 ? "checkmark.circle.fill" : "checkmark.circle")
                     Text("Задачи")
                 }
 
             MailListView()
-                .tag(1)
+                .tag(2)
                 .tabItem {
-                    Image(systemName: tab == 1 ? "paperplane.fill" : "paperplane")
+                    Image(systemName: tab == 2 ? "paperplane.fill" : "paperplane")
                     Text("Почта")
                 }
 
             FinanceView()
-                .tag(2)
+                .tag(3)
                 .tabItem {
-                    Image(systemName: tab == 2 ? "dollarsign.circle.fill" : "dollarsign.circle")
+                    Image(systemName: tab == 3 ? "dollarsign.circle.fill" : "dollarsign.circle")
                     Text("Финансы")
                 }
 
             MoreView()
-                .tag(3)
+                .tag(4)
                 .tabItem {
                     Image(systemName: "ellipsis")
                     Text("Ещё")
                 }
         }
-        .tint(.accentColor)
+        .tint(Color(hex: "#6366F1"))
     }
 }
 
