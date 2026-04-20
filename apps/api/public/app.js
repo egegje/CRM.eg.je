@@ -3824,29 +3824,48 @@ async function loadBriefing() {
 }
 
 // Highlight key phrases (numbers, dates, priorities, statuses) in briefing text.
-// Escapes first, then wraps with <b class="bi-*"> around matched patterns.
+// Escapes first, then wraps <b class="bi-*"> around whole-phrase matches
+// (number + adjective + optional trailing noun).
 function styleBriefing(raw) {
   let s = esc(raw);
-  // overdue: "11 просроченных", "просрочено 3" — red
-  s = s.replace(/(\b\d+)\s+(просроченн\w*)/gi, '<b class="bi-danger">$1 $2</b>');
-  s = s.replace(/(просрочено)\s+(\d+)/gi, '<b class="bi-danger">$1 $2</b>');
-  // unread: "2 непрочитанных" — accent blue/indigo
-  s = s.replace(/(\b\d+)\s+(непрочитанн\w*|непрочит\w*)/gi, '<b class="bi-accent">$1 $2</b>');
-  // open tasks: "13 открытых задач" — accent
-  s = s.replace(/(\b\d+)\s+(открыт\w*\s+задач\w*)/gi, '<b class="bi-accent">$1 $2</b>');
-  // high priority / urgent — orange
-  s = s.replace(/(\b(?:высок\w*\s+приоритет\w*|срочн\w+|важно))/gi, '<b class="bi-warning">$1</b>');
-  // low priority — muted
-  s = s.replace(/(\b(?:низк\w*\s+приоритет\w*))/gi, '<b class="bi-muted">$1</b>');
-  // dates like "к 21 апреля", "21 апреля", "до 23 марта"
-  const months = "(?:янв\\w*|фев\\w*|мар\\w*|апр\\w*|ма(?:я|й)|июн\\w*|июл\\w*|авг\\w*|сен\\w*|окт\\w*|ноя\\w*|дек\\w*)";
-  s = s.replace(new RegExp(`(\\b(?:к|до|от|на)\\s+)?(\\d{1,2}\\s+${months})`, "gi"), (m, prep, date) => `${prep || ""}<b class="bi-date">${date}</b>`);
-  // money in rubles
+
+  // Russian unicode word = letters + dash; standard \w misses Cyrillic in some engines,
+  // so use explicit [А-Яа-яЁё] ranges.
+  const RU = "[А-Яа-яЁё\\-]+";
+  const months = "(?:янв|фев|мар|апр|ма(?:я|й)|июн|июл|авг|сен|окт|ноя|дек)" + RU + "?";
+
+  // overdue: "11 просроченных задач" / "11 просроченных" / "просрочено 3"
+  s = s.replace(new RegExp(`(\\b\\d+)\\s+(просроченн${RU})(\\s+задач${RU})?`, "gi"),
+    (m, n, a, tail) => `<b class="bi-danger">${n} ${a}${tail || ""}</b>`);
+  s = s.replace(new RegExp(`(просрочено)\\s+(\\d+)(\\s+задач${RU})?`, "gi"),
+    (m, a, n, tail) => `<b class="bi-danger">${a} ${n}${tail || ""}</b>`);
+
+  // unread: "2 непрочитанных сообщения" / "2 непрочитанных"
+  s = s.replace(new RegExp(`(\\b\\d+)\\s+(непрочитанн${RU}|непрочит${RU})(\\s+(?:сообщени${RU}|письм${RU}))?`, "gi"),
+    (m, n, a, tail) => `<b class="bi-accent">${n} ${a}${tail || ""}</b>`);
+
+  // open tasks: "13 открытых задач"
+  s = s.replace(new RegExp(`(\\b\\d+)\\s+(открыт${RU})(\\s+задач${RU})?`, "gi"),
+    (m, n, a, tail) => `<b class="bi-accent">${n} ${a}${tail || ""}</b>`);
+
+  // done: "3 выполнено", "закрыта", "27 закрытых задач"
+  s = s.replace(new RegExp(`(\\b\\d+)\\s+(выполнен${RU}|готов${RU}|закрыт${RU})(\\s+задач${RU})?`, "gi"),
+    (m, n, a, tail) => `<b class="bi-ok">${n} ${a}${tail || ""}</b>`);
+
+  // priority: "высокий приоритет", "это высокий приоритет", "низкий приоритет"
+  s = s.replace(new RegExp(`(высок${RU}\\s+приоритет${RU})`, "gi"), '<b class="bi-warning">$1</b>');
+  s = s.replace(new RegExp(`(низк${RU}\\s+приоритет${RU})`, "gi"), '<b class="bi-muted">$1</b>');
+  s = s.replace(/(\b(?:срочн\w+|важно|критическ\w+|критичная?\s+\w*))/gi, '<b class="bi-warning">$1</b>');
+
+  // dates: "к 21 апреля", "до 23 марта", "27 апреля", "23-му"
+  s = s.replace(new RegExp(`(\\b(?:к|до|от|на)\\s+)?(\\d{1,2}\\s+${months})`, "gi"),
+    (m, prep, date) => `${prep || ""}<b class="bi-date">${date}</b>`);
+  s = s.replace(/(\bк\s+)(\d{1,2}-(?:му|му-го|е|го))/gi, '$1<b class="bi-date">$2</b>');
+
+  // money / percent
   s = s.replace(/([+\-]?\s?\d[\d\s.,]*\s?₽)/g, '<b class="bi-money">$1</b>');
-  // percentages
   s = s.replace(/([+\-]?\d+(?:[.,]\d+)?\s?%)/g, '<b class="bi-pct">$1</b>');
-  // done: "выполнено N", "готово"
-  s = s.replace(/(\b\d+)\s+(выполнен\w*|готов\w*|закрыт\w*)/gi, '<b class="bi-ok">$1 $2</b>');
+
   return s;
 }
 
