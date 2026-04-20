@@ -402,6 +402,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       where: { id },
       data: {
         isDraft: false,
+        isRead: true,
         sentAt: new Date(),
         folderId: sent.id,
         messageId: result.messageId,
@@ -410,5 +411,38 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     });
     await audit(req, "message.send", { messageId: id, to: m.toAddrs, subject: m.subject });
     return { sent: true };
+  });
+
+  // Cancel a pending scheduled-send (used by the "Undo send" toast).
+  app.delete("/scheduled-sends/:id", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const sched = await prisma.scheduledSend.findUnique({ where: { id } });
+    if (!sched) throw new NotFound();
+    if (sched.userId !== req.user!.id) throw new BadRequest("не твоя отправка");
+    if (sched.status !== "pending") return { cancelled: false, reason: "already " + sched.status };
+
+    // Try to remove the BullMQ job so it doesn't fire.
+    if (sched.jobId) {
+      try {
+        const job = await sendQueue.getJob(sched.jobId);
+        if (job) await job.remove();
+      } catch { /* job may already be gone */ }
+    }
+
+    await prisma.scheduledSend.update({
+      where: { id },
+      data: { status: "cancelled" },
+    });
+    // Keep the message as a draft so the user can edit and resend.
+    const payload = sched.payload as { messageId?: string };
+    if (payload?.messageId) {
+      const drafts = await getOrCreateFolder(sched.mailboxId, "drafts", "Drafts");
+      await prisma.message.update({
+        where: { id: payload.messageId },
+        data: { isDraft: true, folderId: drafts.id, sentAt: null },
+      }).catch(() => null);
+    }
+    await audit(req, "message.scheduled.cancel", { scheduledId: id });
+    return { cancelled: true };
   });
 }

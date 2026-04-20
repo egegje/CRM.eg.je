@@ -35,6 +35,7 @@ export function startScheduledSendWorker() {
           where: { id: m.id },
           data: {
             isDraft: false,
+            isRead: true,
             sentAt: new Date(),
             folderId: sent.id,
             messageId: r.messageId,

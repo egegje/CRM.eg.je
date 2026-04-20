@@ -419,6 +419,45 @@ function showToast(text, onUndo) {
   setTimeout(() => t.remove(), 6000);
 }
 
+// Countdown toast: "Отправлено. Отменить (20)" — cancels scheduled send on click.
+function showUndoSendToast(scheduledId, seconds) {
+  let left = seconds;
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.innerHTML = `<span>Сообщение отправится через <b id="undo-sec">${left}</b> c</span><button>отменить</button>`;
+  const secEl = t.querySelector("#undo-sec");
+  const btn = t.querySelector("button");
+  let done = false;
+  const timer = setInterval(() => {
+    if (done) return;
+    left--;
+    if (secEl) secEl.textContent = left;
+    if (left <= 0) {
+      clearInterval(timer);
+      done = true;
+      t.remove();
+    }
+  }, 1000);
+  btn.onclick = async () => {
+    done = true; clearInterval(timer);
+    try {
+      const r = await api("/scheduled-sends/" + scheduledId, { method: "DELETE" });
+      if (r.cancelled) {
+        t.innerHTML = '<span>Отправка отменена — письмо сохранено как черновик</span>';
+        setTimeout(() => t.remove(), 3000);
+        refreshList();
+      } else {
+        t.innerHTML = '<span>Уже отправлено, отменить нельзя</span>';
+        setTimeout(() => t.remove(), 3000);
+      }
+    } catch (e) {
+      t.innerHTML = '<span style="color:var(--danger)">Ошибка отмены: ' + escapeHtml(e.message) + '</span>';
+      setTimeout(() => t.remove(), 3000);
+    }
+  };
+  document.body.appendChild(t);
+}
+
 function dateGroup(d) {
   if (!d) return "Раньше";
   const now = new Date();
@@ -458,7 +497,9 @@ function renderList() {
   el.innerHTML = "";
   let lastGroup = null;
   for (const m of state.messages) {
-    const g = dateGroup(m.receivedAt);
+    const isSentFolder = state.currentFolder === "__sent" || (state._globalSearch && m.folder?.kind === "sent");
+    const itemDate = isSentFolder ? (m.sentAt || m.receivedAt) : m.receivedAt;
+    const g = dateGroup(itemDate);
     if (g !== lastGroup) {
       const h = document.createElement("div");
       h.className = "list-group";
@@ -466,14 +507,13 @@ function renderList() {
       el.appendChild(h);
       lastGroup = g;
     }
-    const isSentFolder = state.currentFolder === "__sent" || (state._globalSearch && m.folder?.kind === "sent");
     const displayName = isSentFolder
       ? "Кому: " + ((m.toAddrs && m.toAddrs.length) ? m.toAddrs[0] : "")
       : (m.fromName || m.fromAddr || "");
     const initial = isSentFolder
       ? ((m.toAddrs && m.toAddrs.length) ? m.toAddrs[0] : "?")[0].toUpperCase()
       : (m.fromAddr || "?")[0].toUpperCase();
-    const date = formatListDate(m.receivedAt);
+    const date = formatListDate(itemDate);
     const hasAttach = (m._count?.attachments || 0) > 0;
     const clip = hasAttach ? '<span class="msg-clip" title="есть вложения">📎</span>' : "";
     const snippet = (m.bodyText || "").replace(/\s+/g, " ").slice(0, 120);
@@ -521,7 +561,9 @@ async function selectMessage(id) {
 
 function renderPreview(m) {
   const el = document.getElementById("message-preview");
-  const date = m.receivedAt ? new Date(m.receivedAt).toLocaleString("ru") : "";
+  // Sent messages carry sentAt; inbound carry receivedAt. Prefer whichever is set.
+  const _d = m.sentAt || m.receivedAt;
+  const date = _d ? new Date(_d).toLocaleString("ru") : "";
   const _previewableAttachments = (m.attachments || []).map((a, i) => ({...a, _idx: i}));
   const attachHtml = _previewableAttachments
     .map((a, i) => {
@@ -941,7 +983,16 @@ function openCompose(defaults = {}) {
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
-  if (defaults.mailboxId) form.mailboxId.value = defaults.mailboxId;
+  // Reset doesn't reliably stick on <select>, and defaults.mailboxId may
+  // arrive before options are populated. Apply now + after microtask.
+  const pickMailbox = (mid) => {
+    if (!mid) return;
+    const sel = form.mailboxId;
+    const has = [...sel.options].some((o) => o.value === mid);
+    if (has) sel.value = mid;
+    else setTimeout(() => { sel.value = mid; }, 80);
+  };
+  pickMailbox(defaults.mailboxId);
   if (defaults.to) form.to.value = defaults.to;
   if (defaults.subject) form.subject.value = defaults.subject;
   if (defaults.bodyText) form.bodyText.value = defaults.bodyText;
@@ -1110,9 +1161,12 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     const sendBtn = document.querySelector(".compose-btn-send");
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Отправка..."; }
     const sendAt = f.get("sendAt");
-    await api("/messages/" + draft.id + "/send", {
+    // Default: hold for 20 seconds so the user can undo. Explicit schedule overrides.
+    const UNDO_SEC = 20;
+    const effectiveSendAt = sendAt ? new Date(sendAt).toISOString() : new Date(Date.now() + UNDO_SEC * 1000).toISOString();
+    const sendRes = await api("/messages/" + draft.id + "/send", {
       method: "POST",
-      body: JSON.stringify(sendAt ? { sendAt: new Date(sendAt).toISOString() } : {}),
+      body: JSON.stringify({ sendAt: effectiveSendAt }),
     });
     // If tracking is enabled, create a tracking task
     const trackCb = document.getElementById("track-response-cb");
@@ -1132,7 +1186,14 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
       }
     }
     closeCompose();
-    showToast("Сообщение отправлено", null);
+    if (sendRes && sendRes.scheduled && sendRes.id && !sendAt) {
+      // Show undo-send countdown. The scheduled job fires in UNDO_SEC.
+      showUndoSendToast(sendRes.id, UNDO_SEC);
+    } else if (sendRes && sendRes.scheduled) {
+      showToast("Отправка запланирована", null);
+    } else {
+      showToast("Сообщение отправлено", null);
+    }
     refreshList();
   } catch (err) {
     document.getElementById("compose-error").textContent = "Ошибка: " + err.message;
