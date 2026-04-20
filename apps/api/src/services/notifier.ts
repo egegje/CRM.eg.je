@@ -145,6 +145,7 @@ export async function notifyNewMail(message: Message, mailbox: Mailbox): Promise
   if (imgCount > 0 && imgCount <= 3) {
     for (const a of attachments) {
       if (!/^image\//.test(a.mime)) continue;
+      if (!a.storagePath) continue;
       try {
         await sendTelegramPhoto(a.storagePath, a.filename);
       } catch (e) {

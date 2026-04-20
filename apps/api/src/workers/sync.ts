@@ -1,6 +1,7 @@
 import { ImapFlow, type FetchMessageObject } from "imapflow";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { prisma } from "@crm/db";
 import { parseRaw } from "@crm/mail";
 import { decrypt } from "../crypto.js";
@@ -10,6 +11,9 @@ import { maybeProposeTaskFromEmail, maybeProposeAutoClose } from "../services/em
 
 const cfg = loadConfig();
 const clients = new Map<string, ImapFlow>();
+
+/** Files below this size are saved to disk during sync; larger files are lazy-fetched on demand. */
+const LAZY_FETCH_THRESHOLD = 500 * 1024;
 
 const stripNul = (s: string | undefined | null): string | undefined =>
   s == null ? undefined : s.replace(/\u0000/g, "");
@@ -56,6 +60,21 @@ async function persistMessage(
     },
   });
   for (const a of parsed.attachments) {
+    const lazy = a.size >= LAZY_FETCH_THRESHOLD;
+    if (lazy) {
+      await prisma.attachment.create({
+        data: {
+          messageId: created.id,
+          filename: a.filename,
+          mime: a.mime,
+          size: a.size,
+          storagePath: null,
+          imapUid: msg.uid,
+          imapPart: a.partId ?? null,
+        },
+      });
+      continue;
+    }
     const cleaned = a.filename.replace(/[/\\]/g, "_");
     const buf = Buffer.from(cleaned, "utf8");
     const safe = buf.length > 200 ? buf.subarray(0, 200).toString("utf8") + "_" : cleaned;
@@ -63,6 +82,7 @@ async function persistMessage(
     await mkdir(dir, { recursive: true });
     const path = join(dir, safe);
     await writeFile(path, a.content);
+    const sha = createHash("sha256").update(a.content).digest("hex");
     await prisma.attachment.create({
       data: {
         messageId: created.id,
@@ -70,6 +90,10 @@ async function persistMessage(
         mime: a.mime,
         size: a.size,
         storagePath: path,
+        sha256: sha,
+        cachedAt: new Date(),
+        imapUid: msg.uid,
+        imapPart: a.partId ?? null,
       },
     });
   }

@@ -376,6 +376,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     const dbAttachments = await prisma.attachment.findMany({ where: { messageId: id } });
     const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
     for (const att of dbAttachments) {
+      if (!att.storagePath) continue;
       try {
         const buf = await readFile(att.storagePath);
         attachments.push({ filename: att.filename, content: buf, contentType: att.mime });

@@ -12,6 +12,7 @@ export async function runCleanup(now = new Date()): Promise<number> {
   });
   for (const m of old) {
     for (const a of m.attachments) {
+      if (!a.storagePath) continue;
       try {
         await unlink(a.storagePath);
       } catch {

@@ -10,7 +10,13 @@ export type Parsed = {
   text?: string;
   html?: string;
   date?: Date;
-  attachments: { filename: string; mime: string; size: number; content: Buffer }[];
+  attachments: {
+    filename: string;
+    mime: string;
+    size: number;
+    content: Buffer;
+    partId?: string;
+  }[];
 };
 
 function flatAddrs(a: AddressObject | AddressObject[] | undefined): string[] {
@@ -36,6 +42,7 @@ export async function parseRaw(raw: Buffer): Promise<Parsed> {
       mime: a.contentType,
       size: a.size,
       content: a.content,
+      partId: (a as { partId?: string }).partId,
     })),
   };
 }

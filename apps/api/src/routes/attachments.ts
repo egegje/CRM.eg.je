@@ -1,12 +1,56 @@
 import type { FastifyInstance } from "fastify";
 import { mkdir, writeFile, access as fsAccess } from "node:fs/promises";
 import { createReadStream } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
+import { ImapFlow } from "imapflow";
 import { prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { loadConfig } from "../config.js";
+import { decrypt } from "../crypto.js";
 import { NotFound, BadRequest } from "../errors.js";
 import { assertMessageAccess } from "../services/access.js";
+
+async function imapFetchAttachment(
+  mailboxId: string,
+  imapUid: number,
+  imapPart: string | null,
+): Promise<Buffer> {
+  const m = await prisma.mailbox.findUnique({ where: { id: mailboxId } });
+  if (!m) throw new Error("mailbox gone");
+  const pass = decrypt(m.encryptedAppPassword, m.email);
+  const client = new ImapFlow({
+    host: m.imapHost,
+    port: m.imapPort,
+    secure: m.imapPort === 993,
+    auth: { user: m.email, pass },
+    logger: false,
+  });
+  await client.connect();
+  try {
+    await client.mailboxOpen("INBOX");
+    if (imapPart) {
+      const d = await client.download(String(imapUid), imapPart, { uid: true });
+      if (!d || !d.content) throw new Error("part not found");
+      const chunks: Buffer[] = [];
+      for await (const c of d.content) chunks.push(c as Buffer);
+      return Buffer.concat(chunks);
+    }
+    // Fallback — fetch full source and parse attachments
+    const { parseRaw } = await import("@crm/mail");
+    const full = await client.fetchOne(
+      String(imapUid),
+      { source: true },
+      { uid: true },
+    );
+    if (!full || !full.source) throw new Error("message not found");
+    const parsed = await parseRaw(full.source);
+    if (parsed.attachments.length === 0) throw new Error("no attachments in message");
+    return parsed.attachments[0].content;
+  } finally {
+    await client.logout().catch(() => {});
+  }
+}
 
 export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
   const cfg = loadConfig();
@@ -26,6 +70,7 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
     await mkdir(dir, { recursive: true });
     const path = join(dir, file.filename);
     await writeFile(path, buf);
+    const sha = createHash("sha256").update(buf).digest("hex");
     return prisma.attachment.create({
       data: {
         messageId: id,
@@ -33,6 +78,8 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
         mime: file.mimetype,
         size: buf.length,
         storagePath: path,
+        sha256: sha,
+        cachedAt: new Date(),
       },
     });
   });
@@ -41,27 +88,65 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
     const id = (req.params as { id: string }).id;
     const a = await prisma.attachment.findUnique({
       where: { id },
-      include: { message: { select: { mailboxId: true } } },
+      include: { message: { select: { mailboxId: true, imapUid: true } } },
     });
     if (!a) throw new NotFound();
     await assertMessageAccess(req.user!, a.message);
 
-    // Verify file exists on disk
-    try {
-      await fsAccess(a.storagePath);
-    } catch {
-      throw new NotFound("file not found on disk");
+    let path = a.storagePath;
+    let onDisk = false;
+    if (path) {
+      try {
+        await fsAccess(path);
+        onDisk = true;
+      } catch {
+        onDisk = false;
+      }
     }
 
+    // Lazy fetch from IMAP if not cached
+    if (!onDisk) {
+      const uid = a.imapUid ?? a.message.imapUid;
+      if (!uid) throw new NotFound("attachment not on disk and no IMAP uid");
+      let buf: Buffer;
+      try {
+        buf = await imapFetchAttachment(a.message.mailboxId, uid, a.imapPart);
+      } catch (e) {
+        app.log.error({ err: e, attachmentId: id }, "lazy-fetch failed");
+        throw new NotFound("could not fetch attachment from mail server");
+      }
+      const cleaned = a.filename.replace(/[/\\]/g, "_");
+      const safeBuf = Buffer.from(cleaned, "utf8");
+      const safe = safeBuf.length > 200 ? safeBuf.subarray(0, 200).toString("utf8") + "_" : cleaned;
+      const dir = join(cfg.attachmentDir, a.message.mailboxId, a.messageId);
+      await mkdir(dir, { recursive: true });
+      path = join(dir, safe);
+      await writeFile(path, buf);
+      const sha = createHash("sha256").update(buf).digest("hex");
+      await prisma.attachment.update({
+        where: { id: a.id },
+        data: {
+          storagePath: path,
+          sha256: sha,
+          cachedAt: new Date(),
+        },
+      });
+    }
+
+    // Mark accessed (async — don't block download)
+    prisma.attachment
+      .update({ where: { id: a.id }, data: { lastAccessedAt: new Date() } })
+      .catch(() => {});
+
     reply.header("content-type", a.mime);
-    // PDFs and images render inline so the browser can preview them in a new
-    // tab without forcing a download. Other types still download.
     const inline = a.mime === "application/pdf" || a.mime.startsWith("image/");
     const disp = inline ? "inline" : "attachment";
-    // RFC 5987 encoding for non-ASCII filenames
     const encodedFilename = encodeURIComponent(a.filename).replace(/'/g, "%27");
-    reply.header("content-disposition", `${disp}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`);
-    const stream = createReadStream(a.storagePath);
+    reply.header(
+      "content-disposition",
+      `${disp}; filename="${encodedFilename}"; filename*=UTF-8''${encodedFilename}`,
+    );
+    const stream = createReadStream(path!);
     stream.on("error", () => {
       if (!reply.sent) reply.status(500).send({ error: "read error" });
     });

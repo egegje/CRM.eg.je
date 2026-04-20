@@ -4,6 +4,7 @@ import { prisma } from "@crm/db";
 import { startSyncFor } from "./workers/sync.js";
 import { startScheduledSendWorker } from "./workers/scheduled-send.js";
 import { startTrashCleanupWorker } from "./workers/trash-cleanup.js";
+import { startAttachmentPurgeWorker } from "./workers/attachment-purge.js";
 import { runReminders, runFollowups, runSnoozes, checkResponseTracking } from "./workers/reminders.js";
 import { startTelegramBot } from "./workers/telegram-bot.js";
 import { startTaskBot } from "./workers/task-bot.js";
@@ -24,6 +25,7 @@ for (const m of mailboxes) {
 }
 startScheduledSendWorker();
 await startTrashCleanupWorker();
+await startAttachmentPurgeWorker();
 
 // Hourly reminders + follow-ups
 const HOUR = 60 * 60 * 1000;

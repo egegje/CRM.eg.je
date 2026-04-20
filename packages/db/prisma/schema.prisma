@@ -125,13 +125,21 @@ model Message {
 }
 
 model Attachment {
-  id          String  @id @default(cuid())
-  message     Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  messageId   String
-  filename    String
-  mime        String
-  size        Int
-  storagePath String
+  id             String    @id @default(cuid())
+  message        Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  messageId      String
+  filename       String
+  mime           String
+  size           Int
+  storagePath    String?
+  sha256         String?
+  cachedAt       DateTime?
+  lastAccessedAt DateTime?
+  imapUid        Int?
+  imapPart       String?
+
+  @@index([sha256])
+  @@index([lastAccessedAt])
 }
 
 model Rule {
@@ -238,6 +246,7 @@ model Task {
   sourceTgMessageId    Int?
   createdAt            DateTime     @default(now())
   completedAt          DateTime?
+  pyrusId              Int?         @unique
   project              Project?     @relation(fields: [projectId], references: [id])
   comments             TaskComment[]
   tagAssignments       TaskTagAssignment[]
