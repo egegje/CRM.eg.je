@@ -1565,6 +1565,18 @@ function switchSection(section) {
   document.querySelectorAll(".tabbar button[id^='mtab-']").forEach((el) => {
     el.classList.toggle("mtab-active", el.id === "mtab-" + section);
   });
+  // Hamburgers (top-left + tabbar) only make sense in mail view, where the
+  // sidebar shows folders/mailboxes. On other views they'd open an empty
+  // gray overlay, so hide them.
+  const showBurgers = section === "mail";
+  document.querySelectorAll(".burger, .tabbar button.tab-burger").forEach((el) => {
+    el.style.display = showBurgers ? "" : "none";
+  });
+  // Ensure sidebar itself collapses when leaving mail
+  if (!showBurgers) {
+    document.getElementById("app").classList.remove("show-sidebar");
+    document.getElementById("sidebar-overlay")?.remove();
+  }
 }
 
 async function showAdminView() {
