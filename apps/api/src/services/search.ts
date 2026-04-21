@@ -7,6 +7,8 @@ export type Filters = {
   folderId?: string;
   mailboxId?: string;
   fromAddr?: string;
+  to?: string;
+  subject?: string;
   dateFrom?: Date;
   dateTo?: Date;
   status?: "read" | "unread" | "all";
@@ -17,6 +19,7 @@ export type Filters = {
 
 export function buildWhere(f: Filters): Prisma.MessageWhereInput {
   const w: Prisma.MessageWhereInput = f.trash ? { deletedAt: { not: null } } : { deletedAt: null };
+  const ands: Prisma.MessageWhereInput[] = [];
   // folderKind overrides folderId when set to a specific kind
   if (f.folderKind && f.folderKind !== "all") {
     w.folder = { kind: f.folderKind };
@@ -24,7 +27,27 @@ export function buildWhere(f: Filters): Prisma.MessageWhereInput {
     w.folderId = f.folderId;
   }
   if (f.mailboxId) w.mailboxId = f.mailboxId;
-  if (f.fromAddr) w.fromAddr = { contains: f.fromAddr, mode: "insensitive" };
+  const mode = "insensitive" as const;
+  if (f.fromAddr) {
+    ands.push({
+      OR: [
+        { fromAddr: { contains: f.fromAddr, mode } },
+        { fromName: { contains: f.fromAddr, mode } },
+      ],
+    });
+  }
+  if (f.to) {
+    // match any recipient / cc (exact element match, case tolerated)
+    ands.push({
+      OR: [
+        { toAddrs: { has: f.to } },
+        { toAddrs: { has: f.to.toLowerCase() } },
+        { ccAddrs: { has: f.to } },
+        { ccAddrs: { has: f.to.toLowerCase() } },
+      ],
+    });
+  }
+  if (f.subject) w.subject = { contains: f.subject, mode };
   if (f.dateFrom || f.dateTo) {
     w.receivedAt = {};
     if (f.dateFrom) (w.receivedAt as Prisma.DateTimeFilter).gte = f.dateFrom;
@@ -32,6 +55,7 @@ export function buildWhere(f: Filters): Prisma.MessageWhereInput {
   }
   if (f.status === "read") w.isRead = true;
   if (f.status === "unread") w.isRead = false;
+  if (ands.length > 0) w.AND = ands;
   return w;
 }
 

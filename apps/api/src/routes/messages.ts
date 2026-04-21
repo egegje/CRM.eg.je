@@ -17,6 +17,8 @@ const ListQuery = z.object({
   mailboxId: z.string().optional(),
   q: z.string().optional(),
   from: z.string().optional(),
+  to: z.string().optional(),
+  subject: z.string().optional(),
   searchIn: z.enum(["all", "subject", "body", "from", "to"]).default("all"),
   folderKind: z.enum(["all", "inbox", "sent", "drafts"]).optional(),
   dateFrom: z.coerce.date().optional(),

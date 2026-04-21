@@ -101,10 +101,12 @@ async function api(path, opts = {}) {
 function showLogin() {
   document.getElementById("login-screen").classList.remove("hidden");
   document.getElementById("app").classList.add("hidden");
+  const tb = document.getElementById("tabbar"); if (tb) tb.classList.add("hidden");
 }
 function showApp() {
   document.getElementById("login-screen").classList.add("hidden");
   document.getElementById("app").classList.remove("hidden");
+  const tb = document.getElementById("tabbar"); if (tb) tb.classList.remove("hidden");
 }
 
 /* login */
@@ -983,6 +985,10 @@ function openCompose(defaults = {}) {
   const modal = document.getElementById("compose-modal");
   const form = document.getElementById("compose-form");
   form.reset();
+  // form.reset() doesn't touch button disabled state — re-enable in case a
+  // previous send left the button in "Отправка..." locked state.
+  const sb = form.querySelector(".compose-btn-send");
+  if (sb) { sb.disabled = false; sb.textContent = "Отправить"; }
   // Reset doesn't reliably stick on <select>, and defaults.mailboxId may
   // arrive before options are populated. Apply now + after microtask.
   const pickMailbox = (mid) => {
