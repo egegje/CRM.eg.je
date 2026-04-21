@@ -85,9 +85,13 @@ async function api(path, opts = {}) {
     ...rest,
     headers,
   });
-  if (res.status === 401 || res.status === 403) {
+  if (res.status === 401) {
+    // Only 401 (unauthenticated) bounces to login. 403 (forbidden) just rejects.
     showLogin();
     throw new Error("auth");
+  }
+  if (res.status === 403) {
+    throw new Error("forbidden");
   }
   if (!res.ok) {
     const body = await res.text().catch(() => "");
