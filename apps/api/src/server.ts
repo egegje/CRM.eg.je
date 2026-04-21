@@ -55,6 +55,12 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
     root: join(__dirname, "..", "public"),
     prefix: "/",
     decorateReply: false,
+    setHeaders: (res, filePath) => {
+      // sw.js and index.html must revalidate every time (bust cached client code)
+      if (filePath.endsWith("/sw.js") || filePath.endsWith("/index.html") || filePath.endsWith("/app.js") || filePath.endsWith("/app.css")) {
+        res.setHeader("cache-control", "no-cache, must-revalidate");
+      }
+    },
   });
   await app.register(fastifyStatic, {
     root: "/opt/stroy.eg.je",

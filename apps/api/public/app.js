@@ -305,6 +305,13 @@ async function refreshList() {
   const dt = document.getElementById("date-to").value;
   if (df) params.set("dateFrom", df);
   if (dt) params.set("dateTo", dt);
+  // Advanced filter inputs (From / To / Subject)
+  const fromF = document.getElementById("search-from-field")?.value?.trim();
+  const toF = document.getElementById("search-to-field")?.value?.trim();
+  const subjF = document.getElementById("search-subject-field")?.value?.trim();
+  if (fromF) params.set("from", fromF);
+  if (toF) params.set("to", toF);
+  if (subjF) params.set("subject", subjF);
   // Folder/mailbox filtering
   state._globalSearch = false;
   if (state.currentMailbox) params.set("mailboxId", state.currentMailbox);
