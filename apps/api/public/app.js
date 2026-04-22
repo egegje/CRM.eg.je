@@ -6,11 +6,19 @@ const state = {
   mailboxes: [],
   folders: [],
   currentFolder: '__inbox',
-  currentMailbox: null,
+  currentMailbox: (function(){ try { return localStorage.getItem("currentMailbox") || null; } catch(_) { return null; } })(),
   messages: [],
   selectedId: null,
   selectedIds: new Set(),
 };
+
+function setCurrentMailbox(id) {
+  state.currentMailbox = id || null;
+  try {
+    if (id) localStorage.setItem("currentMailbox", id);
+    else localStorage.removeItem("currentMailbox");
+  } catch(_) {}
+}
 
 /* theme */
 function initTheme() {
@@ -219,13 +227,17 @@ async function loadMailboxes() {
   ]);
   state.mailboxes = mailboxes;
   state.unreadByMailbox = unread;
+  // Drop persisted selection if that mailbox no longer exists
+  if (state.currentMailbox && !mailboxes.some(m => m.id === state.currentMailbox)) {
+    setCurrentMailbox(null);
+  }
   const list = document.getElementById("mailboxes-list");
   list.innerHTML = "";
   const totalUnread = Object.values(unread).reduce((a, b) => a + b, 0);
   const all = document.createElement("div");
   all.className = "folder-item" + (state.currentMailbox === null ? " active" : "");
   all.innerHTML = `<span>Все ящики</span>${totalUnread ? `<span class="count">${totalUnread}</span>` : ""}`;
-  all.onclick = () => { exitTasksView(); state.currentMailbox = null; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
+  all.onclick = () => { exitTasksView(); setCurrentMailbox(null); state.selectedIds.clear(); renderBulkBar(); refreshList(); };
   list.appendChild(all);
   for (const mb of state.mailboxes) {
     const u = unread[mb.id] || 0;
@@ -233,7 +245,7 @@ async function loadMailboxes() {
     d.className = "folder-item" + (state.currentMailbox === mb.id ? " active" : "");
     d.innerHTML = `<span>${escapeHtml(mb.displayName)}</span>${u ? `<span class="count">${u}</span>` : ""}`;
     d.title = mb.email;
-    d.onclick = () => { exitTasksView(); state.currentMailbox = mb.id; state.selectedIds.clear(); renderBulkBar(); refreshList(); };
+    d.onclick = () => { exitTasksView(); setCurrentMailbox(mb.id); state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
   const sel = document.getElementById("compose-mailbox");
