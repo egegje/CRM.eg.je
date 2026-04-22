@@ -1,5 +1,6 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
+import { sendWebPush } from "./push.js";
 
 const cfg = loadConfig();
 
@@ -67,9 +68,14 @@ export async function notifyAssignment(taskId: string, byUserId: string | null):
   const targets = new Set<string>();
   if (t.assigneeId) targets.add(t.assigneeId);
   for (const ca of t.coAssignees) targets.add(ca.userId);
+  const pushTitle = "Новая задача";
+  const pushBody = by ? `${t.title} · от ${by.name}` : t.title;
+  const pushUrl = `/#/tasks/${t.id}`;
   for (const uid of targets) {
     if (byUserId && uid === byUserId) continue;
     await sendTaskBotToUser(uid, lines.join("\n"));
+    sendWebPush(uid, { title: pushTitle, body: pushBody, url: pushUrl, tag: `task-${t.id}` })
+      .catch((e) => console.error("push:", (e as Error).message));
   }
 }
 

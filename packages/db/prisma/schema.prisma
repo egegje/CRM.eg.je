@@ -39,6 +39,7 @@ model User {
   signature    String?
   folders      Folder[]
   scheduled    ScheduledSend[]
+  taskComments TaskComment[]
 }
 
 model Mailbox {
@@ -271,12 +272,14 @@ model TaskCoAssignee {
 }
 
 model TaskComment {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   taskId    String
   userId    String
   text      String
-  createdAt DateTime @default(now())
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime?
+  task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id])
 }
 
 model Persona {
@@ -394,6 +397,18 @@ model TgUserBinding {
   userId     String  @id
   tgUserId   BigInt  @unique
   tgUsername String?
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 model TaskSetting {

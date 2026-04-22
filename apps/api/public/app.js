@@ -2517,12 +2517,47 @@ function renderTaskComments(comments) {
     list.innerHTML = '<div style="color:var(--text-muted);font-size:11px">нет комментариев</div>';
     return;
   }
-  list.innerHTML = comments.map((c) => `
-    <div style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
-      <div style="font-size:10px;color:var(--text-muted)">${new Date(c.createdAt).toLocaleString("ru")}</div>
-      <div style="font-size:12px;white-space:pre-wrap;word-wrap:break-word">${escapeHtml(c.text)}</div>
-    </div>
-  `).join("");
+  const me = state.user?.id;
+  const now = Date.now();
+  list.innerHTML = comments.map((c) => {
+    const authorName = (c.user && c.user.name) || "—";
+    const ageMs = now - new Date(c.createdAt).getTime();
+    const canEdit = me && c.userId === me && ageMs < 24 * 60 * 60 * 1000;
+    const edited = c.updatedAt ? ' <span style="color:var(--text-muted)">(изменено ' + new Date(c.updatedAt).toLocaleString("ru") + ')</span>' : '';
+    const editBtn = canEdit
+      ? ` <a href="#" onclick="event.preventDefault();editTaskComment('${c.id}')" style="font-size:10px;color:#7c3aed;text-decoration:none">редактировать</a>`
+      : '';
+    return `
+      <div id="cmt-${c.id}" data-cmt-text="${escapeHtml(c.text).replace(/"/g, '&quot;')}" style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
+        <div style="font-size:10px;color:var(--text-muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <b style="color:var(--text)">${escapeHtml(authorName)}</b>
+          · ${new Date(c.createdAt).toLocaleString("ru")}${edited}${editBtn}
+        </div>
+        <div style="font-size:12px;white-space:pre-wrap;word-wrap:break-word">${escapeHtml(c.text)}</div>
+      </div>
+    `;
+  }).join("");
+}
+
+async function editTaskComment(commentId) {
+  const div = document.getElementById("cmt-" + commentId);
+  if (!div) return;
+  const current = div.getAttribute("data-cmt-text") || "";
+  const next = prompt("Редактировать комментарий:", current);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (!trimmed || trimmed === current) return;
+  const taskId = document.getElementById("task-form").id.value;
+  try {
+    await api(`/tasks/${taskId}/comments/${commentId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ text: trimmed }),
+    });
+    const t = await api("/tasks/" + taskId);
+    renderTaskComments(t.comments || []);
+  } catch (e) {
+    alert((e && e.message) || "Не удалось сохранить");
+  }
 }
 
 async function toggleTaskDone(id, done) {
@@ -3637,8 +3672,43 @@ if ("Notification" in window && Notification.permission === "default") {
 }
 
 /* PWA */
+function urlB64ToUint8Array(b64) {
+  const padding = "=".repeat((4 - (b64.length % 4)) % 4);
+  const b = (b64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b);
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+
+async function ensureWebPush(reg) {
+  try {
+    if (!("PushManager" in window)) return;
+    if (Notification.permission !== "granted") return;
+    const r = await fetch("/api/push/public-key").then((x) => x.json());
+    if (!r || !r.publicKey) return;
+    const existing = await reg.pushManager.getSubscription();
+    const sub =
+      existing ||
+      (await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(r.publicKey),
+      }));
+    const body = sub.toJSON();
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ endpoint: body.endpoint, keys: body.keys }),
+    });
+  } catch (_) {}
+}
+
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/sw.js").catch(() => {});
+  navigator.serviceWorker
+    .register("/sw.js")
+    .then((reg) => ensureWebPush(reg))
+    .catch(() => {});
 }
 
 /* password reset flow */

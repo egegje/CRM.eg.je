@@ -57,7 +57,10 @@ const ListQuery = z.object({
 
 const TASK_INCLUDE = {
   project: true,
-  comments: { orderBy: { createdAt: "asc" as const } },
+  comments: {
+    orderBy: { createdAt: "asc" as const },
+    include: { user: { select: { id: true, name: true, email: true } } },
+  },
   tagAssignments: { include: { tag: true } },
   attachments: true,
   coAssignees: true,
@@ -186,8 +189,33 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const user = req.user!;
     return prisma.taskComment.create({
       data: { taskId: id, userId: user.id, text: body.text },
+      include: { user: { select: { id: true, name: true, email: true } } },
     });
   });
+
+  app.patch(
+    "/tasks/:id/comments/:commentId",
+    { preHandler: requireUser() },
+    async (req) => {
+      const { commentId } = z
+        .object({ id: z.string(), commentId: z.string() })
+        .parse(req.params);
+      const body = z.object({ text: z.string().min(1) }).parse(req.body);
+      const user = req.user!;
+      const c = await prisma.taskComment.findUnique({ where: { id: commentId } });
+      if (!c) throw new NotFound();
+      if (c.userId !== user.id) throw new BadRequest("Редактировать можно только свои комментарии");
+      const ageMs = Date.now() - c.createdAt.getTime();
+      if (ageMs > 24 * 60 * 60 * 1000) {
+        throw new BadRequest("Редактирование возможно только в первые 24 часа");
+      }
+      return prisma.taskComment.update({
+        where: { id: commentId },
+        data: { text: body.text, updatedAt: new Date() },
+        include: { user: { select: { id: true, name: true, email: true } } },
+      });
+    },
+  );
 
   // ---- team stats ----
   app.get("/tasks/team-stats", { preHandler: requireUser() }, async (req) => {

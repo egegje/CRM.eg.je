@@ -16,6 +16,9 @@ const Schema = z.object({
   SBER_CLIENT_ID: z.string().optional(),
   SBER_CLIENT_SECRET: z.string().optional(),
   SBER_REDIRECT_URI: z.string().optional(),
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(),
 });
 
 export type Config = {
@@ -34,6 +37,9 @@ export type Config = {
   sberClientId?: string;
   sberClientSecret?: string;
   sberRedirectUri?: string;
+  vapidPublicKey?: string;
+  vapidPrivateKey?: string;
+  vapidSubject?: string;
 };
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
@@ -58,5 +64,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     sberClientId: p.SBER_CLIENT_ID,
     sberClientSecret: p.SBER_CLIENT_SECRET,
     sberRedirectUri: p.SBER_REDIRECT_URI,
+    vapidPublicKey: p.VAPID_PUBLIC_KEY,
+    vapidPrivateKey: p.VAPID_PRIVATE_KEY,
+    vapidSubject: p.VAPID_SUBJECT,
   };
 }
