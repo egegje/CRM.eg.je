@@ -26,6 +26,7 @@ const SENT_FOLDER_NAMES = [
   "Sent Items",
   "Отправленные",
   "INBOX.Отправленные",
+  "[Gmail]/Sent Mail",
 ];
 
 async function persistMessage(
@@ -36,7 +37,8 @@ async function persistMessage(
 ): Promise<void> {
   if (!msg.source) return;
   const parsed = await parseRaw(msg.source);
-  const receivedAt = parsed.date ?? msg.internalDate ?? new Date();
+  const rawDate = parsed.date ?? msg.internalDate ?? new Date();
+  const receivedAt = rawDate instanceof Date ? rawDate : new Date(rawDate);
   if (options.syncSince && receivedAt < options.syncSince) return;
   if (parsed.messageId) {
     const exists = await prisma.message.findUnique({
@@ -156,12 +158,27 @@ async function persistMessage(
  * Returns the IMAP folder name that succeeded, or null if none found.
  */
 async function openSentFolder(client: ImapFlow): Promise<string | null> {
-  for (const name of SENT_FOLDER_NAMES) {
+  let listed: { path: string; specialUse?: string }[] = [];
+  try {
+    listed = (await client.list()) as { path: string; specialUse?: string }[];
+  } catch {
+    listed = [];
+  }
+  const sentBySpecialUse = listed.find((b) => b.specialUse === "\\Sent");
+  if (sentBySpecialUse) {
+    try {
+      await client.mailboxOpen(sentBySpecialUse.path);
+      return sentBySpecialUse.path;
+    } catch {}
+  }
+  const existingPaths = new Set(listed.map((b) => b.path));
+  const candidates = SENT_FOLDER_NAMES.filter((n) => existingPaths.has(n));
+  for (const name of candidates) {
     try {
       await client.mailboxOpen(name);
       return name;
     } catch {
-      // folder doesn't exist on this server, try next
+      // try next
     }
   }
   return null;
@@ -223,9 +240,11 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
   });
   clients.set(mailboxId, client);
   await client.connect();
+  console.log(`[sync] connected: ${m.email}`);
 
   const syncSince = m.syncSince ?? null;
   const lazyAttachments = m.lazyAttachments;
+  console.log(`[sync] ${m.email} syncSince=${syncSince ? syncSince.toISOString() : "null"} lazy=${lazyAttachments}`);
 
   // --- Sync Sent folder first (one-time fetch, no IDLE) ---
   try {
@@ -234,16 +253,7 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
       create: { mailboxId, lastUid: 0, sentLastUid: 0 },
       update: {},
     });
-    let sentStart = state.sentLastUid;
-    if (sentStart === 0 && syncSince) {
-      const sentFolderName = await openSentFolder(client);
-      if (sentFolderName) {
-        const uids = await client.search({ since: syncSince }, { uid: true });
-        if (uids && uids.length) sentStart = Math.min(...uids) - 1;
-        else sentStart = 0xffffffff;
-      }
-    }
-    const newSentUid = await syncSentFolder(client, mailboxId, sentStart, { syncSince, lazyAttachments });
+    const newSentUid = await syncSentFolder(client, mailboxId, state.sentLastUid, { syncSince, lazyAttachments });
     if (newSentUid !== state.sentLastUid) {
       await prisma.syncState.update({
         where: { mailboxId },
@@ -255,7 +265,9 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
   }
 
   // --- Switch back to INBOX for ongoing sync + IDLE ---
+  console.log(`[sync] ${m.email} opening INBOX`);
   await client.mailboxOpen("INBOX");
+  console.log(`[sync] ${m.email} INBOX opened`);
 
   const inbox =
     (await prisma.folder.findFirst({ where: { mailboxId, kind: "inbox" } })) ??
@@ -269,10 +281,14 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
 
   let inboxStart = state.lastUid;
   if (inboxStart === 0 && syncSince) {
+    console.log(`[sync] ${m.email} INBOX search since=${syncSince.toISOString()}`);
     const uids = await client.search({ since: syncSince }, { uid: true });
-    if (uids && uids.length) inboxStart = Math.min(...uids) - 1;
+    const count = uids && Array.isArray(uids) ? uids.length : 0;
+    console.log(`[sync] ${m.email} INBOX search returned ${count} uids`);
+    if (uids && Array.isArray(uids) && uids.length) inboxStart = Math.min(...uids) - 1;
     else inboxStart = 0xffffffff;
     await prisma.syncState.update({ where: { mailboxId }, data: { lastUid: inboxStart } });
+    console.log(`[sync] ${m.email} INBOX inboxStart set to ${inboxStart}`);
   }
 
   async function fetchSince(uid: number): Promise<void> {
