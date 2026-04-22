@@ -2916,6 +2916,7 @@ async function renderAdminTab() {
     else if (adminTab === "audit") c.innerHTML = await renderAuditTab();
     else if (adminTab === "analytics") c.innerHTML = await renderAnalyticsTab();
     else if (adminTab === "telegram") c.innerHTML = await renderTelegramTab();
+    else if (adminTab === "tgdelivery") c.innerHTML = await renderTgDeliveryTab();
     else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
     else if (adminTab === "personas") c.innerHTML = await renderPersonasTab();
     else if (adminTab === "sheets") c.innerHTML = await renderSheetsAdminTab();
@@ -3427,6 +3428,64 @@ async function renderTelegramTab() {
     </div>
   `;
 }
+
+async function renderTgDeliveryTab() {
+  const logs = await api("/admin/tg-notify-log?limit=200");
+  const kindLabel = {
+    assignment: "назначение",
+    reviewRequested: "на проверку",
+    reviewConfirmed: "закрытие",
+    reviewReturned: "возврат",
+  };
+  const statusPill = (s) => {
+    if (s === "sent") return '<span style="background:#dcfce7;color:#166534;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">✓ доставлено</span>';
+    if (s === "failed") return '<span style="background:#fee2e2;color:#991b1b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">✗ ошибка</span>';
+    return '<span style="background:#f3f4f6;color:#6b7280;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:500">⏭ пропущено</span>';
+  };
+  const sent = logs.filter((l) => l.status === "sent").length;
+  const failed = logs.filter((l) => l.status === "failed").length;
+  const skipped = logs.filter((l) => l.status === "skipped").length;
+  const rows = logs.map((l) => `
+    <tr>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text-muted);white-space:nowrap">${new Date(l.createdAt).toLocaleString("ru")}</td>
+      <td style="padding:8px 10px">
+        <div style="font-size:13px;font-weight:500;cursor:pointer;color:var(--accent)" onclick="openTaskForm('${l.taskId}')">${escapeHtml(l.task?.title || "(удалена)")}</div>
+      </td>
+      <td style="padding:8px 10px;font-size:13px">${l.user ? escapeHtml(l.user.name) : "<i>неизвестен</i>"}<div style="font-size:11px;color:var(--text-muted)">${l.user ? escapeHtml(l.user.email) : escapeHtml(l.userId)}</div></td>
+      <td style="padding:8px 10px;font-size:12px;color:var(--text-muted)">${kindLabel[l.kind] || escapeHtml(l.kind)}</td>
+      <td style="padding:8px 10px">${statusPill(l.status)}</td>
+      <td style="padding:8px 10px;font-size:11px;color:var(--text-muted)">${l.tgMessageId ? "msg#" + l.tgMessageId : (l.reason ? escapeHtml(l.reason) : "")}</td>
+    </tr>
+  `).join("");
+  return `
+    <div class="settings-card">
+      <div class="settings-card-title">📬 Доставка TG-уведомлений</div>
+      <p style="margin:0 0 10px">Журнал отправок через @task_crm_bot. Отсюда видно, дошло ли уведомление до исполнителя.</p>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div style="padding:8px 14px;background:#dcfce7;color:#166534;border-radius:8px;font-size:13px"><b>${sent}</b> доставлено</div>
+        <div style="padding:8px 14px;background:#fee2e2;color:#991b1b;border-radius:8px;font-size:13px"><b>${failed}</b> ошибок</div>
+        <div style="padding:8px 14px;background:#f3f4f6;color:#6b7280;border-radius:8px;font-size:13px"><b>${skipped}</b> пропущено</div>
+      </div>
+      ${logs.length === 0 ? '<div style="color:var(--text-muted);font-size:13px;padding:20px 0;text-align:center">пока нет записей</div>' : `
+      <div style="overflow-x:auto">
+        <table class="admin-table" style="width:100%;border-collapse:collapse">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Время</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Задача</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Кому</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Тип</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Статус</th>
+            <th style="padding:8px 10px;text-align:left;font-size:11px;color:var(--text-muted);font-weight:500">Детали</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+      `}
+      <p style="margin-top:10px;font-size:11px;color:var(--text-muted)">«Пропущено» = у юзера нет привязки к TG, или он не нажал /start боту, или глобально выключены уведомления. «Ошибка» = Telegram отклонил (чаще всего — бот заблокирован получателем).</p>
+    </div>
+  `;
+}
+
 async function adminCreateTgBinding(e) {
   e.preventDefault();
   const f = new FormData(e.target);

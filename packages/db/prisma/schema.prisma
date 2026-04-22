@@ -256,6 +256,7 @@ model Task {
   attachments          TaskAttachment[]
   coAssignees          TaskCoAssignee[]
   views                TaskView[]
+  tgNotifies           TgTaskNotify[]
 
   @@index([assigneeId, status])
   @@index([dueDate, status])
@@ -291,6 +292,22 @@ model TaskView {
 
   @@id([userId, taskId])
   @@index([taskId])
+}
+
+model TgTaskNotify {
+  id          String   @id @default(cuid())
+  taskId      String
+  userId      String
+  kind        String   // assignment | reviewRequested | reviewConfirmed | reviewReturned
+  status      String   // sent | skipped | failed
+  tgMessageId Int?
+  reason      String?
+  createdAt   DateTime @default(now())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
 }
 
 model Persona {

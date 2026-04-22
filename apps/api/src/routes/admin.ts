@@ -211,6 +211,31 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
+  // ---- TG task notification delivery log ----
+  app.get("/admin/tg-notify-log", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const q = z.object({
+      taskId: z.string().optional(),
+      userId: z.string().optional(),
+      status: z.enum(["sent", "skipped", "failed"]).optional(),
+      limit: z.coerce.number().int().min(1).max(500).default(200),
+    }).parse(req.query);
+    const logs = await prisma.tgTaskNotify.findMany({
+      where: { taskId: q.taskId, userId: q.userId, status: q.status },
+      orderBy: { createdAt: "desc" },
+      take: q.limit,
+      include: { task: { select: { id: true, title: true } } },
+    });
+    const userIds = Array.from(new Set(logs.map((l) => l.userId)));
+    const users = userIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+    return logs.map((l) => ({ ...l, user: userMap[l.userId] || null }));
+  });
+
   // ---- audit log ----
   app.get("/admin/audit", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const q = z.object({
