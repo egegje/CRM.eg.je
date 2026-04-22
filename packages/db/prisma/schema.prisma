@@ -53,6 +53,8 @@ model Mailbox {
   smtpPort             Int             @default(465)
   enabled              Boolean         @default(true)
   signature            String?
+  syncSince            DateTime?
+  lazyAttachments      Boolean         @default(false)
   createdAt            DateTime        @default(now())
   folders              Folder[]
   messages             Message[]

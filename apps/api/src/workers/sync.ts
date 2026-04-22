@@ -32,10 +32,12 @@ async function persistMessage(
   mailboxId: string,
   folderId: string,
   msg: FetchMessageObject,
-  options: { isRead?: boolean; skipNotify?: boolean } = {},
+  options: { isRead?: boolean; skipNotify?: boolean; syncSince?: Date | null; lazyAttachments?: boolean } = {},
 ): Promise<void> {
   if (!msg.source) return;
   const parsed = await parseRaw(msg.source);
+  const receivedAt = parsed.date ?? msg.internalDate ?? new Date();
+  if (options.syncSince && receivedAt < options.syncSince) return;
   if (parsed.messageId) {
     const exists = await prisma.message.findUnique({
       where: { messageId: parsed.messageId },
@@ -56,11 +58,11 @@ async function persistMessage(
       bodyText: stripNul(parsed.text),
       bodyHtml: stripNul(parsed.html),
       isRead: options.isRead ?? false,
-      receivedAt: parsed.date ?? msg.internalDate ?? new Date(),
+      receivedAt,
     },
   });
   for (const a of parsed.attachments) {
-    const lazy = a.size >= LAZY_FETCH_THRESHOLD;
+    const lazy = options.lazyAttachments || a.size >= LAZY_FETCH_THRESHOLD;
     if (lazy) {
       await prisma.attachment.create({
         data: {
@@ -173,6 +175,7 @@ async function syncSentFolder(
   client: ImapFlow,
   mailboxId: string,
   lastUid: number,
+  opts: { syncSince?: Date | null; lazyAttachments?: boolean } = {},
 ): Promise<number> {
   const sentFolderName = await openSentFolder(client);
   if (!sentFolderName) {
@@ -190,7 +193,12 @@ async function syncSentFolder(
       { uid: `${lastUid + 1}:*` },
       { source: true, uid: true, envelope: true, internalDate: true },
     )) {
-      await persistMessage(mailboxId, sentFolder.id, msg, { isRead: true, skipNotify: true });
+      await persistMessage(mailboxId, sentFolder.id, msg, {
+        isRead: true,
+        skipNotify: true,
+        syncSince: opts.syncSince,
+        lazyAttachments: opts.lazyAttachments,
+      });
       if (msg.uid > max) max = msg.uid;
     }
   } catch (e) {
@@ -216,6 +224,9 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
   clients.set(mailboxId, client);
   await client.connect();
 
+  const syncSince = m.syncSince ?? null;
+  const lazyAttachments = m.lazyAttachments;
+
   // --- Sync Sent folder first (one-time fetch, no IDLE) ---
   try {
     const state = await prisma.syncState.upsert({
@@ -223,7 +234,16 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
       create: { mailboxId, lastUid: 0, sentLastUid: 0 },
       update: {},
     });
-    const newSentUid = await syncSentFolder(client, mailboxId, state.sentLastUid);
+    let sentStart = state.sentLastUid;
+    if (sentStart === 0 && syncSince) {
+      const sentFolderName = await openSentFolder(client);
+      if (sentFolderName) {
+        const uids = await client.search({ since: syncSince }, { uid: true });
+        if (uids && uids.length) sentStart = Math.min(...uids) - 1;
+        else sentStart = 0xffffffff;
+      }
+    }
+    const newSentUid = await syncSentFolder(client, mailboxId, sentStart, { syncSince, lazyAttachments });
     if (newSentUid !== state.sentLastUid) {
       await prisma.syncState.update({
         where: { mailboxId },
@@ -247,13 +267,21 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
     update: {},
   });
 
+  let inboxStart = state.lastUid;
+  if (inboxStart === 0 && syncSince) {
+    const uids = await client.search({ since: syncSince }, { uid: true });
+    if (uids && uids.length) inboxStart = Math.min(...uids) - 1;
+    else inboxStart = 0xffffffff;
+    await prisma.syncState.update({ where: { mailboxId }, data: { lastUid: inboxStart } });
+  }
+
   async function fetchSince(uid: number): Promise<void> {
     let max = uid;
     for await (const msg of client.fetch(
       { uid: `${uid + 1}:*` },
       { source: true, uid: true, envelope: true, internalDate: true },
     )) {
-      await persistMessage(mailboxId, inbox.id, msg);
+      await persistMessage(mailboxId, inbox.id, msg, { syncSince, lazyAttachments });
       if (msg.uid > max) max = msg.uid;
     }
     if (max !== uid) {
@@ -264,7 +292,7 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
     }
   }
 
-  await fetchSince(state.lastUid);
+  await fetchSince(inboxStart);
 
   client.on("exists", async () => {
     const s = await prisma.syncState.findUnique({ where: { mailboxId } });
@@ -302,7 +330,10 @@ export async function syncSentForMailbox(mailboxId: string): Promise<{ synced: n
     });
 
     const beforeUid = state.sentLastUid;
-    const newSentUid = await syncSentFolder(client, mailboxId, beforeUid);
+    const newSentUid = await syncSentFolder(client, mailboxId, beforeUid, {
+      syncSince: m.syncSince ?? null,
+      lazyAttachments: m.lazyAttachments,
+    });
     if (newSentUid !== beforeUid) {
       await prisma.syncState.update({
         where: { mailboxId },

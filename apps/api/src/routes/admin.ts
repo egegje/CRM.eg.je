@@ -87,6 +87,8 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       smtpHost: z.string().min(1).optional(),
       smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
       appPassword: z.string().min(1).optional(),
+      syncSince: z.union([z.coerce.date(), z.null()]).optional(),
+      lazyAttachments: z.boolean().optional(),
     }).parse(req.body);
     const { appPassword, ...body } = parsed;
     const data: Prisma.MailboxUpdateInput = { ...body };
@@ -98,7 +100,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return prisma.mailbox.update({
       where: { id },
       data,
-      select: { id: true, email: true, displayName: true, enabled: true, signature: true, imapHost: true, imapPort: true, smtpHost: true, smtpPort: true },
+      select: { id: true, email: true, displayName: true, enabled: true, signature: true, imapHost: true, imapPort: true, smtpHost: true, smtpPort: true, syncSince: true, lazyAttachments: true },
     });
   });
 
