@@ -47,7 +47,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
           folder: { kind: "inbox" },
         },
       }),
-      prisma.task.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      prisma.task.count({ where: { status: { in: ["open", "in_progress", "awaiting_review"] } } }),
       prisma.task.count({ where: { status: { in: ["open", "in_progress"] }, dueDate: { lt: startOfDay(now) } } }),
       prisma.bankAccount.findMany({ select: { balance: true, currency: true } }),
       prisma.company.count({}),
@@ -164,7 +164,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
     const [unread, overdue, openTasks, nextWeek, recentPayments] = await Promise.all([
       prisma.message.count({ where: { isRead: false, deletedAt: null, mailboxId: mailboxFilter, folder: { kind: "inbox" } } }),
       prisma.task.count({ where: { status: { in: ["open", "in_progress"] }, dueDate: { lt: startOfDay(now) } } }),
-      prisma.task.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      prisma.task.count({ where: { status: { in: ["open", "in_progress", "awaiting_review"] } } }),
       prisma.task.findMany({
         where: {
           status: { in: ["open", "in_progress"] },

@@ -7,12 +7,13 @@ final class TasksStore: ObservableObject {
     @Published var errorMessage: String?
 
     enum Filter: String, CaseIterable, Identifiable {
-        case mine, createdByMe, unassigned, overdue, done
+        case mine, createdByMe, review, unassigned, overdue, done
         var id: String { rawValue }
         var title: String {
             switch self {
             case .mine: return "Мои"
             case .createdByMe: return "Поставлено мной"
+            case .review: return "На проверку"
             case .unassigned: return "Без исполнителя"
             case .overdue: return "Просроченные"
             case .done: return "Выполненные"
@@ -22,6 +23,7 @@ final class TasksStore: ObservableObject {
             switch self {
             case .mine: return "pin.fill"
             case .createdByMe: return "paperplane.fill"
+            case .review: return "magnifyingglass.circle"
             case .unassigned: return "questionmark.circle"
             case .overdue: return "clock.badge.exclamationmark"
             case .done: return "checkmark.circle"
@@ -42,15 +44,18 @@ final class TasksStore: ObservableObject {
         switch filter {
         case .mine:
             if let id = currentUserId { params["assigneeId"] = id }
-            params["status"] = "open"
+            params["statusIn"] = "open,in_progress"
         case .createdByMe:
             if let id = currentUserId { params["creatorId"] = id }
-            params["status"] = "open"
+            params["statusIn"] = "open,in_progress,awaiting_review"
+        case .review:
+            if let id = currentUserId { params["creatorId"] = id }
+            params["status"] = "awaiting_review"
         case .unassigned:
             params["unassigned"] = "true"
-            params["status"] = "open"
+            params["statusIn"] = "open,in_progress"
         case .overdue:
-            params["status"] = "open"
+            params["statusIn"] = "open,in_progress"
         case .done:
             params["status"] = "done"
         }

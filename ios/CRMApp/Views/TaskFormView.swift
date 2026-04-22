@@ -60,6 +60,7 @@ struct TaskFormView: View {
                         Picker("Статус", selection: $status) {
                             Text("открыта").tag("open")
                             Text("в работе").tag("in_progress")
+                            Text("на проверке").tag("awaiting_review")
                             Text("выполнена").tag("done")
                             Text("отменена").tag("cancelled")
                         }

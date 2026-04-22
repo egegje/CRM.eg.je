@@ -9,14 +9,21 @@ struct CRMTask: Codable, Identifiable, Hashable {
     var projectId: String?
     var dueDate: Date?
     var priority: String   // low | normal | high | urgent
-    var status: String     // open | in_progress | done | cancelled
+    var status: String     // open | in_progress | awaiting_review | done | cancelled
     var category: String?
     var createdAt: Date
     var completedAt: Date?
+    var reviewRequestedAt: Date?
     var project: Project?
     var comments: [TaskComment]?
     var tagAssignments: [TagAssignment]?
     var attachments: [TaskAttachment]?
+    var coAssignees: [TaskCoAssignee]?
+}
+
+struct TaskCoAssignee: Codable, Hashable {
+    let taskId: String
+    let userId: String
 }
 
 struct Project: Codable, Identifiable, Hashable {

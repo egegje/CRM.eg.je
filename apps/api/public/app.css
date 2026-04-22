@@ -212,9 +212,37 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 /* modal */
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
 .modal-box { background: var(--bg); border-radius: 10px; width: 640px; max-width: 90vw; max-height: 90vh; overflow-y: auto; }
+.modal-box.wide { width: 1120px; max-width: 96vw; max-height: 94vh; }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--border); }
 .modal-header h3 { margin: 0; }
 .modal-header button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text); }
+
+/* Task detail: two-column layout (main text + comments | side meta) */
+.task-detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 0; }
+.modal-box:not(.wide) .task-detail-layout { grid-template-columns: 1fr; }
+.modal-box:not(.wide) .task-detail-aside { background: transparent; border-left: none; padding: 4px 20px 12px; }
+.modal-box:not(.wide) .task-detail-main { padding: 18px 20px 4px; }
+.task-detail-main { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.task-detail-aside { padding: 20px 18px; background: var(--bg-alt); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.task-detail-aside label { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
+.task-detail-aside select, .task-detail-aside input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); font-size: 13px; }
+.task-title-inline { font-size: 22px; font-weight: 600; line-height: 1.25; padding: 6px 0; border: none; background: transparent; color: var(--text); width: 100%; }
+.task-title-inline:focus { outline: none; border-bottom: 1px solid var(--accent); }
+.task-desc-inline { min-height: 180px; font-size: 14px; line-height: 1.5; padding: 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-alt); color: var(--text); font-family: inherit; resize: vertical; }
+.task-review-banner { background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.4); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.task-review-banner h4 { margin: 0; font-size: 14px; color: var(--text); }
+.task-review-banner .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.task-review-banner button { padding: 7px 14px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; font-size: 12px; background: var(--bg); color: var(--text); }
+.task-review-banner button.primary { background: #10b981; color: white; border-color: #10b981; }
+.task-review-banner button.secondary { background: #f59e0b; color: white; border-color: #f59e0b; }
+.coassignee-pills { display: flex; flex-wrap: wrap; gap: 4px; }
+.coassignee-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; font-size: 11px; }
+.coassignee-pill button { background: none; border: none; cursor: pointer; color: var(--text-muted); padding: 0; font-size: 12px; line-height: 1; }
+@media (max-width: 900px) {
+  .modal-box.wide { width: 100vw; max-width: 100vw; max-height: 100vh; border-radius: 0; }
+  .task-detail-layout { grid-template-columns: 1fr; }
+  .task-detail-aside { border-left: none; border-top: 1px solid var(--border); }
+}
 
 /* Compose modal — Mail.ru style */
 .compose-box { width: min(90vw, 900px) !important; max-width: 900px !important; height: 85vh; max-height: 85vh !important; overflow: hidden !important; display: flex; flex-direction: column; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.25); }

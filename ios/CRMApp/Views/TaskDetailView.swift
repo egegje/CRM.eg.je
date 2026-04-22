@@ -28,10 +28,10 @@ struct TaskDetailView: View {
                 Picker("Статус", selection: $currentStatus) {
                     Text("Открыта").tag("open")
                     Text("В работе").tag("in_progress")
+                    Text("На проверке").tag("awaiting_review")
                     Text("Выполнена").tag("done")
                     Text("Отменена").tag("cancelled")
                 }
-                .pickerStyle(.segmented)
                 .onChange(of: currentStatus) { _, new in
                     Task {
                         working = true

@@ -57,6 +57,7 @@ struct StatusPill: View {
     private var config: (String, Color) {
         switch status {
         case "in_progress": return ("в работе", .orange)
+        case "awaiting_review": return ("на проверке", .purple)
         case "done": return ("выполнена", .green)
         case "cancelled": return ("отменена", .gray)
         default: return ("", .clear)

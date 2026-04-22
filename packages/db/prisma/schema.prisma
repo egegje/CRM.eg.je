@@ -209,6 +209,7 @@ model PasswordReset {
 enum TaskStatus {
   open
   in_progress
+  awaiting_review
   done
   cancelled
 }
@@ -246,15 +247,27 @@ model Task {
   sourceTgMessageId    Int?
   createdAt            DateTime     @default(now())
   completedAt          DateTime?
+  reviewRequestedAt    DateTime?
   pyrusId              Int?         @unique
   project              Project?     @relation(fields: [projectId], references: [id])
   comments             TaskComment[]
   tagAssignments       TaskTagAssignment[]
   attachments          TaskAttachment[]
+  coAssignees          TaskCoAssignee[]
 
   @@index([assigneeId, status])
   @@index([dueDate, status])
   @@index([projectId])
+}
+
+model TaskCoAssignee {
+  taskId    String
+  userId    String
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, userId])
+  @@index([userId])
 }
 
 model TaskComment {

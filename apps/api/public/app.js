@@ -1933,6 +1933,7 @@ async function showTasksView(filter) {
   const titles = {
     me: "Мои задачи",
     createdByMe: "Поставлено мной",
+    review: "🔎 На проверку",
     unassigned: "Без исполнителя",
     overdue: "Просроченные",
     done: "Выполненные",
@@ -2250,11 +2251,24 @@ async function loadTasks() {
     params.set("creatorId", state.user.id);
     params.set("status", "all");
   }
+  if (tasksFilter === "review" && state.user) {
+    params.set("creatorId", state.user.id);
+    params.set("status", "awaiting_review");
+  }
   if (tasksFilter === "unassigned") params.set("unassigned", "true");
   const assigneeOverride = document.getElementById("tasks-assignee-filter")?.value;
   if (assigneeOverride && tasksMode === "kanban") params.set("assigneeId", assigneeOverride);
-  if (tasksMode !== "kanban" && tasksFilter !== "overdue" && tasksFilter !== "done") params.set("status", "open");
+  if (
+    tasksMode !== "kanban" &&
+    tasksFilter !== "overdue" &&
+    tasksFilter !== "done" &&
+    tasksFilter !== "createdByMe" &&
+    tasksFilter !== "review"
+  ) {
+    params.set("statusIn", "open,in_progress,awaiting_review");
+  }
   if (tasksFilter === "done") params.set("status", "done");
+  if (tasksFilter === "overdue") params.set("statusIn", "open,in_progress");
   const search = document.getElementById("tasks-search")?.value;
   if (search) params.set("search", search);
   params.set("limit", "500");
@@ -2512,13 +2526,29 @@ function renderTaskComments(comments) {
 }
 
 async function toggleTaskDone(id, done) {
-  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: done ? "done" : "open" }) });
+  if (!done) {
+    await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: "open" }) });
+    loadTasks();
+    return;
+  }
+  // Assignee completing: if creator != current user, route to awaiting_review
+  const t = await api("/tasks/" + id).catch(() => null);
+  const me = state.user?.id;
+  const shouldReview = t && me && t.creatorId !== me && (t.assigneeId === me ||
+    (t.coAssignees || []).some((ca) => ca.userId === me));
+  await api("/tasks/" + id, {
+    method: "PATCH",
+    body: JSON.stringify({ status: shouldReview ? "awaiting_review" : "done" }),
+  });
   loadTasks();
 }
+
+let _taskCoAssignees = []; // current set of user ids for the task being edited
 
 async function openTaskForm(id) {
   const f = document.getElementById("task-form");
   f.reset();
+  _taskCoAssignees = [];
   if (!_projects.length) {
     [_users, _projects] = await Promise.all([
       api("/admin/users").catch(() => []),
@@ -2534,9 +2564,14 @@ async function openTaskForm(id) {
     const catSel = document.getElementById("task-category-select");
     if (catSel) catSel.innerHTML = '<option value="">—</option>' + labels.map((l) => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
   } catch {}
+  const box = document.getElementById("task-modal-box");
+  const aside = document.getElementById("task-detail-aside");
+  const banner = document.getElementById("task-review-banner");
   if (id) {
     const t = await api("/tasks/" + id);
     document.getElementById("task-form-title").textContent = "Задача";
+    box.classList.add("wide");
+    aside.style.display = "flex";
     f.id.value = t.id;
     f.title.value = t.title;
     f.description.value = t.description || "";
@@ -2546,6 +2581,8 @@ async function openTaskForm(id) {
     f.priority.value = t.priority;
     f.category.value = t.category || "";
     f.status.value = t.status;
+    _taskCoAssignees = (t.coAssignees || []).map((ca) => ca.userId);
+    renderCoAssigneePills();
     document.getElementById("task-delete-btn").style.display = "inline-block";
     document.getElementById("task-delete-btn").onclick = () => deleteTask(t.id);
     document.getElementById("task-comments-row").style.display = "flex";
@@ -2554,6 +2591,7 @@ async function openTaskForm(id) {
     renderTaskTagsEditor(t.id, t.tagAssignments || []);
     document.getElementById("task-attach-row").style.display = "flex";
     renderTaskAttachments(t.id, t.attachments || []);
+    renderReviewBanner(t);
     // Tracking actions
     const isTracking = (t.tagAssignments || []).some((ta) => ta.tag && ta.tag.name === "отслеживание");
     let trackEl = document.getElementById("task-tracking-actions");
@@ -2575,14 +2613,103 @@ async function openTaskForm(id) {
     }
   } else {
     document.getElementById("task-form-title").textContent = "Новая задача";
+    box.classList.remove("wide");
+    aside.style.display = "flex";
+    banner.style.display = "none";
     f.id.value = "";
     f.status.value = "open";
+    renderCoAssigneePills();
     document.getElementById("task-delete-btn").style.display = "none";
     document.getElementById("task-comments-row").style.display = "none";
     document.getElementById("task-tags-row").style.display = "none";
     document.getElementById("task-attach-row").style.display = "none";
   }
   document.getElementById("task-form-modal").classList.remove("hidden");
+}
+
+function renderCoAssigneePills() {
+  const pills = document.getElementById("task-coassignee-pills");
+  const add = document.getElementById("task-coassignee-add");
+  const primary = document.querySelector('#task-form [name="assigneeId"]').value;
+  const picked = new Set(_taskCoAssignees);
+  if (pills) {
+    pills.innerHTML = _taskCoAssignees.map((uid) => {
+      const u = _users.find((x) => x.id === uid);
+      const name = u ? (u.name || u.email) : uid;
+      return `<span class="coassignee-pill">${escapeHtml(name)}<button type="button" onclick="removeCoAssignee('${uid}')">✕</button></span>`;
+    }).join("");
+  }
+  if (add) {
+    add.innerHTML = '<option value="">+ добавить</option>' + _users
+      .filter((u) => u.id !== primary && !picked.has(u.id))
+      .map((u) => `<option value="${u.id}">${escapeHtml(u.name || u.email)}</option>`)
+      .join("");
+    add.value = "";
+  }
+}
+
+function addCoAssignee(uid) {
+  if (!uid) return;
+  if (!_taskCoAssignees.includes(uid)) _taskCoAssignees.push(uid);
+  renderCoAssigneePills();
+}
+
+function removeCoAssignee(uid) {
+  _taskCoAssignees = _taskCoAssignees.filter((x) => x !== uid);
+  renderCoAssigneePills();
+}
+
+function renderReviewBanner(t) {
+  const banner = document.getElementById("task-review-banner");
+  if (!banner || !state.user) { if (banner) banner.style.display = "none"; return; }
+  const iAmCreator = t.creatorId === state.user.id;
+  const iAmAssignee = t.assigneeId === state.user.id ||
+    (t.coAssignees || []).some((ca) => ca.userId === state.user.id);
+  if (t.status === "awaiting_review" && iAmCreator) {
+    banner.style.display = "flex";
+    banner.innerHTML = `
+      <h4>🔎 Задача ожидает вашей проверки</h4>
+      <div style="font-size:12px;color:var(--text-muted)">Исполнитель завершил работу. Проверьте результат и подтвердите закрытие или верните в работу с комментарием.</div>
+      <div class="actions">
+        <button type="button" class="primary" onclick="reviewApprove('${t.id}')">✅ Подтвердить закрытие</button>
+        <button type="button" class="secondary" onclick="reviewReturn('${t.id}')">↩️ Вернуть в работу</button>
+      </div>`;
+  } else if (t.status === "awaiting_review" && iAmAssignee) {
+    banner.style.display = "flex";
+    banner.innerHTML = `
+      <h4>⏳ Отправлено на проверку</h4>
+      <div style="font-size:12px;color:var(--text-muted)">Постановщик получит уведомление и подтвердит закрытие или вернёт задачу в работу.</div>`;
+  } else if (t.status !== "done" && t.status !== "cancelled" && iAmAssignee && !iAmCreator) {
+    banner.style.display = "flex";
+    banner.innerHTML = `
+      <div class="actions">
+        <button type="button" class="primary" onclick="submitForReview('${t.id}')">✅ Выполнить — на проверку</button>
+      </div>`;
+  } else {
+    banner.style.display = "none";
+  }
+}
+
+async function submitForReview(id) {
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: "awaiting_review" }) });
+  closeModal("task-form-modal");
+  loadTasks();
+}
+
+async function reviewApprove(id) {
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
+  closeModal("task-form-modal");
+  loadTasks();
+}
+
+async function reviewReturn(id) {
+  const comment = prompt("Комментарий (что нужно доработать):");
+  if (comment && comment.trim()) {
+    await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify({ text: comment.trim() }) });
+  }
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: "in_progress" }) });
+  closeModal("task-form-modal");
+  loadTasks();
 }
 
 function closeModal(id) {
@@ -2597,6 +2724,7 @@ async function saveTask(e) {
   const id = body.id;
   delete body.id;
   if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
+  body.coAssigneeIds = _taskCoAssignees.slice();
   try {
     if (id) await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify(body) });
     else await api("/tasks", { method: "POST", body: JSON.stringify(body) });

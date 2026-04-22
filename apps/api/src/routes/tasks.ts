@@ -8,14 +8,22 @@ import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
 import { loadConfig } from "../config.js";
 import { audit } from "../services/audit.js";
-import { notifyAssignment } from "../services/task-tg.js";
+import {
+  notifyAssignment,
+  notifyReviewRequested,
+  notifyReviewConfirmed,
+  notifyReviewReturned,
+} from "../services/task-tg.js";
 
 const Params = z.object({ id: z.string() });
+
+const TASK_STATUSES = ["open", "in_progress", "awaiting_review", "done", "cancelled"] as const;
 
 const Create = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   assigneeId: z.string().optional(),
+  coAssigneeIds: z.array(z.string()).optional(),
   projectId: z.string().optional(),
   dueDate: z.coerce.date().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
@@ -27,10 +35,11 @@ const Patch = z.object({
   title: z.string().optional(),
   description: z.string().optional().nullable(),
   assigneeId: z.string().nullable().optional(),
+  coAssigneeIds: z.array(z.string()).optional(),
   projectId: z.string().nullable().optional(),
   dueDate: z.coerce.date().nullable().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
-  status: z.enum(["open", "in_progress", "done", "cancelled"]).optional(),
+  status: z.enum(TASK_STATUSES).optional(),
   category: z.string().optional().nullable(),
 });
 
@@ -39,11 +48,20 @@ const ListQuery = z.object({
   creatorId: z.string().optional(),
   unassigned: z.coerce.boolean().optional(),
   projectId: z.string().optional(),
-  status: z.enum(["open", "in_progress", "done", "cancelled", "all"]).optional(),
+  status: z.enum([...TASK_STATUSES, "all"]).optional(),
+  statusIn: z.string().optional(),
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   search: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(500).default(200),
 });
+
+const TASK_INCLUDE = {
+  project: true,
+  comments: { orderBy: { createdAt: "asc" as const } },
+  tagAssignments: { include: { tag: true } },
+  attachments: true,
+  coAssignees: true,
+};
 
 export async function taskRoutes(app: FastifyInstance): Promise<void> {
   const cfg = loadConfig();
@@ -55,7 +73,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     if (q.unassigned) where.assigneeId = null;
     if (q.projectId) where.projectId = q.projectId;
     if (q.priority) where.priority = q.priority;
-    if (q.status && q.status !== "all") where.status = q.status;
+    if (q.statusIn) {
+      const arr = q.statusIn
+        .split(",")
+        .map((s) => s.trim())
+        .filter((s): s is (typeof TASK_STATUSES)[number] =>
+          (TASK_STATUSES as readonly string[]).includes(s),
+        );
+      if (arr.length) where.status = { in: arr };
+    } else if (q.status && q.status !== "all") where.status = q.status;
     if (q.search) {
       where.OR = [
         { title: { contains: q.search, mode: "insensitive" } },
@@ -66,12 +92,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       where,
       orderBy: [{ status: "asc" }, { dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       take: q.limit,
-      include: {
-        project: true,
-        comments: { orderBy: { createdAt: "asc" } },
-        tagAssignments: { include: { tag: true } },
-        attachments: true,
-      },
+      include: TASK_INCLUDE,
     });
   });
 
@@ -79,12 +100,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const t = await prisma.task.findUnique({
       where: { id },
-      include: {
-        project: true,
-        comments: { orderBy: { createdAt: "asc" } },
-        tagAssignments: { include: { tag: true } },
-        attachments: true,
-      },
+      include: TASK_INCLUDE,
     });
     if (!t) throw new NotFound();
     return t;
@@ -93,8 +109,16 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   app.post("/tasks", { preHandler: requireUser() }, async (req) => {
     const body = Create.parse(req.body);
     const user = req.user!;
+    const { coAssigneeIds, ...rest } = body;
     const t = await prisma.task.create({
-      data: { ...body, creatorId: user.id },
+      data: {
+        ...rest,
+        creatorId: user.id,
+        ...(coAssigneeIds && coAssigneeIds.length
+          ? { coAssignees: { create: coAssigneeIds.map((userId) => ({ userId })) } }
+          : {}),
+      },
+      include: TASK_INCLUDE,
     });
     await audit(req, "task.create", { taskId: t.id, title: t.title });
     notifyAssignment(t.id, user.id).catch((e) => console.error("notify:", (e as Error).message));
@@ -104,16 +128,49 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/tasks/:id", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const body = Patch.parse(req.body);
-    const before = await prisma.task.findUnique({ where: { id }, select: { assigneeId: true } });
-    const data: Prisma.TaskUpdateInput = { ...body } as Prisma.TaskUpdateInput;
-    if (body.status === "done") (data as { completedAt: Date }).completedAt = new Date();
-    if (body.status && body.status !== "done") (data as { completedAt: null }).completedAt = null;
-    const t = await prisma.task.update({ where: { id }, data });
-    await audit(req, "task.update", { taskId: id, changes: body });
-    if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== before?.assigneeId) {
-      notifyAssignment(t.id, req.user!.id).catch((e) => console.error("notify:", (e as Error).message));
+    const before = await prisma.task.findUnique({
+      where: { id },
+      select: { assigneeId: true, status: true, creatorId: true },
+    });
+    if (!before) throw new NotFound();
+    const { coAssigneeIds, ...rest } = body;
+    const data: Prisma.TaskUpdateInput = { ...rest } as Prisma.TaskUpdateInput;
+    if (body.status === "awaiting_review") {
+      (data as { reviewRequestedAt: Date }).reviewRequestedAt = new Date();
+      (data as { completedAt: null }).completedAt = null;
+    } else if (body.status === "done") {
+      (data as { completedAt: Date }).completedAt = new Date();
+    } else if (body.status) {
+      (data as { completedAt: null }).completedAt = null;
+      (data as { reviewRequestedAt: null }).reviewRequestedAt = null;
     }
-    return t;
+    const t = await prisma.task.update({ where: { id }, data, include: TASK_INCLUDE });
+    // Replace coAssignees set if provided
+    if (coAssigneeIds !== undefined) {
+      await prisma.taskCoAssignee.deleteMany({ where: { taskId: id } });
+      if (coAssigneeIds.length) {
+        await prisma.taskCoAssignee.createMany({
+          data: coAssigneeIds.map((userId) => ({ taskId: id, userId })),
+          skipDuplicates: true,
+        });
+      }
+    }
+    await audit(req, "task.update", { taskId: id, changes: body });
+    const me = req.user!.id;
+    if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== before.assigneeId) {
+      notifyAssignment(t.id, me).catch((e) => console.error("notify:", (e as Error).message));
+    }
+    // Review workflow notifications
+    if (body.status && body.status !== before.status) {
+      if (body.status === "awaiting_review") {
+        notifyReviewRequested(t.id, me).catch((e) => console.error("notify:", (e as Error).message));
+      } else if (before.status === "awaiting_review" && body.status === "done") {
+        notifyReviewConfirmed(t.id, me).catch((e) => console.error("notify:", (e as Error).message));
+      } else if (before.status === "awaiting_review" && (body.status === "in_progress" || body.status === "open")) {
+        notifyReviewReturned(t.id, me).catch((e) => console.error("notify:", (e as Error).message));
+      }
+    }
+    return prisma.task.findUnique({ where: { id }, include: TASK_INCLUDE });
   });
 
   app.delete("/tasks/:id", { preHandler: requireUser() }, async (req, reply) => {

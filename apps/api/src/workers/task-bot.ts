@@ -1,7 +1,12 @@
 import { prisma } from "@crm/db";
 import { loadConfig } from "../config.js";
 import { parseTaskFromText } from "../services/tasks-ai.js";
-import { notifyAssignment } from "../services/task-tg.js";
+import {
+  notifyAssignment,
+  notifyReviewRequested,
+  notifyReviewConfirmed,
+  notifyReviewReturned,
+} from "../services/task-tg.js";
 
 const cfg = loadConfig();
 let offset = 0;
@@ -202,7 +207,7 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>): Promis
     return;
   }
 
-  // tcl:<taskId> — confirm "close task"
+  // tcl:<taskId> — assignee marks task complete (goes to review if creator differs)
   if (data.startsWith("tcl:")) {
     const taskId = data.slice(4);
     const t = await prisma.task.findUnique({ where: { id: taskId } });
@@ -210,12 +215,59 @@ async function handleCallback(cb: NonNullable<Update["callback_query"]>): Promis
       await answer("задача не найдена");
       return;
     }
+    const byUser = await prisma.tgUserBinding.findUnique({ where: { tgUserId: BigInt(cb.from.id) } });
+    const byUserId = byUser?.userId ?? null;
+    const needsReview = t.creatorId && byUserId && t.creatorId !== byUserId;
+    if (needsReview) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "awaiting_review", reviewRequestedAt: new Date() },
+      });
+      await editText(`🔎 На проверку: <b>${escapeHtml(t.title)}</b>`);
+      await answer("отправлено на проверку");
+      await notifyReviewRequested(taskId, byUserId).catch(() => undefined);
+    } else {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "done", completedAt: new Date() },
+      });
+      await editText(`✅ Задача закрыта: <b>${escapeHtml(t.title)}</b>`);
+      await answer("закрыто");
+    }
+    return;
+  }
+
+  // tra:<taskId> — creator approves (awaiting_review → done)
+  if (data.startsWith("tra:")) {
+    const taskId = data.slice(4);
+    const t = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!t) { await answer("задача не найдена"); return; }
+    const byUser = await prisma.tgUserBinding.findUnique({ where: { tgUserId: BigInt(cb.from.id) } });
+    const byUserId = byUser?.userId ?? null;
     await prisma.task.update({
       where: { id: taskId },
-      data: { status: "done", completedAt: new Date() },
+      data: { status: "done", completedAt: new Date(), reviewRequestedAt: null },
     });
-    await editText(`✅ Задача закрыта: <b>${escapeHtml(t.title)}</b>`);
-    await answer("закрыто");
+    await editText(`✅ Закрытие подтверждено: <b>${escapeHtml(t.title)}</b>`);
+    await answer("подтверждено");
+    await notifyReviewConfirmed(taskId, byUserId).catch(() => undefined);
+    return;
+  }
+
+  // trr:<taskId> — creator returns task to in_progress
+  if (data.startsWith("trr:")) {
+    const taskId = data.slice(4);
+    const t = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!t) { await answer("задача не найдена"); return; }
+    const byUser = await prisma.tgUserBinding.findUnique({ where: { tgUserId: BigInt(cb.from.id) } });
+    const byUserId = byUser?.userId ?? null;
+    await prisma.task.update({
+      where: { id: taskId },
+      data: { status: "in_progress", reviewRequestedAt: null, completedAt: null },
+    });
+    await editText(`↩️ Возвращено в работу: <b>${escapeHtml(t.title)}</b>`);
+    await answer("возвращено");
+    await notifyReviewReturned(taskId, byUserId).catch(() => undefined);
     return;
   }
 

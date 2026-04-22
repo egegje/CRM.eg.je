@@ -8,6 +8,7 @@ struct KanbanView: View {
     private let columns: [(key: String, title: String, icon: String, color: Color)] = [
         ("open", "Открыта", "tray", .blue),
         ("in_progress", "В работе", "gearshape", .orange),
+        ("awaiting_review", "На проверке", "magnifyingglass.circle", .purple),
         ("done", "Выполнена", "checkmark.circle", .green),
         ("cancelled", "Отменена", "xmark.circle", .gray),
     ]

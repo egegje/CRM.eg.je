@@ -39,15 +39,20 @@ export async function sendTaskBotToUser(
   });
 }
 
-/** Notify an assignee that a new task was created or assigned to them. */
-export async function notifyAssignment(taskId: string, byUserId: string | null): Promise<void> {
-  // Check if TG notifications are paused
-  const pauseSetting = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
-  if (pauseSetting?.value === "true") return;
+async function notificationsPaused(): Promise<boolean> {
+  const p = await prisma.taskSetting.findUnique({ where: { key: "tg_notifications_paused" } });
+  return p?.value === "true";
+}
 
-  const t = await prisma.task.findUnique({ where: { id: taskId }, include: { project: true } });
-  if (!t || !t.assigneeId) return;
-  if (byUserId && t.assigneeId === byUserId) return; // self-assigned, no ping
+/** Notify an assignee + co-assignees that a new task was created or assigned to them. */
+export async function notifyAssignment(taskId: string, byUserId: string | null): Promise<void> {
+  if (await notificationsPaused()) return;
+
+  const t = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { project: true, coAssignees: true },
+  });
+  if (!t) return;
   const by = byUserId
     ? await prisma.user.findUnique({ where: { id: byUserId }, select: { name: true } })
     : null;
@@ -59,5 +64,71 @@ export async function notifyAssignment(taskId: string, byUserId: string | null):
   if (t.project) lines.push(`проект: ${escapeHtml(t.project.name)}`);
   if (t.priority && t.priority !== "normal") lines.push(`приоритет: ${t.priority}`);
   if (t.description) lines.push("", escapeHtml(t.description.slice(0, 300)));
-  await sendTaskBotToUser(t.assigneeId, lines.join("\n"));
+  const targets = new Set<string>();
+  if (t.assigneeId) targets.add(t.assigneeId);
+  for (const ca of t.coAssignees) targets.add(ca.userId);
+  for (const uid of targets) {
+    if (byUserId && uid === byUserId) continue;
+    await sendTaskBotToUser(uid, lines.join("\n"));
+  }
+}
+
+/** Notify creator: assignee marked task as ready for review. */
+export async function notifyReviewRequested(taskId: string, byUserId: string | null): Promise<void> {
+  if (await notificationsPaused()) return;
+  const t = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!t || !t.creatorId) return;
+  if (byUserId && t.creatorId === byUserId) return;
+  const by = byUserId
+    ? await prisma.user.findUnique({ where: { id: byUserId }, select: { name: true } })
+    : null;
+  const lines = [
+    `🔎 <b>Задача на проверку:</b> ${escapeHtml(t.title)}`,
+    by ? `исполнитель: ${escapeHtml(by.name)}` : "",
+    `Откройте задачу в CRM и подтвердите закрытие или верните в работу.`,
+  ].filter(Boolean);
+  await sendTaskBotToUser(t.creatorId, lines.join("\n"));
+}
+
+/** Notify assignee + co-assignees: creator confirmed closure. */
+export async function notifyReviewConfirmed(taskId: string, byUserId: string | null): Promise<void> {
+  if (await notificationsPaused()) return;
+  const t = await prisma.task.findUnique({ where: { id: taskId }, include: { coAssignees: true } });
+  if (!t) return;
+  const by = byUserId
+    ? await prisma.user.findUnique({ where: { id: byUserId }, select: { name: true } })
+    : null;
+  const text = [
+    `✅ <b>Закрытие подтверждено:</b> ${escapeHtml(t.title)}`,
+    by ? `подтвердил(а): ${escapeHtml(by.name)}` : "",
+  ].filter(Boolean).join("\n");
+  const targets = new Set<string>();
+  if (t.assigneeId) targets.add(t.assigneeId);
+  for (const ca of t.coAssignees) targets.add(ca.userId);
+  for (const uid of targets) {
+    if (byUserId && uid === byUserId) continue;
+    await sendTaskBotToUser(uid, text);
+  }
+}
+
+/** Notify assignee + co-assignees: creator returned task to work. */
+export async function notifyReviewReturned(taskId: string, byUserId: string | null): Promise<void> {
+  if (await notificationsPaused()) return;
+  const t = await prisma.task.findUnique({ where: { id: taskId }, include: { coAssignees: true } });
+  if (!t) return;
+  const by = byUserId
+    ? await prisma.user.findUnique({ where: { id: byUserId }, select: { name: true } })
+    : null;
+  const text = [
+    `↩️ <b>Задача возвращена в работу:</b> ${escapeHtml(t.title)}`,
+    by ? `вернул(а): ${escapeHtml(by.name)}` : "",
+    `Проверьте комментарии и продолжите выполнение.`,
+  ].filter(Boolean).join("\n");
+  const targets = new Set<string>();
+  if (t.assigneeId) targets.add(t.assigneeId);
+  for (const ca of t.coAssignees) targets.add(ca.userId);
+  for (const uid of targets) {
+    if (byUserId && uid === byUserId) continue;
+    await sendTaskBotToUser(uid, text);
+  }
 }
