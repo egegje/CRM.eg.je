@@ -2223,6 +2223,56 @@ function exitTasksView() {
 let tasksMode = "list";
 let _tags = [];
 
+function tasksSortKey() {
+  return "tasks-sort:" + (tasksFilter || "me");
+}
+function getTasksSort() {
+  return localStorage.getItem(tasksSortKey()) || "deadline";
+}
+function onTasksSortChange() {
+  const v = document.getElementById("tasks-sort")?.value || "deadline";
+  localStorage.setItem(tasksSortKey(), v);
+  loadTasks();
+}
+function taskHasNewComments(t) {
+  if (!t.lastCommentAt) return false;
+  const me = state.user?.id;
+  // If last comment was by me, don't flag as new.
+  const last = (t.comments || [])[((t.comments || []).length - 1)];
+  if (last && me && last.userId === me) return false;
+  if (!t.viewedAt) return true;
+  return new Date(t.lastCommentAt) > new Date(t.viewedAt);
+}
+function applyTasksSort(tasks) {
+  const mode = getTasksSort();
+  const arr = tasks.slice();
+  const toTs = (d) => (d ? new Date(d).getTime() : null);
+  if (mode === "deadline") {
+    arr.sort((a, b) => {
+      const ad = toTs(a.dueDate), bd = toTs(b.dueDate);
+      if (ad == null && bd == null) return toTs(b.createdAt) - toTs(a.createdAt);
+      if (ad == null) return 1;
+      if (bd == null) return -1;
+      return ad - bd;
+    });
+  } else if (mode === "updates") {
+    arr.sort((a, b) => {
+      const an = taskHasNewComments(a) ? 1 : 0;
+      const bn = taskHasNewComments(b) ? 1 : 0;
+      if (an !== bn) return bn - an;
+      const ac = toTs(a.lastCommentAt) || 0;
+      const bc = toTs(b.lastCommentAt) || 0;
+      if (ac !== bc) return bc - ac;
+      return toTs(b.createdAt) - toTs(a.createdAt);
+    });
+  } else if (mode === "created_desc") {
+    arr.sort((a, b) => toTs(b.createdAt) - toTs(a.createdAt));
+  } else if (mode === "created_asc") {
+    arr.sort((a, b) => toTs(a.createdAt) - toTs(b.createdAt));
+  }
+  return arr;
+}
+
 async function loadTasks() {
   // Refresh tag dropdown lazily on first call
   if (!_tags.length) {
@@ -2297,6 +2347,14 @@ async function loadTasks() {
   } else if (labelSel) {
     labelSel.style.display = "none";
   }
+  // Sync sort selector to saved value + hide in kanban
+  const sortSel = document.getElementById("tasks-sort");
+  if (sortSel) {
+    sortSel.value = getTasksSort();
+    sortSel.style.display = tasksMode === "kanban" ? "none" : "";
+  }
+  // Apply sort (kanban keeps its own status-based layout)
+  if (tasksMode !== "kanban") tasks = applyTasksSort(tasks);
   if (tasksMode === "kanban") renderKanban(tasks);
   else if (tasksFilter === "createdByMe") await renderTasksGrouped(tasks);
   else renderTasks(tasks);
@@ -2318,10 +2376,11 @@ function renderTasks(tasks) {
   el.innerHTML = tasks.map((t) => {
     const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
     const done = t.status === "done";
-    return `<div style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px" onclick="openTaskForm('${t.id}')">
+    const hasNew = taskHasNewComments(t);
+    return `<div class="task-row${hasNew ? " has-new" : ""}" style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px" onclick="openTaskForm('${t.id}')">
       <div style="flex:1;min-width:0">
-        <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word">
-          ${t.priority === "urgent" ? "🔥 " : ""}${done ? "✅ " : ""}${escapeHtml(t.title)}
+        <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word;display:flex;align-items:center;gap:6px">
+          ${hasNew ? '<span class="task-new-dot" title="новые комментарии"></span>' : ""}${t.priority === "urgent" ? "🔥 " : ""}${done ? "✅ " : ""}${escapeHtml(t.title)}
         </div>
         <div style="font-size:11px;color:var(--text-muted);margin-top:3px">
           ${t.project ? `📁 ${escapeHtml(t.project.name)} · ` : ""}
@@ -2365,21 +2424,23 @@ async function renderTasksGrouped(tasks) {
   });
   for (const key of keys) {
     const name = key === "__none" ? "Без исполнителя" : (userNames[key] || key);
-    const list = groups[key];
+    const list = applyTasksSort(groups[key]);
     const openCount = list.filter((t) => t.status === "open" || t.status === "in_progress").length;
+    const newCount = list.filter((t) => taskHasNewComments(t)).length;
     html += `
       <div style="margin-bottom:18px">
         <div style="font-weight:600;font-size:14px;padding:8px 0;border-bottom:2px solid var(--accent);margin-bottom:6px">
-          ${escapeHtml(name)} <span style="color:var(--text-muted);font-weight:400;font-size:12px">(${openCount} активных из ${list.length})</span>
+          ${escapeHtml(name)} <span style="color:var(--text-muted);font-weight:400;font-size:12px">(${openCount} активных из ${list.length}${newCount ? ` · <span style="color:var(--accent);font-weight:600">💬 ${newCount}</span>` : ""})</span>
         </div>
         ${list.map((t) => {
           const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
           const done = t.status === "done" || t.status === "cancelled";
-          return `<div style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:8px;opacity:${done ? 0.5 : 1}" onclick="openTaskForm('${t.id}')">
+          const hasNew = taskHasNewComments(t);
+          return `<div class="task-row${hasNew ? " has-new" : ""}" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:8px;opacity:${done ? 0.5 : 1}" onclick="openTaskForm('${t.id}')">
             <span style="font-size:12px">${statusIcon[t.status] || "⬚"}</span>
             <div style="flex:1;min-width:0">
-              <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};font-size:13px">
-                ${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
+              <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};font-size:13px;display:flex;align-items:center;gap:6px">
+                ${hasNew ? '<span class="task-new-dot" title="новые комментарии"></span>' : ""}${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}
               </div>
               <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
                 ${t.category ? `<span style="background:var(--accent);color:white;padding:1px 6px;border-radius:8px;font-size:10px;margin-right:4px">${escapeHtml(t.category)}</span>` : ""}
@@ -2604,6 +2665,8 @@ async function openTaskForm(id) {
   const banner = document.getElementById("task-review-banner");
   if (id) {
     const t = await api("/tasks/" + id);
+    // Mark task as viewed (clears "new comments" highlight on next list load)
+    api("/tasks/" + id + "/view", { method: "POST" }).catch(() => {});
     document.getElementById("task-form-title").textContent = "Задача";
     box.classList.add("wide");
     aside.style.display = "flex";

@@ -535,3 +535,24 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
 }
 .ap-avatar svg { width: 20px; height: 20px; display: block; }
+
+/* Task rows with unread/new comments */
+.task-row { position: relative; transition: background 0.15s ease; }
+.task-row.has-new {
+  background: linear-gradient(90deg, var(--accent-soft), transparent 40%);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.task-row.has-new:hover { background: linear-gradient(90deg, var(--accent-soft), var(--bg-hover) 60%); }
+.task-new-dot {
+  display: inline-block;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  flex-shrink: 0;
+  margin-right: 2px;
+  animation: task-pulse 1.8s ease-in-out infinite;
+}
+@keyframes task-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px var(--accent-soft); }
+  50% { box-shadow: 0 0 0 6px var(--accent-soft); }
+}

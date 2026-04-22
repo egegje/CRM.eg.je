@@ -91,12 +91,44 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
         { description: { contains: q.search, mode: "insensitive" } },
       ];
     }
-    return prisma.task.findMany({
+    const tasks = await prisma.task.findMany({
       where,
       orderBy: [{ status: "asc" }, { dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
       take: q.limit,
       include: TASK_INCLUDE,
     });
+    const me = req.user!.id;
+    const ids = tasks.map((t) => t.id);
+    const views = ids.length
+      ? await prisma.taskView.findMany({
+          where: { userId: me, taskId: { in: ids } },
+          select: { taskId: true, viewedAt: true },
+        })
+      : [];
+    const viewMap = new Map(views.map((v) => [v.taskId, v.viewedAt]));
+    return tasks.map((t) => {
+      const lastCommentAt = t.comments.length
+        ? t.comments[t.comments.length - 1].createdAt
+        : null;
+      return {
+        ...t,
+        lastCommentAt,
+        viewedAt: viewMap.get(t.id) ?? null,
+      };
+    });
+  });
+
+  app.post("/tasks/:id/view", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const me = req.user!.id;
+    const t = await prisma.task.findUnique({ where: { id }, select: { id: true } });
+    if (!t) throw new NotFound();
+    const v = await prisma.taskView.upsert({
+      where: { userId_taskId: { userId: me, taskId: id } },
+      update: { viewedAt: new Date() },
+      create: { userId: me, taskId: id },
+    });
+    return { viewedAt: v.viewedAt };
   });
 
   app.get("/tasks/:id", { preHandler: requireUser() }, async (req) => {

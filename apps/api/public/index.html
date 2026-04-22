@@ -167,6 +167,12 @@
       <select id="tasks-assignee-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все исполнители</option></select>
       <select id="tasks-label-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);display:none"><option value="">все метки</option></select>
       <select id="tasks-tag-filter" onchange="loadTasks()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)"><option value="">все теги</option></select>
+      <select id="tasks-sort" onchange="onTasksSortChange()" style="padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text)">
+        <option value="deadline">🗓 по дедлайну</option>
+        <option value="updates">💬 по обновлениям</option>
+        <option value="created_desc">🆕 новые → старые</option>
+        <option value="created_asc">📜 старые → новые</option>
+      </select>
     </div>
     <div id="tasks-list"></div>
   </section>

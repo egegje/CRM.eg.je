@@ -255,6 +255,7 @@ model Task {
   tagAssignments       TaskTagAssignment[]
   attachments          TaskAttachment[]
   coAssignees          TaskCoAssignee[]
+  views                TaskView[]
 
   @@index([assigneeId, status])
   @@index([dueDate, status])
@@ -280,6 +281,16 @@ model TaskComment {
   updatedAt DateTime?
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id])
+}
+
+model TaskView {
+  userId   String
+  taskId   String
+  viewedAt DateTime @default(now())
+  task     Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@id([userId, taskId])
+  @@index([taskId])
 }
 
 model Persona {
