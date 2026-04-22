@@ -1,6 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { prisma } from "@crm/db";
+import { prisma, type Prisma } from "@crm/db";
 import { requireRole } from "../auth.js";
 import { hashPassword } from "../auth.js";
 import { setKey, encrypt } from "../crypto.js";
@@ -45,7 +45,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   // ---- mailboxes ----
   app.get("/admin/mailboxes", { preHandler: requireRole("owner", "admin") }, async () => {
     return prisma.mailbox.findMany({
-      select: { id: true, email: true, displayName: true, enabled: true, imapHost: true, smtpHost: true, createdAt: true },
+      select: { id: true, email: true, displayName: true, enabled: true, imapHost: true, imapPort: true, smtpHost: true, smtpPort: true, createdAt: true },
       orderBy: { displayName: "asc" },
     });
   });
@@ -54,27 +54,51 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     email: z.string().email(),
     displayName: z.string().min(1),
     appPassword: z.string().min(1),
+    imapHost: z.string().min(1).optional(),
+    imapPort: z.coerce.number().int().min(1).max(65535).optional(),
+    smtpHost: z.string().min(1).optional(),
+    smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
   });
   app.post("/admin/mailboxes", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const body = CreateMailbox.parse(req.body);
     const enc = encrypt(body.appPassword, body.email);
     return prisma.mailbox.create({
-      data: { email: body.email, displayName: body.displayName, encryptedAppPassword: enc },
+      data: {
+        email: body.email,
+        displayName: body.displayName,
+        encryptedAppPassword: enc,
+        ...(body.imapHost ? { imapHost: body.imapHost } : {}),
+        ...(body.imapPort ? { imapPort: body.imapPort } : {}),
+        ...(body.smtpHost ? { smtpHost: body.smtpHost } : {}),
+        ...(body.smtpPort ? { smtpPort: body.smtpPort } : {}),
+      },
       select: { id: true, email: true, displayName: true, enabled: true },
     });
   });
 
   app.patch("/admin/mailboxes/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const { id } = Params.parse(req.params);
-    const body = z.object({
+    const parsed = z.object({
       enabled: z.boolean().optional(),
       displayName: z.string().optional(),
       signature: z.string().optional(),
+      imapHost: z.string().min(1).optional(),
+      imapPort: z.coerce.number().int().min(1).max(65535).optional(),
+      smtpHost: z.string().min(1).optional(),
+      smtpPort: z.coerce.number().int().min(1).max(65535).optional(),
+      appPassword: z.string().min(1).optional(),
     }).parse(req.body);
+    const { appPassword, ...body } = parsed;
+    const data: Prisma.MailboxUpdateInput = { ...body };
+    if (appPassword) {
+      const mb = await prisma.mailbox.findUnique({ where: { id }, select: { email: true } });
+      if (!mb) throw new NotFound();
+      data.encryptedAppPassword = encrypt(appPassword, mb.email);
+    }
     return prisma.mailbox.update({
       where: { id },
-      data: body,
-      select: { id: true, email: true, displayName: true, enabled: true, signature: true },
+      data,
+      select: { id: true, email: true, displayName: true, enabled: true, signature: true, imapHost: true, imapPort: true, smtpHost: true, smtpPort: true },
     });
   });
 

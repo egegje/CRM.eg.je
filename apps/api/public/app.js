@@ -3109,11 +3109,24 @@ async function renderMailboxesTab() {
   return `
     ${cards}
     <div class="settings-card">
+      ${helpBtn("mailbox-add")}
       <div class="settings-card-title">+ Новый ящик</div>
       <form onsubmit="adminCreateMailbox(event)" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:12px;color:var(--text-muted);grid-column:span 2">Провайдер
+          <select name="_preset" onchange="applyMailboxPreset(this.form)" style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box">
+            <option value="mailru">Mail.ru</option>
+            <option value="gmail">Gmail / Google Workspace (вкл. @eg.je)</option>
+            <option value="yandex">Яндекс.Почта</option>
+            <option value="custom">Свой IMAP/SMTP сервер</option>
+          </select>
+        </label>
         <label style="font-size:12px;color:var(--text-muted)">Email<input type="email" name="email" placeholder="user@mail.ru" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
         <label style="font-size:12px;color:var(--text-muted)">Название<input name="displayName" placeholder="Основной" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
-        <label style="font-size:12px;color:var(--text-muted);grid-column:span 2">Пароль приложения<input type="password" name="appPassword" placeholder="из настроек почты" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted);grid-column:span 2">Пароль приложения<input type="password" name="appPassword" placeholder="16 символов без пробелов" required style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">IMAP host<input name="imapHost" value="imap.mail.ru" readonly style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">IMAP port<input name="imapPort" type="number" value="993" readonly style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">SMTP host<input name="smtpHost" value="smtp.mail.ru" readonly style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
+        <label style="font-size:12px;color:var(--text-muted)">SMTP port<input name="smtpPort" type="number" value="465" readonly style="display:block;width:100%;padding:8px 10px;margin-top:4px;border:1px solid var(--border);border-radius:8px;background:var(--bg-alt);color:var(--text);font-size:13px;box-sizing:border-box"></label>
         <button type="submit" style="grid-column:span 2;padding:10px;background:var(--accent);color:white;border:none;border-radius:10px;cursor:pointer;font-weight:600;font-size:13px">Добавить</button>
       </form>
     </div>
@@ -3134,10 +3147,32 @@ async function editSignature(id, current) {
   renderAdminTab();
 }
 
+const MAILBOX_PRESETS = {
+  mailru: { imapHost: "imap.mail.ru", imapPort: 993, smtpHost: "smtp.mail.ru", smtpPort: 465 },
+  gmail:  { imapHost: "imap.gmail.com", imapPort: 993, smtpHost: "smtp.gmail.com", smtpPort: 465 },
+  yandex: { imapHost: "imap.yandex.ru", imapPort: 993, smtpHost: "smtp.yandex.ru", smtpPort: 465 },
+  custom: { imapHost: "", imapPort: "", smtpHost: "", smtpPort: "" },
+};
+function applyMailboxPreset(form) {
+  const key = form._preset.value;
+  const p = MAILBOX_PRESETS[key] || MAILBOX_PRESETS.mailru;
+  form.imapHost.value = p.imapHost;
+  form.imapPort.value = p.imapPort;
+  form.smtpHost.value = p.smtpHost;
+  form.smtpPort.value = p.smtpPort;
+  const readonly = key !== "custom";
+  ["imapHost", "imapPort", "smtpHost", "smtpPort"].forEach((n) => { form[n].readOnly = readonly; });
+}
+
 async function adminCreateMailbox(e) {
   e.preventDefault();
   const f = new FormData(e.target);
-  await api("/admin/mailboxes", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  const data = Object.fromEntries(f);
+  delete data._preset;
+  for (const k of ["imapHost", "imapPort", "smtpHost", "smtpPort"]) {
+    if (data[k] === "" || data[k] == null) delete data[k];
+  }
+  await api("/admin/mailboxes", { method: "POST", body: JSON.stringify(data) });
   renderAdminTab();
 }
 async function adminToggleMailbox(id, enabled) {
@@ -3458,6 +3493,27 @@ const HELP_TEXTS = {
         <li><b>Автозакрытие</b> — если по задаче есть отслеживание переписки и AI видит в новом письме закрывающий ответ, он предлагает закрыть задачу.</li>
       </ul>
       <p>AI-классификация с уверенностью ≥60% — всё что ниже, не беспокоит.</p>
+    `,
+  },
+  "mailbox-add": {
+    title: "+ Новый ящик",
+    body: `
+      <p>Подключает почтовый ящик по IMAP (чтение) и SMTP (отправка).</p>
+      <h4>Пресеты провайдеров</h4>
+      <ul>
+        <li><b>Mail.ru</b> — <code>imap.mail.ru:993</code> / <code>smtp.mail.ru:465</code>. В настройках mail.ru: Почта → Настройки → Безопасность → Пароли для внешних приложений.</li>
+        <li><b>Gmail / Google Workspace</b> (включая <code>@eg.je</code>) — <code>imap.gmail.com:993</code> / <code>smtp.gmail.com:465</code>. Требует 2FA + App Password из <code>myaccount.google.com/apppasswords</code>.</li>
+        <li><b>Яндекс</b> — <code>imap.yandex.ru:993</code> / <code>smtp.yandex.ru:465</code>. Нужен пароль приложения из Яндекс ID → Безопасность.</li>
+        <li><b>Свой сервер</b> — заполни все 4 поля вручную.</li>
+      </ul>
+      <h4>Кто увидит ящик</h4>
+      <p>По умолчанию — только owner. Чтобы дать доступ другим сотрудникам: /admin → Пользователи → открыть юзера → в блоке «Доступ к ящикам» поставить галку.</p>
+      <h4>Если не подключается</h4>
+      <ul>
+        <li>Проверь, что включена 2FA и используешь App Password, а не обычный пароль аккаунта.</li>
+        <li>У Google Workspace админ может запретить App Passwords — тогда нужно OAuth (отдельная интеграция).</li>
+        <li>Порт 465 — SSL/TLS. Если порт 587 — это STARTTLS, пока не поддерживаем.</li>
+      </ul>
     `,
   },
   "task-settings-metr": {
