@@ -3063,22 +3063,23 @@ async function manageUserAccess(userId, email, role) {
     .map((co) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-co="${co.id}" ${coSet.has(co.id) ? "checked" : ""}> ${escapeHtml(co.name)}${co.inn ? " (ИНН " + escapeHtml(co.inn) + ")" : ""}</label>`)
     .join("");
   const c = document.getElementById("admin-view-content");
+  const ownerHint = role === "owner"
+    ? `<p style="margin:0 0 8px;font-size:12px;color:var(--text-muted)">Для owner: если ничего не отмечено — видны <b>все</b> ящики (поведение по умолчанию). Как только поставишь хотя бы одну галку, owner начнёт видеть только отмеченные. Новые подключённые ящики автоматически добавятся в этот список.</p>`
+    : `<p style="margin:0 0 8px">Отметьте ящики к которым у пользователя есть доступ. Без галочек — почта не видна.</p>`;
   c.innerHTML = `
     <h4 style="margin-top:0">Доступ: ${escapeHtml(email)} (${escapeHtml(role)})</h4>
-    ${role !== "owner" ? `
-      <div class="settings-card">
-        <div class="settings-card-title">📧 Ящики</div>
-        <p style="margin:0 0 8px">Отметьте ящики к которым у пользователя есть доступ. Без галочек — почта не видна.</p>
-        <div id="access-mb-list">${mbList || "<span style='color:var(--text-muted)'>нет ящиков</span>"}</div>
-      </div>
-    ` : ""}
+    <div class="settings-card">
+      <div class="settings-card-title">📧 Ящики</div>
+      ${ownerHint}
+      <div id="access-mb-list">${mbList || "<span style='color:var(--text-muted)'>нет ящиков</span>"}</div>
+    </div>
     ${role !== "owner" ? `
       <div class="settings-card">
         <div class="settings-card-title">💰 Компании (финансы)</div>
         <p style="margin:0 0 8px">Отметьте компании которые пользователь может видеть. Без галочек — финансы не видны.</p>
         <div id="access-co-list">${coList || "<span style='color:var(--text-muted)'>нет компаний</span>"}</div>
       </div>
-    ` : '<p style="color:var(--text-muted)">Owner имеет полный доступ ко всему.</p>'}
+    ` : '<p style="color:var(--text-muted)">Owner имеет полный доступ к финансам всех компаний.</p>'}
     <div style="display:flex;gap:8px;margin-top:14px">
       <button onclick="saveAccess('${userId}')" style="padding:10px 20px;background:var(--accent);color:white;border:none;border-radius:8px;cursor:pointer;font-weight:600">Сохранить</button>
       <button onclick="renderAdminTab()" style="padding:10px 20px;border:1px solid var(--border);border-radius:8px;cursor:pointer;background:var(--bg)">← Назад</button>
@@ -3088,11 +3089,13 @@ async function manageUserAccess(userId, email, role) {
 
 async function saveAccess(userId) {
   const mbIds = [...document.querySelectorAll('#access-mb-list input[type=checkbox]:checked')].map((c) => c.dataset.mb);
-  const coIds = [...document.querySelectorAll('#access-co-list input[type=checkbox]:checked')].map((c) => c.dataset.co);
-  await Promise.all([
-    api("/admin/users/" + userId + "/mailboxes", { method: "PUT", body: JSON.stringify({ mailboxIds: mbIds }) }),
-    api("/admin/users/" + userId + "/companies", { method: "PUT", body: JSON.stringify({ companyIds: coIds }) }).catch(() => {}),
-  ]);
+  const coListEl = document.getElementById("access-co-list");
+  const tasks = [api("/admin/users/" + userId + "/mailboxes", { method: "PUT", body: JSON.stringify({ mailboxIds: mbIds }) })];
+  if (coListEl) {
+    const coIds = [...coListEl.querySelectorAll('input[type=checkbox]:checked')].map((c) => c.dataset.co);
+    tasks.push(api("/admin/users/" + userId + "/companies", { method: "PUT", body: JSON.stringify({ companyIds: coIds }) }).catch(() => {}));
+  }
+  await Promise.all(tasks);
   renderAdminTab();
 }
 

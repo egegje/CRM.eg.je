@@ -62,7 +62,7 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
   app.post("/admin/mailboxes", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const body = CreateMailbox.parse(req.body);
     const enc = encrypt(body.appPassword, body.email);
-    return prisma.mailbox.create({
+    const mb = await prisma.mailbox.create({
       data: {
         email: body.email,
         displayName: body.displayName,
@@ -74,6 +74,16 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       },
       select: { id: true, email: true, displayName: true, enabled: true },
     });
+    // Auto-grant to any owner who already has an explicit subset configured —
+    // otherwise the new mailbox would silently disappear from their view.
+    const owners = await prisma.user.findMany({ where: { role: "owner" }, select: { id: true } });
+    for (const o of owners) {
+      const has = await prisma.userMailbox.count({ where: { userId: o.id } });
+      if (has > 0) {
+        await prisma.userMailbox.create({ data: { userId: o.id, mailboxId: mb.id } });
+      }
+    }
+    return mb;
   });
 
   app.patch("/admin/mailboxes/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
