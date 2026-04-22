@@ -515,3 +515,23 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .home-ai-text .bi-date { color: var(--text); font-weight: 700; background: var(--bg-hover); padding: 1px 5px; border-radius: 4px; }
 .home-ai-text .bi-money { color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums; }
 .home-ai-text .bi-pct { color: var(--success); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Apple-style avatars (used in admin Telegram tab, could be reused elsewhere) */
+.ap-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  flex-shrink: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.10),
+    0 1px 2px rgba(0, 0, 0, 0.16),
+    0 0 0 0.5px rgba(0, 0, 0, 0.06);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+}
+.ap-avatar svg { width: 20px; height: 20px; display: block; }

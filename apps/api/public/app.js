@@ -3279,6 +3279,27 @@ async function renderAuditTab() {
   return `<table class="admin-table"><thead><tr><th>Время</th><th>Кто</th><th>Действие</th><th>Детали</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
+function apAvatarHue(seed) {
+  const s = String(seed || "");
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h % 360;
+}
+function apAvatarGradient(seed) {
+  const h = apAvatarHue(seed);
+  return `linear-gradient(135deg, hsl(${h} 78% 62%) 0%, hsl(${(h + 32) % 360} 70% 46%) 100%)`;
+}
+function apInitials(name) {
+  return (name || "?")
+    .trim()
+    .split(/\s+/)
+    .map((w) => w[0] || "")
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+const AP_CHAT_ICON_SVG = '<svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4.5 11.2c0-3.7 3.2-6.7 7.5-6.7s7.5 3 7.5 6.7c0 3.7-3.2 6.7-7.5 6.7-.9 0-1.7-.1-2.5-.3l-3.2 1.6c-.4.2-.9-.2-.8-.7l.6-2.5c-1-1.1-1.6-2.4-1.6-3.8Z" fill="currentColor"/></svg>';
+
 async function renderTelegramTab() {
   const [chats, bindings, users] = await Promise.all([
     api("/admin/tg-chats"),
@@ -3290,7 +3311,7 @@ async function renderTelegramTab() {
   // Chat cards
   const chatCards = chats.map((c) => `
     <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-      <div style="width:36px;height:36px;border-radius:50%;background:#2563eb;display:flex;align-items:center;justify-content:center;color:white;font-size:16px;flex-shrink:0">💬</div>
+      <div class="ap-avatar" style="background:${apAvatarGradient("chat:" + c.chatId)}">${AP_CHAT_ICON_SVG}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:500;font-size:13px">${escapeHtml(c.name)}</div>
         <div style="font-size:11px;color:var(--text-muted);font-family:monospace">${escapeHtml(c.chatId)}</div>
@@ -3302,9 +3323,11 @@ async function renderTelegramTab() {
   // Binding cards
   const bindingCards = bindings.map((b) => {
     const u = userMap[b.userId];
+    const seed = u ? (u.id || u.email || u.name) : ("tg:" + b.tgUserId);
+    const initials = u ? apInitials(u.name) : "?";
     return `
       <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)">
-        <div style="width:36px;height:36px;border-radius:50%;background:#10b981;display:flex;align-items:center;justify-content:center;color:white;font-size:14px;flex-shrink:0">${u ? escapeHtml((u.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase()) : "?"}</div>
+        <div class="ap-avatar" style="background:${apAvatarGradient(seed)}">${escapeHtml(initials)}</div>
         <div style="flex:1;min-width:0">
           <div style="font-weight:500;font-size:13px">${u ? escapeHtml(u.name) : "<i>удалён</i>"} <span style="color:var(--text-muted);font-size:11px">${u ? escapeHtml(u.email) : ""}</span></div>
           <div style="font-size:11px;color:var(--text-muted)">ID: ${escapeHtml(b.tgUserId)} ${b.tgUsername ? " · @" + escapeHtml(b.tgUsername) : ""}</div>
