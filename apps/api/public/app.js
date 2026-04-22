@@ -2572,6 +2572,53 @@ async function deleteTaskAttach(taskId, aid) {
   renderTaskAttachments(taskId, t.attachments || []);
 }
 
+function renderTaskNotifiedStrip(notifies) {
+  const aside = document.getElementById("task-detail-aside");
+  if (!aside) return;
+  let strip = document.getElementById("task-notified-strip");
+  // Assignment notifications only — one entry per user (latest)
+  const assignments = (notifies || []).filter((n) => n.kind === "assignment");
+  const seen = new Set();
+  const items = [];
+  for (const n of assignments) {
+    if (seen.has(n.userId)) continue;
+    seen.add(n.userId);
+    items.push(n);
+  }
+  if (!items.length) {
+    if (strip) strip.style.display = "none";
+    return;
+  }
+  if (!strip) {
+    strip = document.createElement("div");
+    strip.id = "task-notified-strip";
+    strip.style.cssText = "font-size:11px;color:var(--text-muted);padding:8px 0;border-top:1px solid var(--border);margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center";
+    aside.appendChild(strip);
+  }
+  strip.style.display = "flex";
+  const nameOf = (n) => (n.user && n.user.name) || "id:" + n.userId.slice(-6);
+  const shortReason = (r) => {
+    if (!r) return "";
+    const s = r.toLowerCase();
+    if (s.includes("blocked")) return "бот заблокирован";
+    if (s.includes("chat not found")) return "не нажал /start";
+    if (s === "no tg binding") return "нет привязки";
+    if (s === "paused") return "пауза";
+    return r.length > 40 ? r.slice(0, 40) + "…" : r;
+  };
+  const pill = (n) => {
+    const when = new Date(n.createdAt).toLocaleString("ru", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+    if (n.status === "sent") {
+      return `<span style="background:rgba(16,185,129,0.12);color:#047857;padding:2px 8px;border-radius:10px;font-weight:500">✓ ${escapeHtml(nameOf(n))} <span style="opacity:0.7;font-weight:400">${when}</span></span>`;
+    }
+    if (n.status === "failed") {
+      return `<span style="background:rgba(239,68,68,0.12);color:#b91c1c;padding:2px 8px;border-radius:10px;font-weight:500" title="${escapeHtml(n.reason || "")}">✗ ${escapeHtml(nameOf(n))} <span style="opacity:0.75;font-weight:400">${escapeHtml(shortReason(n.reason))}</span></span>`;
+    }
+    return `<span style="background:var(--bg-hover);color:var(--text-muted);padding:2px 8px;border-radius:10px;font-weight:500" title="${escapeHtml(n.reason || "")}">⏭ ${escapeHtml(nameOf(n))} <span style="opacity:0.75;font-weight:400">${escapeHtml(shortReason(n.reason))}</span></span>`;
+  };
+  strip.innerHTML = `<span style="font-weight:500;color:var(--text)">Уведомлено в TG:</span> ${items.map(pill).join("")}`;
+}
+
 function renderTaskComments(comments) {
   const list = document.getElementById("task-comments-list");
   if (!comments.length) {
@@ -2685,6 +2732,7 @@ async function openTaskForm(id) {
     document.getElementById("task-delete-btn").onclick = () => deleteTask(t.id);
     document.getElementById("task-comments-row").style.display = "flex";
     renderTaskComments(t.comments || []);
+    renderTaskNotifiedStrip(t.tgNotifies || []);
     document.getElementById("task-tags-row").style.display = "flex";
     renderTaskTagsEditor(t.id, t.tagAssignments || []);
     document.getElementById("task-attach-row").style.display = "flex";
@@ -2721,6 +2769,8 @@ async function openTaskForm(id) {
     document.getElementById("task-comments-row").style.display = "none";
     document.getElementById("task-tags-row").style.display = "none";
     document.getElementById("task-attach-row").style.display = "none";
+    const strip = document.getElementById("task-notified-strip");
+    if (strip) strip.style.display = "none";
   }
   document.getElementById("task-form-modal").classList.remove("hidden");
 }
@@ -3291,6 +3341,170 @@ async function renderAnalyticsTab() {
   `;
 }
 
+// ---- Help popovers ----
+const HELP_TEXTS = {
+  "tg-chats": {
+    title: "💬 Чаты для задач",
+    body: `
+      <p>Группы в Telegram, где бот <code>@task_crm_bot</code> слушает хештеги <code>#task</code> и <code>#задача</code>. Пишешь в группе сообщение с таким хештегом — бот автоматически заводит задачу в CRM.</p>
+      <h4>Как добавить группу</h4>
+      <ul>
+        <li>В Telegram добавь <code>@task_crm_bot</code> в группу, дай права читать сообщения (или сделай админом).</li>
+        <li>Узнай <code>chat_id</code> группы — напиши в неё <code>/id</code> либо открой <code>@getmyid_bot</code>, он подскажет. ID групп начинается с <code>-100</code>.</li>
+        <li>Введи chat_id и название → «+ Чат».</li>
+      </ul>
+      <h4>Как убрать</h4>
+      <p>Крестик справа от строки. Бот перестанет слушать эту группу.</p>
+    `,
+  },
+  "tg-bindings": {
+    title: "🔗 Привязки пользователей",
+    body: `
+      <p>Соединяет CRM-сотрудника с его аккаунтом Telegram. Без привязки бот не сможет ему писать.</p>
+      <h4>Для чего</h4>
+      <ul>
+        <li>Уведомления о назначенных задачах приходят в личку <code>@task_crm_bot</code>.</li>
+        <li>Утренний дайджест с задачами на день отправляется туда же.</li>
+        <li>В задаче можно вызвать исполнителя через <code>@username</code>.</li>
+      </ul>
+      <h4>Как добавить</h4>
+      <ul>
+        <li>Сотрудник сам открывает <code>@task_crm_bot</code> и жмёт <b>/start</b> — это требование Telegram, иначе бот не имеет права писать в личку.</li>
+        <li>Он пересылает свой tg user_id и @username (через <code>@userinfobot</code>).</li>
+        <li>В админке: выбери сотрудника в списке → введи id и username → «+ Связать».</li>
+      </ul>
+      <p style="color:var(--text-muted)">Если у сотрудника нет записи в этой таблице — уведомления ему идти не будут.</p>
+    `,
+  },
+  "tg-delivery": {
+    title: "📬 Доставка TG-уведомлений",
+    body: `
+      <p>Журнал каждой попытки отправить сотруднику сообщение через <code>@task_crm_bot</code>. Отсюда видно, дошло или нет.</p>
+      <h4>Типы событий</h4>
+      <ul>
+        <li><b>назначение</b> — создана/переназначена задача.</li>
+        <li><b>на проверку</b> — исполнитель отправил на review.</li>
+        <li><b>закрытие</b> — постановщик подтвердил выполнение.</li>
+        <li><b>возврат</b> — постановщик вернул задачу в работу.</li>
+      </ul>
+      <h4>Статусы</h4>
+      <ul>
+        <li><b>✓ доставлено</b> — Telegram принял, в деталях номер сообщения.</li>
+        <li><b>✗ ошибка</b> — Telegram отклонил. Чаще всего: «Forbidden: bot was blocked by the user» (юзер блокнул бота) или «chat not found» (не нажал /start).</li>
+        <li><b>⏭ пропущено</b> — у юзера нет привязки, или глобальная пауза, или не настроен токен бота.</li>
+      </ul>
+      <p>Если сотрудник жалуется что не получает задачи — найди его в этой таблице, в столбце «Детали» будет причина.</p>
+    `,
+  },
+  "task-settings-sending": {
+    title: "✉️ Отправка",
+    body: `
+      <p>Глобальные рубильники. Если что-то идёт не так — их можно выключить, пока разбираешься, не трогая код.</p>
+      <h4>Отправка писем</h4>
+      <p>Выключено — кнопки «Отправить» в почтовом модуле не работают. Удобно перед миграцией или когда подозрение на спам-рассылку из скриптов.</p>
+      <h4>Уведомления в Telegram</h4>
+      <p>Выключено — бот <code>@task_crm_bot</code> не шлёт ничего про задачи (ни назначения, ни review-события, ни утренний дайджест). В журнале доставки такие попытки появятся со статусом «пропущено».</p>
+      <h4>AI краткое содержание писем</h4>
+      <p>Выключено — в списке писем не показывается AI-саммари, экономит токены. Существующие саммари остаются в базе.</p>
+    `,
+  },
+  "task-settings-vtb": {
+    title: "🏦 ВТБ Host-to-Host",
+    body: `
+      <p>Реквизиты для интеграции с ВТБ Бизнес через H2H-протокол (корпоративный API банка).</p>
+      <ul>
+        <li><b>CustID</b> — внутренний код клиента в ВТБ (выдаётся банком).</li>
+        <li><b>Логин/пароль</b> — те же, что в личном кабинете ВТБ Бизнес.</li>
+      </ul>
+      <p>Для запросов также нужен КЭП-сертификат (устанавливается в CryptoPro CSP на сервере — не здесь).</p>
+    `,
+  },
+  "task-settings-labels": {
+    title: "🏷 Метки задач",
+    body: `
+      <p>Список предопределённых меток через запятую. Появятся как выпадающий список при создании задачи и как фильтр в разделе «Поставлено мной».</p>
+      <p>Пример: <code>электричество, планировки, арендаторы</code>.</p>
+      <p>Отличаются от тегов (теги редактируются отдельно, имеют цвет и могут назначаться несколько на задачу). Метка — одна на задачу, плоский словарь.</p>
+    `,
+  },
+  "task-settings-quicklinks": {
+    title: "⚡ Быстрые ссылки",
+    body: `
+      <p>Ссылки в главном меню — на внешние сервисы, которые команда использует каждый день (1С, Figma, Notion и т.п.).</p>
+      <p>Видны всем пользователям CRM, открываются в новой вкладке.</p>
+    `,
+  },
+  "task-settings-digest": {
+    title: "⏰ Утренний дайджест",
+    body: `
+      <p>Каждое утро в указанный час (по Москве) задач-бот шлёт каждому сотруднику с TG-привязкой личное сообщение со списком открытых задач на сегодня.</p>
+      <h4>Что туда попадает</h4>
+      <ul>
+        <li>Задачи, где сотрудник — исполнитель или соисполнитель.</li>
+        <li>Статусы: open, in_progress, awaiting_review.</li>
+        <li>Особо выделяются просроченные и на сегодня.</li>
+      </ul>
+      <p>Отключить персонально нельзя — только глобально, через рубильник «Уведомления в Telegram» в блоке «Отправка».</p>
+    `,
+  },
+  "task-settings-ai-email": {
+    title: "📧 AI: задачи из писем",
+    body: `
+      <p>AI читает каждое входящее письмо и, если видит чёткий запрос на действие (например «пришлите акт» или «срок до пятницы»), предлагает завести задачу в CRM.</p>
+      <h4>Как работает</h4>
+      <ul>
+        <li><b>AI смотрит каждое входящее</b> — включает/выключает фоновый анализ.</li>
+        <li><b>Кому слать предложения</b> — одному сотруднику приходят карточки-предложения в <code>@task_crm_bot</code> с кнопками «Создать» / «Игнор». Обычно это owner или admin.</li>
+        <li><b>Автозакрытие</b> — если по задаче есть отслеживание переписки и AI видит в новом письме закрывающий ответ, он предлагает закрыть задачу.</li>
+      </ul>
+      <p>AI-классификация с уверенностью ≥60% — всё что ниже, не беспокоит.</p>
+    `,
+  },
+  "task-settings-metr": {
+    title: "🏗 Авто-задачи из metr",
+    body: `
+      <p>Интеграция с системой metr.eg.je. Если в metr у объекта истекает срок (аренда, согласование и т.п.) — CRM автоматически создаёт задачу с соответствующим дедлайном.</p>
+      <h4>Настройки</h4>
+      <ul>
+        <li><b>Включено</b> — ночной джоб создаёт задачи за указанное количество дней до дедлайна.</li>
+        <li><b>За сколько дней</b> — напоминание ставится за N дней до срока.</li>
+        <li><b>Исполнитель по умолчанию</b> — кто в CRM отвечает, если в metr не указан ответственный.</li>
+      </ul>
+      <p>Дубли отсекаются: если на этот дедлайн уже есть задача — вторая не создаётся.</p>
+    `,
+  },
+};
+function helpBtn(key) {
+  return `<button class="help-btn" onclick="showHelp('${key}')" title="Справка" type="button">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.9.4-1 1-1 1.7"/><circle cx="12" cy="17" r=".6" fill="currentColor"/></svg>
+  </button>`;
+}
+function showHelp(key) {
+  const h = HELP_TEXTS[key];
+  if (!h) return;
+  closeHelp();
+  const overlay = document.createElement("div");
+  overlay.className = "help-modal-overlay";
+  overlay.id = "help-modal";
+  overlay.onclick = (e) => { if (e.target === overlay) closeHelp(); };
+  overlay.innerHTML = `
+    <div class="help-modal-box" role="dialog" aria-modal="true">
+      <div class="help-modal-title">${h.title}</div>
+      <div class="help-modal-sub">Краткая инструкция</div>
+      ${h.body}
+      <button class="help-modal-close" onclick="closeHelp()">Понятно</button>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  document.addEventListener("keydown", helpEscHandler);
+}
+function closeHelp() {
+  const el = document.getElementById("help-modal");
+  if (el) el.remove();
+  document.removeEventListener("keydown", helpEscHandler);
+}
+function helpEscHandler(e) { if (e.key === "Escape") closeHelp(); }
+
 function exportAnalyticsCSV() {
   const list = window._analytics || [];
   const headers = ["email", "name", "role", "sessions", "hours", "sent", "deleted", "avgResponseHours", "aiSummarize", "aiReply", "aiUsageRatio", "lastLogin", "inactiveDays"];
@@ -3405,6 +3619,7 @@ async function renderTelegramTab() {
 
   return `
     <div class="settings-card">
+      ${helpBtn("tg-chats")}
       <div class="settings-card-title">💬 Чаты для задач</div>
       <p style="margin:0 0 10px">Группы где @task_crm_bot принимает #task / #задача и создаёт задачи.</p>
       ${chatCards || '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">нет чатов</div>'}
@@ -3416,6 +3631,7 @@ async function renderTelegramTab() {
     </div>
 
     <div class="settings-card">
+      ${helpBtn("tg-bindings")}
       <div class="settings-card-title">🔗 Привязки пользователей</div>
       <p style="margin:0 0 10px">Связь CRM-юзера с Telegram-аккаунтом. Нужна для назначения задач через @username, уведомлений и утреннего дайджеста. ID и @username можно узнать через @userinfobot.</p>
       ${bindingCards || '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">нет привязок</div>'}
@@ -3459,6 +3675,7 @@ async function renderTgDeliveryTab() {
   `).join("");
   return `
     <div class="settings-card">
+      ${helpBtn("tg-delivery")}
       <div class="settings-card-title">📬 Доставка TG-уведомлений</div>
       <p style="margin:0 0 10px">Журнал отправок через @task_crm_bot. Отсюда видно, дошло ли уведомление до исполнителя.</p>
       <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
@@ -3509,6 +3726,7 @@ async function renderTaskSettingsTab() {
     <form style="display:flex;flex-direction:column;gap:0;max-width:640px" onsubmit="saveTaskSettings(event)">
 
       <div class="settings-card">
+        ${helpBtn("task-settings-sending")}
         <div class="settings-card-title">✉️ Отправка</div>
         <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <label class="toggle-switch"><input name="email_sending_enabled" type="checkbox" ${s.email_sending_paused !== "true" ? "checked" : ""}><span class="slider"></span></label>
@@ -3526,6 +3744,7 @@ async function renderTaskSettingsTab() {
       </div>
 
       <div class="settings-card">
+        ${helpBtn("task-settings-vtb")}
         <div class="settings-card-title">🏦 ВТБ Host-to-Host</div>
         <label>CustID<input type="text" name="vtb_cust_id" value="${escapeHtml(s.vtb_cust_id || "")}" placeholder="662875628"></label>
         <label>Логин ВТБ Бизнес<input type="text" name="vtb_login" value="${escapeHtml(s.vtb_login || "")}" placeholder="логин"></label>
@@ -3534,18 +3753,21 @@ async function renderTaskSettingsTab() {
       </div>
 
       <div class="settings-card">
+        ${helpBtn("task-settings-labels")}
         <div class="settings-card-title">🏷 Метки задач</div>
         <label>Список меток (через запятую)<input type="text" name="task_labels" value="${escapeHtml(s.task_labels || "")}" placeholder="электричество, планировки, арендаторы"></label>
         <p>Появятся в выпадающем списке при создании задачи и как фильтр в «Поставлено мной».</p>
       </div>
 
       <div class="settings-card">
+        ${helpBtn("task-settings-digest")}
         <div class="settings-card-title">⏰ Утренний дайджест</div>
         <label>Час МСК (0-23)<input type="number" name="digest_hour_msk" min="0" max="23" value="${escapeHtml(s.digest_hour_msk || "9")}" style="width:100px"></label>
         <p>Каждое утро task-бот шлёт каждому юзеру с TG-привязкой список открытых задач.</p>
       </div>
 
       <div class="settings-card">
+        ${helpBtn("task-settings-ai-email")}
         <div class="settings-card-title">📧 AI: задачи из писем</div>
         <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <label class="toggle-switch"><input name="ai_email_detect_enabled" type="checkbox" ${s.ai_email_detect_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>
@@ -3561,10 +3783,11 @@ async function renderTaskSettingsTab() {
           <label class="toggle-switch"><input name="ai_autoclose_enabled" type="checkbox" ${s.ai_autoclose_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>
           Автозакрытие — AI спрашивает «Закрыть задачу N?»
         </label>
-        <p>Claude Haiku, уверенность ≥60%. Кнопки в TG: создать / игнор.</p>
+        <p>AI-классификация с уверенностью ≥60%. Кнопки в TG: создать / игнор.</p>
       </div>
 
       <div class="settings-card">
+        ${helpBtn("task-settings-metr")}
         <div class="settings-card-title">🏗 Авто-задачи из metr</div>
         <label style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
           <label class="toggle-switch"><input name="metr_deadline_enabled" type="checkbox" ${s.metr_deadline_enabled === "true" ? "checked" : ""}><span class="slider"></span></label>

@@ -138,7 +138,20 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       include: TASK_INCLUDE,
     });
     if (!t) throw new NotFound();
-    return t;
+    const notifies = await prisma.tgTaskNotify.findMany({
+      where: { taskId: id },
+      orderBy: { createdAt: "desc" },
+    });
+    const userIds = Array.from(new Set(notifies.map((n) => n.userId)));
+    const users = userIds.length
+      ? await prisma.user.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, name: true, email: true },
+        })
+      : [];
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+    const tgNotifies = notifies.map((n) => ({ ...n, user: userMap[n.userId] || null }));
+    return { ...t, tgNotifies };
   });
 
   app.post("/tasks", { preHandler: requireUser() }, async (req) => {

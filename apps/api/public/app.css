@@ -313,7 +313,58 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .admin-form button { padding: 8px 16px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 500; }
 
 /* Settings cards */
-.settings-card { background: var(--bg); border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); }
+.settings-card { position: relative; background: var(--bg); border-radius: 16px; padding: 20px; margin-bottom: 16px; border: 1px solid var(--border); }
+
+/* Info/help button placed in the top-right of any card */
+.help-btn {
+  position: absolute; top: 14px; right: 14px;
+  width: 26px; height: 26px;
+  border: none; background: var(--bg-hover);
+  color: var(--text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px; font-weight: 600; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all 0.15s ease;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", system-ui, sans-serif;
+}
+.help-btn:hover { background: var(--accent); color: #fff; transform: scale(1.08); }
+.help-btn svg { width: 14px; height: 14px; }
+
+/* Help modal */
+.help-modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; padding: 20px;
+  backdrop-filter: blur(4px);
+  animation: help-fade-in 0.15s ease;
+}
+@keyframes help-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.help-modal-box {
+  background: var(--bg-alt);
+  border-radius: 16px;
+  max-width: 560px; width: 100%;
+  max-height: 80vh; overflow-y: auto;
+  padding: 24px 28px;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  border: 1px solid var(--border);
+  animation: help-slide-in 0.2s cubic-bezier(.3,0,.2,1);
+}
+@keyframes help-slide-in { from { transform: translateY(12px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+.help-modal-title { font-size: 17px; font-weight: 600; margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+.help-modal-sub   { font-size: 12px; color: var(--text-muted); margin: 0 0 16px; }
+.help-modal-box h4 { font-size: 13px; font-weight: 600; margin: 14px 0 6px; color: var(--text); }
+.help-modal-box p  { font-size: 13px; line-height: 1.55; color: var(--text); margin: 6px 0; }
+.help-modal-box ul { font-size: 13px; line-height: 1.55; color: var(--text); margin: 6px 0; padding-left: 20px; }
+.help-modal-box li { margin: 4px 0; }
+.help-modal-box code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; padding: 1px 6px; background: var(--bg-hover); border-radius: 4px; }
+.help-modal-close {
+  margin-top: 16px; width: 100%;
+  padding: 10px; border: none; border-radius: 10px;
+  background: var(--accent); color: #fff;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.help-modal-close:hover { background: var(--accent-hover); }
 .settings-card legend, .settings-card-title { font-size: 14px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
 .settings-card label { font-size: 13px; color: var(--text); display: block; margin-bottom: 8px; }
 .settings-card p { font-size: 11px; color: var(--text-muted); margin: 8px 0 0; }
