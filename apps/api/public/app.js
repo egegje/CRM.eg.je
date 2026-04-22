@@ -3101,8 +3101,9 @@ async function renderMailboxesTab() {
       </div>
       <div style="display:flex;gap:4px;align-items:center;flex-shrink:0">
         <label class="toggle-switch"><input type="checkbox" ${m.enabled ? "checked" : ""} onchange="adminToggleMailbox('${m.id}', this.checked)"><span class="slider"></span></label>
-        <button onclick="renameMailbox('${m.id}', ${JSON.stringify(m.displayName).replace(/"/g,'&quot;')})" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">✏️</button>
-        <button onclick="adminDeleteMailbox('${m.id}')" style="padding:5px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)">✕</button>
+        <button onclick="renameMailbox('${m.id}', ${JSON.stringify(m.displayName).replace(/"/g,'&quot;')})" title="Переименовать" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">✏️</button>
+        <button onclick="changeMailboxPassword('${m.id}', ${JSON.stringify(m.email).replace(/"/g,'&quot;')})" title="Сменить пароль приложения" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px">🔑</button>
+        <button onclick="adminDeleteMailbox('${m.id}')" title="Удалить" style="padding:5px 8px;border:1px solid var(--danger);border-radius:6px;background:var(--bg);cursor:pointer;font-size:11px;color:var(--danger)">✕</button>
       </div>
     </div>
   `).join("");
@@ -3132,6 +3133,20 @@ async function renderMailboxesTab() {
     </div>
   `;
 }
+async function changeMailboxPassword(id, email) {
+  const pw = prompt(`Новый пароль приложения для ${email}:\n(16 символов без пробелов для Gmail, для остальных — из настроек безопасности провайдера)`);
+  if (pw === null) return;
+  const clean = pw.replace(/\s+/g, "");
+  if (!clean) return;
+  try {
+    await api("/admin/mailboxes/" + id, { method: "PATCH", body: JSON.stringify({ appPassword: clean }) });
+    alert("Пароль обновлён. Следующая попытка синхронизации через 1-2 мин.");
+    renderAdminTab();
+  } catch (e) {
+    alert("Ошибка: " + (e.message || e));
+  }
+}
+
 async function renameMailbox(id, current) {
   const name = prompt("Название ящика (отображается в списке слева):", current || "");
   if (name === null || !name.trim()) return;
