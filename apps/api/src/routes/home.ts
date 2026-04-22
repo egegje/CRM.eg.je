@@ -27,7 +27,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
     const weekEnd = new Date(weekStart); weekEnd.setDate(weekEnd.getDate() + 7);
 
     const mailboxIds = await accessibleMailboxIds(u);
-    const mailboxFilter = mailboxIds ? { in: mailboxIds } : undefined;
+    const mailboxFilter = { in: mailboxIds };
 
     const [
       unreadCount,
@@ -159,7 +159,7 @@ export async function homeRoutes(app: FastifyInstance): Promise<void> {
 
     const now = new Date();
     const mailboxIds = await accessibleMailboxIds(u);
-    const mailboxFilter = mailboxIds ? { in: mailboxIds } : undefined;
+    const mailboxFilter = { in: mailboxIds };
 
     const [unread, overdue, openTasks, nextWeek, recentPayments] = await Promise.all([
       prisma.message.count({ where: { isRead: false, deletedAt: null, mailboxId: mailboxFilter, folder: { kind: "inbox" } } }),

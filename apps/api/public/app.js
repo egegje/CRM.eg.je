@@ -3063,9 +3063,7 @@ async function manageUserAccess(userId, email, role) {
     .map((co) => `<label style="display:block;padding:4px 0"><input type="checkbox" data-co="${co.id}" ${coSet.has(co.id) ? "checked" : ""}> ${escapeHtml(co.name)}${co.inn ? " (ИНН " + escapeHtml(co.inn) + ")" : ""}</label>`)
     .join("");
   const c = document.getElementById("admin-view-content");
-  const ownerHint = role === "owner"
-    ? `<p style="margin:0 0 8px;font-size:12px;color:var(--text-muted)">Для owner: если ничего не отмечено — видны <b>все</b> ящики (поведение по умолчанию). Как только поставишь хотя бы одну галку, owner начнёт видеть только отмеченные. Новые подключённые ящики автоматически добавятся в этот список.</p>`
-    : `<p style="margin:0 0 8px">Отметьте ящики к которым у пользователя есть доступ. Без галочек — почта не видна.</p>`;
+  const ownerHint = `<p style="margin:0 0 8px">Отметьте ящики, к которым у пользователя есть доступ. Без галочек — почта не видна (правило одинаковое для всех, включая owner). Новый ящик автоматически появляется у того, кто его подключил.</p>`;
   c.innerHTML = `
     <h4 style="margin-top:0">Доступ: ${escapeHtml(email)} (${escapeHtml(role)})</h4>
     <div class="settings-card">

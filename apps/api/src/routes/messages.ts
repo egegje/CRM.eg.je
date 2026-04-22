@@ -87,7 +87,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         where: {
           ...baseWhere,
           ...searchWhere,
-          ...(accessIds ? { mailboxId: { in: accessIds } } : {}),
+          mailboxId: { in: accessIds },
         },
         orderBy: { receivedAt: "desc" },
         take: q.limit,
@@ -104,7 +104,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       trash: q.trash,
       folderKind: q.folderKind as FolderKind,
     });
-    if (accessIds) (where as { mailboxId?: { in: string[] } }).mailboxId = { in: accessIds };
+    (where as { mailboxId?: { in: string[] } }).mailboxId = { in: accessIds };
     const args: Prisma.MessageFindManyArgs = {
       where,
       orderBy: { receivedAt: "desc" },
@@ -197,15 +197,12 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   app.post("/messages/bulk", { preHandler: requireUser() }, async (req) => {
     const body = Bulk.parse(req.body);
     const accessIds = await accessibleMailboxIds(req.user!);
-    if (accessIds) {
-      // Restrict ids to those in accessible mailboxes
-      const allowed = await prisma.message.findMany({
-        where: { id: { in: body.ids }, mailboxId: { in: accessIds } },
-        select: { id: true },
-      });
-      body.ids = allowed.map((m) => m.id);
-      if (!body.ids.length) return { count: 0 };
-    }
+    const allowed = await prisma.message.findMany({
+      where: { id: { in: body.ids }, mailboxId: { in: accessIds } },
+      select: { id: true },
+    });
+    body.ids = allowed.map((m) => m.id);
+    if (!body.ids.length) return { count: 0 };
     const where = { id: { in: body.ids } };
     if (body.action === "read") return prisma.message.updateMany({ where, data: { isRead: true } });
     if (body.action === "unread") return prisma.message.updateMany({ where, data: { isRead: false } });

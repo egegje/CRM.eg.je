@@ -7,7 +7,7 @@ export async function mailboxRoutes(app: FastifyInstance): Promise<void> {
   app.get("/mailboxes", { preHandler: requireUser() }, async (req) => {
     const ids = await accessibleMailboxIds(req.user!);
     return prisma.mailbox.findMany({
-      where: { enabled: true, ...(ids ? { id: { in: ids } } : {}) },
+      where: { enabled: true, id: { in: ids } },
       select: { id: true, email: true, displayName: true, enabled: true, signature: true },
       orderBy: { displayName: "asc" },
     });

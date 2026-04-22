@@ -16,9 +16,8 @@ export async function folderRoutes(app: FastifyInstance): Promise<void> {
   app.get("/folders", { preHandler: requireUser() }, async (req) => {
     const user = req.user!;
     const ids = await accessibleMailboxIds(user);
-    const mailboxFilter = ids ? { mailboxId: { in: ids } } : { mailboxId: { not: null } };
     return prisma.folder.findMany({
-      where: { OR: [{ ownerId: user.id }, mailboxFilter] },
+      where: { OR: [{ ownerId: user.id }, { mailboxId: { in: ids } }] },
       orderBy: [{ kind: "asc" }, { name: "asc" }],
     });
   });

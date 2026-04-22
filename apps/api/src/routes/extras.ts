@@ -62,7 +62,7 @@ export async function extraRoutes(app: FastifyInstance): Promise<void> {
     const q = f.query as { q?: string; from?: string; mailboxId?: string; status?: "read" | "unread"; starred?: boolean };
     const where: Prisma.MessageWhereInput = { deletedAt: null };
     const accessIds = await accessibleMailboxIds(user);
-    if (accessIds) where.mailboxId = { in: accessIds };
+    where.mailboxId = { in: accessIds };
     if (q.mailboxId) where.mailboxId = q.mailboxId;
     if (q.from) where.fromAddr = { contains: q.from, mode: "insensitive" };
     if (q.status === "read") where.isRead = true;
@@ -102,20 +102,14 @@ export async function extraRoutes(app: FastifyInstance): Promise<void> {
   // ---- stats dashboard ----
   app.get("/stats", { preHandler: requireUser() }, async (req) => {
     const ids = await accessibleMailboxIds(req.user!);
-    const mailboxFilter = ids ? { mailboxId: { in: ids } } : {};
+    const mailboxFilter = { mailboxId: { in: ids } };
     const [total, unread, last7daysRows] = await Promise.all([
       prisma.message.count({ where: { deletedAt: null, ...mailboxFilter } }),
       prisma.message.count({ where: { deletedAt: null, isRead: false, ...mailboxFilter } }),
-      ids
-        ? prisma.$queryRaw<{ d: Date; c: bigint }[]>`SELECT date_trunc('day', "receivedAt")::date AS d, count(*)::bigint AS c FROM "Message" WHERE "receivedAt" >= now() - interval '7 days' AND "deletedAt" IS NULL AND "mailboxId" = ANY(${ids}) GROUP BY 1 ORDER BY 1`
-        : prisma.$queryRaw<{ d: Date; c: bigint }[]>`SELECT date_trunc('day', "receivedAt")::date AS d, count(*)::bigint AS c FROM "Message" WHERE "receivedAt" >= now() - interval '7 days' AND "deletedAt" IS NULL GROUP BY 1 ORDER BY 1`,
+      prisma.$queryRaw<{ d: Date; c: bigint }[]>`SELECT date_trunc('day', "receivedAt")::date AS d, count(*)::bigint AS c FROM "Message" WHERE "receivedAt" >= now() - interval '7 days' AND "deletedAt" IS NULL AND "mailboxId" = ANY(${ids}) GROUP BY 1 ORDER BY 1`,
     ]);
-    const byMailbox = ids
-      ? await prisma.$queryRaw<{ email: string; c: bigint }[]>`SELECT mb.email, count(m.id)::bigint AS c FROM "Mailbox" mb LEFT JOIN "Message" m ON m."mailboxId" = mb.id AND m."deletedAt" IS NULL WHERE mb.id = ANY(${ids}) GROUP BY mb.email ORDER BY c DESC`
-      : await prisma.$queryRaw<{ email: string; c: bigint }[]>`SELECT mb.email, count(m.id)::bigint AS c FROM "Mailbox" mb LEFT JOIN "Message" m ON m."mailboxId" = mb.id AND m."deletedAt" IS NULL GROUP BY mb.email ORDER BY c DESC`;
-    const byPriority = ids
-      ? await prisma.$queryRaw<{ p: string | null; c: bigint }[]>`SELECT "aiPriority" AS p, count(*)::bigint AS c FROM "Message" WHERE "deletedAt" IS NULL AND "aiPriority" IS NOT NULL AND "mailboxId" = ANY(${ids}) GROUP BY "aiPriority"`
-      : await prisma.$queryRaw<{ p: string | null; c: bigint }[]>`SELECT "aiPriority" AS p, count(*)::bigint AS c FROM "Message" WHERE "deletedAt" IS NULL AND "aiPriority" IS NOT NULL GROUP BY "aiPriority"`;
+    const byMailbox = await prisma.$queryRaw<{ email: string; c: bigint }[]>`SELECT mb.email, count(m.id)::bigint AS c FROM "Mailbox" mb LEFT JOIN "Message" m ON m."mailboxId" = mb.id AND m."deletedAt" IS NULL WHERE mb.id = ANY(${ids}) GROUP BY mb.email ORDER BY c DESC`;
+    const byPriority = await prisma.$queryRaw<{ p: string | null; c: bigint }[]>`SELECT "aiPriority" AS p, count(*)::bigint AS c FROM "Message" WHERE "deletedAt" IS NULL AND "aiPriority" IS NOT NULL AND "mailboxId" = ANY(${ids}) GROUP BY "aiPriority"`;
     return {
       total,
       unread,
@@ -128,11 +122,11 @@ export async function extraRoutes(app: FastifyInstance): Promise<void> {
   // ---- per-mailbox unread counts (for sidebar badges) ----
   app.get("/mailboxes/unread", { preHandler: requireUser() }, async (req) => {
     const ids = await accessibleMailboxIds(req.user!);
-    const where: { isRead: boolean; deletedAt: null; mailboxId?: { in: string[] } } = {
+    const where: { isRead: boolean; deletedAt: null; mailboxId: { in: string[] } } = {
       isRead: false,
       deletedAt: null,
+      mailboxId: { in: ids },
     };
-    if (ids) where.mailboxId = { in: ids };
     const rows = await prisma.message.groupBy({
       by: ["mailboxId"],
       where,

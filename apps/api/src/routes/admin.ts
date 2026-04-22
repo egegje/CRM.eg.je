@@ -74,14 +74,11 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       },
       select: { id: true, email: true, displayName: true, enabled: true },
     });
-    // Auto-grant to any owner who already has an explicit subset configured —
-    // otherwise the new mailbox would silently disappear from their view.
-    const owners = await prisma.user.findMany({ where: { role: "owner" }, select: { id: true } });
-    for (const o of owners) {
-      const has = await prisma.userMailbox.count({ where: { userId: o.id } });
-      if (has > 0) {
-        await prisma.userMailbox.create({ data: { userId: o.id, mailboxId: mb.id } });
-      }
+    // The creator obviously wants to see the mailbox they just added —
+    // auto-grant access to themselves so they don't have to make a second
+    // trip to /admin/users to check the box.
+    if (req.user) {
+      await prisma.userMailbox.create({ data: { userId: req.user.id, mailboxId: mb.id } });
     }
     return mb;
   });
