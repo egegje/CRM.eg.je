@@ -12,19 +12,35 @@ setKey(cfg.encKey);
 const mailboxes = await prisma.mailbox.findMany({ where: { enabled: true } });
 console.log(`syncing ${mailboxes.length} mailboxes...`);
 
-let total = 0;
-for (const m of mailboxes) {
+// Per-mailbox hard cap. Without this, a single slow IMAP server can stall
+// the whole probe past the watchdog's outer timeout.
+const PER_MAILBOX_TIMEOUT_MS = 25_000;
+// Concurrency ceiling — mail.ru rate-limits aggressive parallel IMAP auth.
+const CONCURRENCY = 4;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`timeout after ${ms}ms (${label})`)), ms);
+    p.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+async function syncOne(m: typeof mailboxes[number]): Promise<{ email: string; pulled?: number; err?: string }> {
   let pulled = 0;
+  let client: ImapFlow | null = null;
   try {
     const pass = decrypt(m.encryptedAppPassword, m.email);
-    const client = new ImapFlow({
+    client = new ImapFlow({
       host: m.imapHost,
       port: m.imapPort,
       secure: m.imapPort === 993,
       auth: { user: m.email, pass },
       logger: false,
     });
-    await client.connect();
+    await withTimeout(client.connect(), PER_MAILBOX_TIMEOUT_MS, `${m.email} connect`);
     const lock = await client.getMailboxLock("INBOX");
     try {
       const inbox =
@@ -101,11 +117,38 @@ for (const m of mailboxes) {
       lock.release();
     }
     await client.logout();
-    console.log(`  ${m.email}: +${pulled}`);
-    total += pulled;
+    return { email: m.email, pulled };
   } catch (e) {
-    console.error(`  ${m.email}: ERROR`, (e as Error).message);
+    try { await client?.logout(); } catch {}
+    try { client?.close(); } catch {}
+    return { email: m.email, err: (e as Error).message };
   }
+}
+
+// Bounded-concurrency fan-out.
+const results: Array<{ email: string; pulled?: number; err?: string }> = [];
+const queue = [...mailboxes];
+const workers: Promise<void>[] = [];
+for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) {
+  workers.push((async () => {
+    while (queue.length) {
+      const m = queue.shift();
+      if (!m) break;
+      const r = await withTimeout(syncOne(m), PER_MAILBOX_TIMEOUT_MS + 5_000, `${m.email} total`)
+        .catch((e) => ({ email: m.email, err: (e as Error).message }));
+      results.push(r);
+    }
+  })());
+}
+await Promise.all(workers);
+
+let total = 0;
+// Preserve input order so the output remains deterministic for parsers.
+for (const m of mailboxes) {
+  const r = results.find((x) => x.email === m.email);
+  if (!r) { console.error(`  ${m.email}: ERROR no-result`); continue; }
+  if (r.err) console.error(`  ${m.email}: ERROR ${r.err}`);
+  else { console.log(`  ${m.email}: +${r.pulled ?? 0}`); total += r.pulled ?? 0; }
 }
 console.log(`done, total ${total} messages`);
 process.exit(0);

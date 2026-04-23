@@ -39,7 +39,8 @@ function svcActive(svc) {
 }
 
 function svcRestart(svc) {
-  execSync(`systemctl restart ${svc}`, { stdio: 'ignore' });
+  // Service runs as ubuntu; systemctl restart needs root. ubuntu has NOPASSWD sudo.
+  execSync(`sudo -n systemctl restart ${svc}`, { stdio: 'ignore' });
 }
 
 function runSyncOnce() {
