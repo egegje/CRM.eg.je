@@ -2252,7 +2252,9 @@ function taskHasNewComments(t) {
   // If last comment was by me, don't flag as new.
   const last = (t.comments || [])[((t.comments || []).length - 1)];
   if (last && me && last.userId === me) return false;
-  if (!t.viewedAt) return true;
+  // No "last viewed" baseline → don't highlight. Highlight only triggers for
+  // comments that arrived AFTER the user opened the task at least once.
+  if (!t.viewedAt) return false;
   return new Date(t.lastCommentAt) > new Date(t.viewedAt);
 }
 function applyTasksSort(tasks) {
@@ -2874,6 +2876,14 @@ async function reviewReturn(id) {
 
 function closeModal(id) {
   document.getElementById(id).classList.add("hidden");
+}
+
+// Closing the task form (× or Отмена) should reload the list so that
+// a just-opened task loses its "new comments" highlight without having
+// to press Save first.
+function closeTaskForm() {
+  closeModal("task-form-modal");
+  if (!document.getElementById("tasks-view").classList.contains("hidden")) loadTasks();
 }
 
 async function saveTask(e) {

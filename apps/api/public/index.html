@@ -187,7 +187,7 @@
   <div class="modal-box" id="task-modal-box">
     <div class="modal-header">
       <h3 id="task-form-title">Новая задача</h3>
-      <button onclick="closeModal('task-form-modal')">✕</button>
+      <button onclick="closeTaskForm()">✕</button>
     </div>
     <form id="task-form" onsubmit="saveTask(event)">
       <input type="hidden" name="id">
@@ -249,7 +249,7 @@
       <div style="display:flex;gap:8px;justify-content:space-between;padding:14px 20px;border-top:1px solid var(--border);background:var(--bg)">
         <button type="button" id="task-delete-btn" class="link-btn" onclick="deleteTask()" style="color:var(--danger);display:none">🗑 удалить</button>
         <div style="display:flex;gap:8px;margin-left:auto">
-          <button type="button" onclick="closeModal('task-form-modal')">Отмена</button>
+          <button type="button" onclick="closeTaskForm()">Отмена</button>
           <button type="submit" style="background:var(--accent);color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer">Сохранить</button>
         </div>
       </div>
