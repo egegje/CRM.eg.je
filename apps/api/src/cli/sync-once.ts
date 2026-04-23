@@ -40,6 +40,9 @@ async function syncOne(m: typeof mailboxes[number]): Promise<{ email: string; pu
       auth: { user: m.email, pass },
       logger: false,
     });
+    // ImapFlow emits 'error' asynchronously on auth/connection failure;
+    // without a listener the process crashes even though connect() also rejects.
+    client.on("error", () => {});
     await withTimeout(client.connect(), PER_MAILBOX_TIMEOUT_MS, `${m.email} connect`);
     const lock = await client.getMailboxLock("INBOX");
     try {

@@ -238,6 +238,8 @@ export async function startSyncFor(mailboxId: string): Promise<void> {
     auth: { user: m.email, pass },
     logger: false,
   });
+  // ImapFlow emits 'error' on connection drops; without a listener Node aborts.
+  client.on("error", (e) => console.error(`[sync] ${m.email} imap error:`, (e as Error).message));
   clients.set(mailboxId, client);
   await client.connect();
   console.log(`[sync] connected: ${m.email}`);
@@ -336,6 +338,7 @@ export async function syncSentForMailbox(mailboxId: string): Promise<{ synced: n
     auth: { user: m.email, pass },
     logger: false,
   });
+  client.on("error", (e) => console.error(`[sync-sent] ${m.email} imap error:`, (e as Error).message));
 
   await client.connect();
   try {
