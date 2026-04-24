@@ -2411,7 +2411,8 @@ async function loadTasks() {
   if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
   if (tasksFilter === "createdByMe" && state.user) {
     params.set("creatorId", state.user.id);
-    params.set("status", "all");
+    // status (all vs active) is set further down by the "show completed"
+    // branch, same as other list tabs.
   }
   if (tasksFilter === "review" && state.user) {
     params.set("creatorId", state.user.id);
@@ -2424,10 +2425,12 @@ async function loadTasks() {
     tasksMode !== "kanban" &&
     tasksFilter !== "overdue" &&
     tasksFilter !== "done" &&
-    tasksFilter !== "createdByMe" &&
     tasksFilter !== "review"
   ) {
-    if (!getTasksShowCompleted()) {
+    if (getTasksShowCompleted()) {
+      // Include every status including done/cancelled.
+      params.set("status", "all");
+    } else {
       params.set("statusIn", "open,in_progress,awaiting_review");
     }
   }
@@ -2476,7 +2479,6 @@ async function loadTasks() {
       tasksMode === "kanban" ||
       tasksFilter === "done" ||
       tasksFilter === "overdue" ||
-      tasksFilter === "createdByMe" ||
       tasksFilter === "review";
     showDoneWrap.style.display = irrelevant ? "none" : "";
   }
