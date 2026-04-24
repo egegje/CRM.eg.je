@@ -456,26 +456,73 @@ function showToast(text, onUndo) {
   setTimeout(() => t.remove(), 6000);
 }
 
-// Countdown toast: "Отправлено. Отменить (20)" — cancels scheduled send on click.
-function showUndoSendToast(scheduledId, seconds) {
+function fmtBytes(n) {
+  if (!n && n !== 0) return "";
+  if (n < 1024) return n + " Б";
+  if (n < 1048576) return Math.round(n / 1024) + " КБ";
+  return (n / 1048576).toFixed(1) + " МБ";
+}
+
+function renderSendSummary(outgoing, title) {
+  // Wide card showing exactly what's going out, so a last-second mailbox
+  // switcheroo or missing attachment is visible before it leaves.
+  const lines = [];
+  lines.push('<div style="font-weight:600;font-size:14px;margin-bottom:6px">' + escapeHtml(title) + '</div>');
+  const fromLabel = outgoing.fromEmail + (outgoing.personaName ? ' · ' + outgoing.personaName : '');
+  lines.push('<div style="font-size:12px;color:var(--text-muted)">От:</div>');
+  lines.push('<div style="font-size:13px;margin-bottom:4px">' + escapeHtml(fromLabel) + '</div>');
+  lines.push('<div style="font-size:12px;color:var(--text-muted)">Кому:</div>');
+  lines.push('<div style="font-size:13px;margin-bottom:4px">' + escapeHtml((outgoing.to || []).join(', ') || '(пусто)') + '</div>');
+  if ((outgoing.cc || []).length) {
+    lines.push('<div style="font-size:12px;color:var(--text-muted)">Копия:</div>');
+    lines.push('<div style="font-size:13px;margin-bottom:4px">' + escapeHtml(outgoing.cc.join(', ')) + '</div>');
+  }
+  lines.push('<div style="font-size:12px;color:var(--text-muted)">Тема:</div>');
+  lines.push('<div style="font-size:13px;margin-bottom:4px">' + escapeHtml(outgoing.subject || '(без темы)') + '</div>');
+  if ((outgoing.attachments || []).length) {
+    lines.push('<div style="font-size:12px;color:var(--text-muted)">Вложения (' + outgoing.attachments.length + '):</div>');
+    lines.push('<ul style="margin:0;padding-left:18px;font-size:12px">' +
+      outgoing.attachments.map((a) => '<li>' + escapeHtml(a.filename) + ' <span style="color:var(--text-muted)">(' + fmtBytes(a.size) + ')</span></li>').join('') +
+      '</ul>');
+  } else {
+    lines.push('<div style="font-size:12px;color:var(--text-muted);font-style:italic">Без вложений</div>');
+  }
+  return lines.join('');
+}
+
+// Detailed undo-send toast: shows the full outgoing payload (from, to, cc,
+// subject, attachments) so a last-second mailbox switch or missing file is
+// visible before the 20-second window closes.
+function showUndoSendToast(scheduledId, seconds, outgoing) {
   let left = seconds;
   const t = document.createElement("div");
-  t.className = "toast";
-  t.innerHTML = `<span>Сообщение отправится через <b id="undo-sec">${left}</b> c</span><button>отменить</button>`;
-  const secEl = t.querySelector("#undo-sec");
-  const btn = t.querySelector("button");
+  t.className = "toast toast-wide";
+  function paint() {
+    t.innerHTML = '<div style="max-width:420px">' +
+      renderSendSummary(outgoing, 'Отправляется через ' + left + ' c') +
+      '<div style="display:flex;gap:8px;margin-top:10px;align-items:center">' +
+        '<button class="undo-btn" style="padding:6px 14px;border:1px solid var(--border);border-radius:6px;background:var(--bg-alt);color:var(--text);cursor:pointer">Отменить</button>' +
+        '<span style="font-size:11px;color:var(--text-muted)">можно отменить ещё <b id="undo-sec">' + left + '</b> c</span>' +
+      '</div>' +
+    '</div>';
+    const btn = t.querySelector('.undo-btn');
+    if (btn) btn.onclick = cancel;
+  }
   let done = false;
   const timer = setInterval(() => {
     if (done) return;
     left--;
+    const secEl = t.querySelector("#undo-sec");
     if (secEl) secEl.textContent = left;
     if (left <= 0) {
       clearInterval(timer);
       done = true;
+      // Swap to post-send confirmation with the same details.
+      showSentToast(outgoing);
       t.remove();
     }
   }, 1000);
-  btn.onclick = async () => {
+  async function cancel() {
     done = true; clearInterval(timer);
     try {
       const r = await api("/scheduled-sends/" + scheduledId, { method: "DELETE" });
@@ -491,8 +538,26 @@ function showUndoSendToast(scheduledId, seconds) {
       t.innerHTML = '<span style="color:var(--danger)">Ошибка отмены: ' + escapeHtml(e.message) + '</span>';
       setTimeout(() => t.remove(), 3000);
     }
-  };
+  }
+  paint();
   document.body.appendChild(t);
+}
+
+// Post-send confirmation — same fields as the undo toast, so the user can
+// double-check what actually left the server even if they looked away during
+// the 20-second window.
+function showSentToast(outgoing) {
+  const t = document.createElement("div");
+  t.className = "toast toast-wide";
+  t.innerHTML = '<div style="max-width:420px">' +
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">' +
+      '<span style="color:#10b981;font-size:18px">✓</span>' +
+      '<div style="font-weight:600;font-size:14px">Отправлено</div>' +
+    '</div>' +
+    renderSendSummary(outgoing, '') +
+  '</div>';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 10000);
 }
 
 function dateGroup(d) {
@@ -1279,6 +1344,20 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     }
     const sendBtn = document.querySelector(".compose-btn-send");
     if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = "Отправка..."; }
+    // Snapshot exactly what the server will send, so the undo/sent toasts
+    // can show the real payload (not what's in the form — which could drift
+    // between the PATCH and the send dispatch).
+    const msgSnapshot = await api("/messages/" + draft.id).catch(() => null);
+    const mailboxRow = (state.mailboxes || []).find((mb) => mb.id === (msgSnapshot?.mailboxId || f.get("mailboxId")));
+    const personaRow = (_personas || []).find((p) => p.id === (msgSnapshot?.personaId || f.get("personaId")));
+    const outgoing = {
+      fromEmail: mailboxRow?.email || f.get("mailboxId") || "",
+      personaName: personaRow?.name || "",
+      to: msgSnapshot?.toAddrs || to,
+      cc: msgSnapshot?.ccAddrs || cc,
+      subject: msgSnapshot?.subject || f.get("subject") || "",
+      attachments: (msgSnapshot?.attachments || []).map((a) => ({ filename: a.filename, size: a.size })),
+    };
     const sendAt = f.get("sendAt");
     // Default: hold for 20 seconds so the user can undo. Explicit schedule overrides.
     const UNDO_SEC = 20;
@@ -1306,12 +1385,13 @@ document.getElementById("compose-form").addEventListener("submit", async (e) => 
     }
     closeCompose();
     if (sendRes && sendRes.scheduled && sendRes.id && !sendAt) {
-      // Show undo-send countdown. The scheduled job fires in UNDO_SEC.
-      showUndoSendToast(sendRes.id, UNDO_SEC);
+      // Show undo-send countdown with the full payload. The scheduled job
+      // fires in UNDO_SEC — the toast self-upgrades to "Отправлено" then.
+      showUndoSendToast(sendRes.id, UNDO_SEC, outgoing);
     } else if (sendRes && sendRes.scheduled) {
       showToast("Отправка запланирована", null);
     } else {
-      showToast("Сообщение отправлено", null);
+      showSentToast(outgoing);
     }
     refreshList();
   } catch (err) {
