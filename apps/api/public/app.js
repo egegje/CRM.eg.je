@@ -643,6 +643,7 @@ function renderPreview(m) {
       </div>
       <div class="preview-actions" style="align-items:center">
         <button class="mobile-back" onclick="closePreview()" title="Назад"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        ${m.isDraft ? `<button onclick="openDraftForEdit('${m.id}')" title="Продолжить" class="primary" style="padding:6px 12px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">✏ Продолжить</button>` : ""}
         <button onclick="replyTo('${m.id}')" title="Ответить"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 17l-5-5 5-5"/><path d="M4 12h12a4 4 0 014 4v1"/></svg></button>
         <button onclick="aiReply('${m.id}')" title="AI ответ"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M12.2 11.8L11 13M12.2 6.2L11 5"/><path d="M15 9l-6 11"/></svg></button>
         <button onclick="forwardMsg('${m.id}')" title="Переслать"><svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M15 17l5-5-5-5"/><path d="M20 12H8a4 4 0 00-4 4v1"/></svg></button>
@@ -1057,6 +1058,54 @@ function closeCompose() {
   document.getElementById("compose-modal").classList.add("hidden");
   document.getElementById("compose-minimized").classList.add("hidden");
   document.getElementById("compose-error").textContent = "";
+  const ex = document.getElementById("compose-existing-attachments");
+  if (ex) ex.innerHTML = "";
+}
+
+async function openDraftForEdit(id) {
+  const m = await api("/messages/" + id);
+  if (!m.isDraft) {
+    showToast("Это не черновик", null);
+    return;
+  }
+  openCompose({
+    _composeTitle: "Продолжить редактирование",
+    mailboxId: m.mailboxId,
+    to: (m.toAddrs || []).join(", "),
+    subject: m.subject || "",
+    bodyText: m.bodyText || "",
+    personaId: m.personaId || "",
+  });
+  _composeDraftId = id;
+  const form = document.getElementById("compose-form");
+  if (form && (m.ccAddrs || []).length) form.cc.value = m.ccAddrs.join(", ");
+  renderExistingAttachments(m.attachments || []);
+}
+
+function renderExistingAttachments(list) {
+  const el = document.getElementById("compose-existing-attachments");
+  if (!el) return;
+  if (!list.length) { el.innerHTML = ""; return; }
+  el.innerHTML = list.map((a) => {
+    const size = a.size < 1024 ? a.size + " Б" : a.size < 1048576 ? Math.round(a.size / 1024) + " КБ" : (a.size / 1048576).toFixed(1) + " МБ";
+    const icon = /^image\//.test(a.mime) ? "🖼" : /pdf/.test(a.mime) ? "📄" : "📎";
+    return '<div id="existing-att-' + a.id + '" style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg-alt);border:1px solid var(--border);border-radius:8px;font-size:13px">' +
+      '<span>' + icon + '</span>' +
+      '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escapeHtml(a.filename) + '</span>' +
+      '<span style="color:var(--text-muted);font-size:11px">(' + size + ')</span>' +
+      '<button type="button" onclick="removeExistingAttachment(\'' + a.id + '\')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:16px;padding:0 2px" title="Убрать">×</button>' +
+      '</div>';
+  }).join("");
+}
+
+async function removeExistingAttachment(id) {
+  try {
+    await api("/attachments/" + id, { method: "DELETE" });
+    const row = document.getElementById("existing-att-" + id);
+    if (row) row.remove();
+  } catch (e) {
+    showToast("Не удалось удалить: " + e.message, null);
+  }
 }
 function toggleComposeMinimize() {
   const modal = document.getElementById("compose-modal");

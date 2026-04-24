@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { mkdir, writeFile, access as fsAccess } from "node:fs/promises";
+import { mkdir, writeFile, access as fsAccess, unlink } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -151,5 +151,27 @@ export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
       if (!reply.sent) reply.status(500).send({ error: "read error" });
     });
     return reply.send(stream);
+  });
+
+  // Delete an attachment. Only allowed on drafts — once a message has been
+  // sent, its attachments are part of the sent record and must stay put.
+  app.delete("/attachments/:id", { preHandler: requireUser() }, async (req, reply) => {
+    const id = (req.params as { id: string }).id;
+    const a = await prisma.attachment.findUnique({
+      where: { id },
+      include: { message: { select: { mailboxId: true, isDraft: true } } },
+    });
+    if (!a) throw new NotFound();
+    await assertMessageAccess(req.user!, a.message);
+    if (!a.message.isDraft) throw new BadRequest("cannot delete attachment of sent message");
+    if (a.storagePath) {
+      try {
+        await unlink(a.storagePath);
+      } catch {
+        /* file may already be gone */
+      }
+    }
+    await prisma.attachment.delete({ where: { id } });
+    return reply.status(204).send();
   });
 }

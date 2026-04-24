@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=150" />
+<link rel="stylesheet" href="/app.css?v=151" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -306,6 +306,7 @@
           <option value="">📋 Шаблон...</option>
         </select>
         <button type="button" onclick="saveAsTemplate()" class="compose-tpl-save">+ сохранить</button>
+        <div id="compose-existing-attachments" class="compose-file-list"></div>
         <div id="compose-attachments" class="compose-file-list"></div>
       </div>
       <progress id="upload-progress" class="hidden" value="0" max="100" style="width:100%"></progress>
@@ -347,7 +348,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=150"></script>
+<script src="/app.js?v=151"></script>
 
 </body>
 </html>

@@ -47,6 +47,7 @@ const Patch = z.object({
   isRead: z.boolean().optional(),
   isStarred: z.boolean().optional(),
   folderId: z.string().optional(),
+  mailboxId: z.string().optional(),
   senderUserId: z.string().nullable().optional(),
   personaId: z.string().nullable().optional(),
 });
@@ -167,7 +168,11 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
 
   app.patch("/messages/:id", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
-    await assertMessageAccess(req.user!, await prisma.message.findUnique({ where: { id }, select: { mailboxId: true } }));
+    const existing = await prisma.message.findUnique({
+      where: { id },
+      select: { mailboxId: true, isDraft: true },
+    });
+    await assertMessageAccess(req.user!, existing);
     const body = Patch.parse(req.body);
     const data: Prisma.MessageUpdateInput = {};
     if (body.to) data.toAddrs = body.to;
@@ -179,7 +184,15 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     if (body.isStarred !== undefined) data.isStarred = body.isStarred;
     if (body.senderUserId !== undefined) data.senderUserId = body.senderUserId;
     if (body.personaId !== undefined) data.personaId = body.personaId;
-    if (body.folderId) {
+    if (body.mailboxId && body.mailboxId !== existing!.mailboxId) {
+      // Only drafts can migrate between mailboxes — a sent message stays
+      // bound to the mailbox it went out from.
+      if (!existing!.isDraft) throw new BadRequest("mailbox can only change on drafts");
+      await assertMessageAccess(req.user!, { mailboxId: body.mailboxId });
+      data.mailbox = { connect: { id: body.mailboxId } };
+      const drafts = await getOrCreateFolder(body.mailboxId, "drafts", "Drafts");
+      data.folder = { connect: { id: drafts.id } };
+    } else if (body.folderId) {
       const target = await prisma.folder.findUnique({ where: { id: body.folderId } });
       if (!target) throw new NotFound("folder not found");
       data.folder = { connect: { id: body.folderId } };
