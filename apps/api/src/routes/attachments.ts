@@ -3,54 +3,12 @@ import { mkdir, writeFile, access as fsAccess, unlink } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
-import { ImapFlow } from "imapflow";
 import { prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { loadConfig } from "../config.js";
-import { decrypt } from "../crypto.js";
 import { NotFound, BadRequest } from "../errors.js";
 import { assertMessageAccess } from "../services/access.js";
-
-async function imapFetchAttachment(
-  mailboxId: string,
-  imapUid: number,
-  imapPart: string | null,
-): Promise<Buffer> {
-  const m = await prisma.mailbox.findUnique({ where: { id: mailboxId } });
-  if (!m) throw new Error("mailbox gone");
-  const pass = decrypt(m.encryptedAppPassword, m.email);
-  const client = new ImapFlow({
-    host: m.imapHost,
-    port: m.imapPort,
-    secure: m.imapPort === 993,
-    auth: { user: m.email, pass },
-    logger: false,
-  });
-  await client.connect();
-  try {
-    await client.mailboxOpen("INBOX");
-    if (imapPart) {
-      const d = await client.download(String(imapUid), imapPart, { uid: true });
-      if (!d || !d.content) throw new Error("part not found");
-      const chunks: Buffer[] = [];
-      for await (const c of d.content) chunks.push(c as Buffer);
-      return Buffer.concat(chunks);
-    }
-    // Fallback — fetch full source and parse attachments
-    const { parseRaw } = await import("@crm/mail");
-    const full = await client.fetchOne(
-      String(imapUid),
-      { source: true },
-      { uid: true },
-    );
-    if (!full || !full.source) throw new Error("message not found");
-    const parsed = await parseRaw(full.source);
-    if (parsed.attachments.length === 0) throw new Error("no attachments in message");
-    return parsed.attachments[0].content;
-  } finally {
-    await client.logout().catch(() => {});
-  }
-}
+import { imapFetchAttachment } from "../services/attachment-fetch.js";
 
 export async function attachmentRoutes(app: FastifyInstance): Promise<void> {
   const cfg = loadConfig();

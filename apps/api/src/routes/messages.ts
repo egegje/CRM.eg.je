@@ -1,6 +1,8 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
@@ -11,6 +13,8 @@ import { decrypt } from "../crypto.js";
 import { sendQueue } from "../queue.js";
 import { audit } from "../services/audit.js";
 import { accessibleMailboxIds, assertMessageAccess } from "../services/access.js";
+import { imapFetchAttachment } from "../services/attachment-fetch.js";
+import { loadConfig } from "../config.js";
 
 const ListQuery = z.object({
   folderId: z.string().optional(),
@@ -164,6 +168,91 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
         bodyHtml: body.bodyHtml,
       },
     });
+  });
+
+  // Create a draft pre-populated as a forward of an existing message,
+  // COPYING its attachments onto the new draft. The compose UI used to
+  // only carry the text body across — so the recipient got a forwarded
+  // email with no file attached.
+  app.post("/messages/:id/forward", { preHandler: requireUser() }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const ForwardBody = z.object({ mailboxId: z.string().optional() }).default({});
+    const fwdBody = ForwardBody.parse(req.body ?? {});
+    const src = await prisma.message.findUnique({
+      where: { id },
+      include: { attachments: true },
+    });
+    if (!src) throw new NotFound();
+    await assertMessageAccess(req.user!, src);
+    const mailboxId = fwdBody.mailboxId || src.mailboxId;
+    await assertMessageAccess(req.user!, { mailboxId });
+    const drafts = await getOrCreateFolder(mailboxId, "drafts", "Drafts");
+    const subject = (src.subject || "").startsWith("Fwd:")
+      ? src.subject
+      : "Fwd: " + (src.subject || "");
+    const header = `\n\n---------- Пересылаемое сообщение ----------\nОт: ${src.fromAddr ?? ""}\nТема: ${src.subject ?? ""}\n\n`;
+    const draft = await prisma.message.create({
+      data: {
+        mailboxId,
+        folderId: drafts.id,
+        isDraft: true,
+        fromAddr: "",
+        toAddrs: [],
+        ccAddrs: [],
+        subject,
+        bodyText: header + (src.bodyText ?? ""),
+        bodyHtml: src.bodyHtml,
+      },
+    });
+    const cfg = loadConfig();
+    const destDir = join(cfg.attachmentDir, mailboxId, draft.id);
+    const copied: string[] = [];
+    const skipped: string[] = [];
+    for (const a of src.attachments) {
+      let buf: Buffer | null = null;
+      if (a.storagePath) {
+        try {
+          buf = await readFile(a.storagePath);
+        } catch {
+          buf = null;
+        }
+      }
+      if (!buf) {
+        const uid = a.imapUid ?? src.imapUid;
+        if (uid) {
+          try {
+            buf = await imapFetchAttachment(src.mailboxId, uid, a.imapPart);
+          } catch (e) {
+            req.log.error(
+              { err: e, attachmentId: a.id },
+              "forward: lazy-fetch failed",
+            );
+          }
+        }
+      }
+      if (!buf) {
+        skipped.push(a.filename);
+        continue;
+      }
+      await mkdir(destDir, { recursive: true });
+      const safeName = a.filename.replace(/[/\\]/g, "_");
+      const destPath = join(destDir, safeName);
+      await writeFile(destPath, buf);
+      const sha = createHash("sha256").update(buf).digest("hex");
+      await prisma.attachment.create({
+        data: {
+          messageId: draft.id,
+          filename: a.filename,
+          mime: a.mime,
+          size: buf.length,
+          storagePath: destPath,
+          sha256: sha,
+          cachedAt: new Date(),
+        },
+      });
+      copied.push(a.filename);
+    }
+    return { id: draft.id, copiedAttachments: copied, skippedAttachments: skipped };
   });
 
   app.patch("/messages/:id", { preHandler: requireUser() }, async (req) => {

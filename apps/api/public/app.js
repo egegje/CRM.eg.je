@@ -866,11 +866,20 @@ async function replyTo(id) {
 
 async function forwardMsg(id) {
   const m = state.messages.find((x) => x.id === id) || (await api("/messages/" + id));
-  openCompose({ _composeTitle: "Переслать письмо",
-    subject: m.subject.startsWith("Fwd:") ? m.subject : "Fwd: " + m.subject,
-    bodyText: `\n\n---------- Пересылаемое сообщение ----------\nОт: ${m.fromAddr}\nТема: ${m.subject}\n\n${m.bodyText || ""}`,
-    mailboxId: m.mailboxId,
-  });
+  try {
+    const r = await api("/messages/" + id + "/forward", { method: "POST" });
+    // Open the freshly created draft (with attachments already copied
+    // server-side). The compose form treats it like "continue editing".
+    await openDraftForEdit(r.id);
+    if (r.skippedAttachments && r.skippedAttachments.length) {
+      showToast(
+        "Не удалось прикрепить: " + r.skippedAttachments.join(", "),
+        null,
+      );
+    }
+  } catch (e) {
+    showToast("Ошибка пересылки: " + e.message, null);
+  }
 }
 
 async function loadTemplates() {
