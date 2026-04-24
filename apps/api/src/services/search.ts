@@ -59,6 +59,23 @@ export function buildWhere(f: Filters): Prisma.MessageWhereInput {
   return w;
 }
 
+/**
+ * Pick the Prisma orderBy for a message list. Sent and drafts folders
+ * sort by sentAt — that's the chronology users actually care about and
+ * it matches the date-group headers in the UI. Every other folder sorts
+ * by receivedAt, which is what IMAP provides and is correct for inbox.
+ *
+ * Exported separately so today's "каша с датами в Исходящих" fix has a
+ * unit test without needing a live database.
+ */
+export function messageListOrderBy(
+  isSentView: boolean,
+): Prisma.MessageOrderByWithRelationInput[] {
+  return isSentView
+    ? [{ sentAt: { sort: "desc", nulls: "last" } }, { receivedAt: "desc" }]
+    : [{ receivedAt: "desc" }];
+}
+
 /** Build Prisma WHERE for scoped text search (safe from SQL injection) */
 export function buildSearchWhere(q: string, searchIn: SearchIn = "all"): Prisma.MessageWhereInput {
   const contains = q;

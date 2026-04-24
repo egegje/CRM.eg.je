@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { prisma, type Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
-import { buildWhere, buildSearchWhere } from "../services/search.js";
+import { buildWhere, buildSearchWhere, messageListOrderBy } from "../services/search.js";
 import type { SearchIn, FolderKind } from "../services/search.js";
 import { sendMessage } from "../services/send.js";
 import { prepareSendPayload } from "../services/send-prepare.js";
@@ -15,6 +15,7 @@ import { audit } from "../services/audit.js";
 import { accessibleMailboxIds, assertMessageAccess } from "../services/access.js";
 import { imapFetchAttachment } from "../services/attachment-fetch.js";
 import { loadConfig } from "../config.js";
+import { MessagePatch } from "../schemas/message.js";
 
 const ListQuery = z.object({
   folderId: z.string().optional(),
@@ -42,19 +43,6 @@ const Create = z.object({
   bodyHtml: z.string().optional(),
 });
 
-const Patch = z.object({
-  to: z.array(z.string().email()).optional(),
-  cc: z.array(z.string().email()).optional(),
-  subject: z.string().optional(),
-  bodyText: z.string().optional(),
-  bodyHtml: z.string().optional(),
-  isRead: z.boolean().optional(),
-  isStarred: z.boolean().optional(),
-  folderId: z.string().optional(),
-  mailboxId: z.string().optional(),
-  senderUserId: z.string().nullable().optional(),
-  personaId: z.string().nullable().optional(),
-});
 
 const SendBody = z.object({ sendAt: z.coerce.date().optional() });
 const Params = z.object({ id: z.string() });
@@ -87,9 +75,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       });
       if (f && (f.kind === "sent" || f.kind === "drafts")) isSentView = true;
     }
-    const orderBy: Prisma.MessageOrderByWithRelationInput[] = isSentView
-      ? [{ sentAt: { sort: "desc", nulls: "last" } }, { receivedAt: "desc" }]
-      : [{ receivedAt: "desc" }];
+    const orderBy = messageListOrderBy(isSentView);
     if (q.q) {
       // Scoped text search using Prisma (safe from SQL injection)
       const searchWhere = buildSearchWhere(q.q, q.searchIn as SearchIn);
@@ -262,7 +248,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       select: { mailboxId: true, isDraft: true },
     });
     await assertMessageAccess(req.user!, existing);
-    const body = Patch.parse(req.body);
+    const body = MessagePatch.parse(req.body);
     const data: Prisma.MessageUpdateInput = {};
     if (body.to) data.toAddrs = body.to;
     if (body.cc) data.ccAddrs = body.cc;

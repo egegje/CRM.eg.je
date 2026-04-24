@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { loadConfig } from "./config.js";
 import { setKey } from "./crypto.js";
+import { buildSessionCookieOptions } from "./session-config.js";
 import { registerErrorHandler } from "./errors.js";
 import { authRoutes } from "./routes/auth.js";
 import { mailboxRoutes } from "./routes/mailboxes.js";
@@ -33,13 +34,7 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
 
   await app.register(secureSession, {
     key: cfg.sessionSecret,
-    cookie: {
-      path: "/",
-      httpOnly: true,
-      sameSite: "lax",
-      secure: cfg.env === "production",
-      maxAge: 60 * 60 * 24 * 30,
-    },
+    cookie: buildSessionCookieOptions(cfg.env),
   });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
