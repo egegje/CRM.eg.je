@@ -38,6 +38,7 @@ export async function buildApp(): Promise<{ app: FastifyInstance; cfg: ReturnTyp
       httpOnly: true,
       sameSite: "lax",
       secure: cfg.env === "production",
+      maxAge: 60 * 60 * 24 * 30,
     },
   });
   await app.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });

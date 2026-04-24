@@ -125,15 +125,27 @@ function showApp() {
 document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
+  const errEl = document.getElementById("login-error");
   try {
-    const u = await api("/auth/login", {
+    const res = await fetch("/auth/login", {
       method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
       body: JSON.stringify({ email: f.get("email"), password: f.get("password") }),
     });
-    state.user = u;
+    if (res.status === 401) {
+      errEl.textContent = "Неверный email или пароль";
+      return;
+    }
+    if (!res.ok) {
+      errEl.textContent = "Ошибка сервера (" + res.status + "). Попробуйте ещё раз.";
+      return;
+    }
+    state.user = await res.json();
+    errEl.textContent = "";
     await bootApp();
   } catch (err) {
-    document.getElementById("login-error").textContent = "Неверный email или пароль";
+    errEl.textContent = "Нет связи с сервером. Проверьте интернет и попробуйте снова.";
   }
 });
 
