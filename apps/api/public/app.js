@@ -1007,12 +1007,22 @@ function updateComposeSignature() {
   }
 }
 
-async function loadContactsDatalist() {
+async function loadContactsDatalist(query) {
   try {
-    const list = await api("/admin/contacts?limit=200").catch(() => []);
+    const url = "/admin/contacts?limit=500" + (query ? "&q=" + encodeURIComponent(query) : "");
+    const list = await api(url).catch(() => []);
     const dl = document.getElementById("contacts-list");
     dl.innerHTML = list.map((c) => `<option value="${escapeHtml(c.email)}">${escapeHtml(c.name || c.email)}</option>`).join("");
   } catch {}
+}
+let _contactsQueryTimer = null;
+function onComposeRecipientInput(e) {
+  const v = e.target.value || "";
+  // If the user is typing a new token (after a comma), only query on the last one.
+  const last = v.split(",").map((s) => s.trim()).filter(Boolean).pop() || "";
+  if (!last || last.length < 2) return;
+  clearTimeout(_contactsQueryTimer);
+  _contactsQueryTimer = setTimeout(() => loadContactsDatalist(last), 200);
 }
 
 function openCompose(defaults = {}) {
@@ -1025,6 +1035,16 @@ function openCompose(defaults = {}) {
   // previous send left the button in "Отправка..." locked state.
   const sb = form.querySelector(".compose-btn-send");
   if (sb) { sb.disabled = false; sb.textContent = "Отправить"; }
+  // Clear any leftover attachment UI from a previous compose. form.reset()
+  // wipes the file input's value but doesn't touch the divs we rendered,
+  // so a stale filename like "Плутон.pdf" could haunt the next "Новое письмо".
+  const attList = document.getElementById("compose-attachments");
+  if (attList) attList.innerHTML = "";
+  const existAtt = document.getElementById("compose-existing-attachments");
+  if (existAtt) existAtt.innerHTML = "";
+  const filesIn = document.getElementById("compose-files");
+  if (filesIn) filesIn.value = "";
+  _composeDraftId = null;
   // Reset doesn't reliably stick on <select>, and defaults.mailboxId may
   // arrive before options are populated. Apply now + after microtask.
   const pickMailbox = (mid) => {
@@ -2911,6 +2931,10 @@ function renderReviewBanner(t) {
   const iAmCreator = t.creatorId === state.user.id;
   const iAmAssignee = t.assigneeId === state.user.id ||
     (t.coAssignees || []).some((ca) => ca.userId === state.user.id);
+  const openStatus = t.status !== "done" && t.status !== "cancelled";
+  const creatorCloseBtn = iAmCreator && openStatus
+    ? `<button type="button" class="secondary" onclick="creatorCloseTask('${t.id}')" title="Автор может завершить задачу, не дожидаясь исполнителя">✔ Завершить задачу</button>`
+    : "";
   if (t.status === "awaiting_review" && iAmCreator) {
     banner.style.display = "flex";
     banner.innerHTML = `
@@ -2925,15 +2949,26 @@ function renderReviewBanner(t) {
     banner.innerHTML = `
       <h4>⏳ Отправлено на проверку</h4>
       <div style="font-size:12px;color:var(--text-muted)">Постановщик получит уведомление и подтвердит закрытие или вернёт задачу в работу.</div>`;
-  } else if (t.status !== "done" && t.status !== "cancelled" && iAmAssignee && !iAmCreator) {
+  } else if (openStatus && iAmAssignee && !iAmCreator) {
     banner.style.display = "flex";
     banner.innerHTML = `
       <div class="actions">
         <button type="button" class="primary" onclick="submitForReview('${t.id}')">✅ Выполнить — на проверку</button>
+        ${creatorCloseBtn}
       </div>`;
+  } else if (creatorCloseBtn) {
+    banner.style.display = "flex";
+    banner.innerHTML = `<div class="actions">${creatorCloseBtn}</div>`;
   } else {
     banner.style.display = "none";
   }
+}
+
+async function creatorCloseTask(id) {
+  if (!confirm("Завершить задачу без проверки исполнителем?")) return;
+  await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify({ status: "done" }) });
+  closeModal("task-form-modal");
+  loadTasks();
 }
 
 async function submitForReview(id) {
