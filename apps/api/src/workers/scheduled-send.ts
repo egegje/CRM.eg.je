@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { prisma } from "@crm/db";
 import { sendMessage } from "../services/send.js";
 import { decrypt } from "../crypto.js";
@@ -15,6 +16,34 @@ export function startScheduledSendWorker() {
     });
     if (!m) return;
     try {
+      let signatureOverride: string | undefined;
+      if (m.personaId) {
+        const p = await prisma.persona.findUnique({
+          where: { id: m.personaId },
+          select: { signature: true },
+        });
+        signatureOverride = p?.signature ?? undefined;
+      }
+      const dbAttachments = await prisma.attachment.findMany({ where: { messageId: m.id } });
+      const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
+      for (const att of dbAttachments) {
+        if (!att.storagePath) {
+          console.error(
+            `[scheduled-send] attachment ${att.id} (${att.filename}) on message ${m.id} has no storagePath — skipping`,
+          );
+          continue;
+        }
+        try {
+          const buf = await readFile(att.storagePath);
+          attachments.push({ filename: att.filename, content: buf, contentType: att.mime });
+        } catch (e) {
+          console.error(
+            `[scheduled-send] failed to read attachment ${att.id} at ${att.storagePath}:`,
+            e,
+          );
+          throw new Error(`attachment ${att.filename} missing on disk`);
+        }
+      }
       const r = await sendMessage(
         { mailbox: m.mailbox, decrypt: (b) => decrypt(b, m.mailbox.email) },
         {
@@ -23,6 +52,9 @@ export function startScheduledSendWorker() {
           cc: m.ccAddrs,
           subject: m.subject,
           text: m.bodyText ?? "",
+          html: m.bodyHtml ?? undefined,
+          attachments: attachments.length ? attachments : undefined,
+          signatureOverride,
         },
       );
       const sent =
