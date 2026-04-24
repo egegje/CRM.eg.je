@@ -9,7 +9,7 @@ import { NotFound, BadRequest } from "../errors.js";
 import { buildWhere, buildSearchWhere } from "../services/search.js";
 import type { SearchIn, FolderKind } from "../services/search.js";
 import { sendMessage } from "../services/send.js";
-import { decrypt } from "../crypto.js";
+import { prepareSendPayload } from "../services/send-prepare.js";
 import { sendQueue } from "../queue.js";
 import { audit } from "../services/audit.js";
 import { accessibleMailboxIds, assertMessageAccess } from "../services/access.js";
@@ -478,42 +478,8 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
       return { scheduled: true, id: sched.id };
     }
 
-    // Per-persona signature: if the draft has personaId set, use that
-    // persona's signature; otherwise fall back to mailbox-level signature.
-    let signatureOverride: string | undefined;
-    if (m.personaId) {
-      const p = await prisma.persona.findUnique({
-        where: { id: m.personaId },
-        select: { signature: true },
-      });
-      signatureOverride = p?.signature ?? undefined;
-    }
-    // Load attachments from DB and read file contents
-    const dbAttachments = await prisma.attachment.findMany({ where: { messageId: id } });
-    const attachments: { filename: string; content: Buffer; contentType: string }[] = [];
-    for (const att of dbAttachments) {
-      if (!att.storagePath) continue;
-      try {
-        const buf = await readFile(att.storagePath);
-        attachments.push({ filename: att.filename, content: buf, contentType: att.mime });
-      } catch {
-        /* skip missing files */
-      }
-    }
-
-    const result = await sendMessage(
-      { mailbox: m.mailbox, decrypt: (b) => decrypt(b, m.mailbox.email) },
-      {
-        from: m.mailbox.email,
-        to: m.toAddrs,
-        cc: m.ccAddrs,
-        subject: m.subject,
-        text: m.bodyText ?? "",
-        html: m.bodyHtml ?? undefined,
-        attachments: attachments.length ? attachments : undefined,
-        signatureOverride,
-      },
-    );
+    const { ctx, payload } = await prepareSendPayload(m);
+    const result = await sendMessage(ctx, payload);
     const sent = await getOrCreateFolder(m.mailboxId, "sent", "Sent");
     await prisma.message.update({
       where: { id },
