@@ -2246,6 +2246,14 @@ function onTasksSortChange() {
   localStorage.setItem(tasksSortKey(), v);
   loadTasks();
 }
+function getTasksShowCompleted() {
+  return localStorage.getItem("crm-tasks-show-completed") === "1";
+}
+function onTasksShowCompletedChange() {
+  const cb = document.getElementById("tasks-show-completed");
+  localStorage.setItem("crm-tasks-show-completed", cb?.checked ? "1" : "0");
+  loadTasks();
+}
 function taskHasNewComments(t) {
   if (!t.lastCommentAt) return false;
   const me = state.user?.id;
@@ -2329,7 +2337,9 @@ async function loadTasks() {
     tasksFilter !== "createdByMe" &&
     tasksFilter !== "review"
   ) {
-    params.set("statusIn", "open,in_progress,awaiting_review");
+    if (!getTasksShowCompleted()) {
+      params.set("statusIn", "open,in_progress,awaiting_review");
+    }
   }
   if (tasksFilter === "done") params.set("status", "done");
   if (tasksFilter === "overdue") params.set("statusIn", "open,in_progress");
@@ -2366,6 +2376,19 @@ async function loadTasks() {
   if (sortSel) {
     sortSel.value = getTasksSort();
     sortSel.style.display = tasksMode === "kanban" ? "none" : "";
+  }
+  // Sync "show completed" checkbox + hide it where it has no effect
+  const showDoneCb = document.getElementById("tasks-show-completed");
+  const showDoneWrap = document.getElementById("tasks-show-completed-wrap");
+  if (showDoneCb) showDoneCb.checked = getTasksShowCompleted();
+  if (showDoneWrap) {
+    const irrelevant =
+      tasksMode === "kanban" ||
+      tasksFilter === "done" ||
+      tasksFilter === "overdue" ||
+      tasksFilter === "createdByMe" ||
+      tasksFilter === "review";
+    showDoneWrap.style.display = irrelevant ? "none" : "";
   }
   // Apply sort (kanban keeps its own status-based layout)
   if (tasksMode !== "kanban") tasks = applyTasksSort(tasks);
