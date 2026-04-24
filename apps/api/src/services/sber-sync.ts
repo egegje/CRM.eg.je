@@ -1,5 +1,9 @@
 import { prisma } from "@crm/db";
-import { getStatementTransactions, getClientInfo } from "./sber-client.js";
+import {
+  getClientInfo,
+  getStatementSummary,
+  getStatementTransactions,
+} from "./sber-client.js";
 
 // Sber API transaction — raw shape (superset of typed SberTransaction)
 type RawTx = Record<string, unknown> & {
@@ -95,6 +99,47 @@ export async function syncSberTransactions(): Promise<{ synced: number; errors: 
       create: { accountNumber: acc.number, lastSyncDate: todayStr },
       update: { lastSyncDate: todayStr },
     });
+
+    // Refresh BankAccount row so the home page counter reflects today's
+    // closing balance (the home handler reads BankAccount, not Sber live).
+    try {
+      const summary = await getStatementSummary(acc.number, todayStr);
+      // Sber sometimes returns amounts as {amount: "12345.67"} objects, not
+      // plain numbers, despite what the TS type claims.
+      const rawBal = (summary as unknown as { closingBalance: unknown }).closingBalance;
+      const closingBalance =
+        typeof rawBal === "object" && rawBal !== null
+          ? parseFloat((rawBal as { amount: string }).amount)
+          : Number(rawBal) || 0;
+      const company = await prisma.company.findFirst({ select: { id: true } });
+      if (company) {
+        const existing = await prisma.bankAccount.findFirst({
+          where: { accountNumber: acc.number },
+          select: { id: true },
+        });
+        if (existing) {
+          await prisma.bankAccount.update({
+            where: { id: existing.id },
+            data: {
+              balance: closingBalance,
+              currency: "RUB",
+            },
+          });
+        } else {
+          await prisma.bankAccount.create({
+            data: {
+              companyId: company.id,
+              bank: "Sber",
+              accountNumber: acc.number,
+              currency: "RUB",
+              balance: closingBalance,
+            },
+          });
+        }
+      }
+    } catch (e) {
+      errors.push(`${acc.number}: balance refresh — ${(e as Error).message.slice(0, 200)}`);
+    }
   }
 
   return { synced, errors };
