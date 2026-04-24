@@ -70,6 +70,21 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
   app.get("/messages", { preHandler: requireUser() }, async (req) => {
     const q = ListQuery.parse(req.query);
     const accessIds = await accessibleMailboxIds(req.user!);
+    // Sent/drafts folders should sort by sentAt (that's the chronology users
+    // expect). Receivedat on those rows reflects IMAP sync time, which can
+    // jitter and breaks date-group headers (e.g. "Сегодня → На этой неделе →
+    // Сегодня" interleaving).
+    let isSentView = q.folderKind === "sent" || q.folderKind === "drafts";
+    if (!isSentView && q.folderId) {
+      const f = await prisma.folder.findUnique({
+        where: { id: q.folderId },
+        select: { kind: true },
+      });
+      if (f && (f.kind === "sent" || f.kind === "drafts")) isSentView = true;
+    }
+    const orderBy: Prisma.MessageOrderByWithRelationInput[] = isSentView
+      ? [{ sentAt: { sort: "desc", nulls: "last" } }, { receivedAt: "desc" }]
+      : [{ receivedAt: "desc" }];
     if (q.q) {
       // Scoped text search using Prisma (safe from SQL injection)
       const searchWhere = buildSearchWhere(q.q, q.searchIn as SearchIn);
@@ -89,7 +104,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
           ...searchWhere,
           mailboxId: { in: accessIds },
         },
-        orderBy: { receivedAt: "desc" },
+        orderBy,
         take: q.limit,
         include: { folder: { select: { kind: true } }, _count: { select: { attachments: true } } },
       });
@@ -107,7 +122,7 @@ export async function messageRoutes(app: FastifyInstance): Promise<void> {
     (where as { mailboxId?: { in: string[] } }).mailboxId = { in: accessIds };
     const args: Prisma.MessageFindManyArgs = {
       where,
-      orderBy: { receivedAt: "desc" },
+      orderBy,
       take: q.limit,
       include: { _count: { select: { attachments: true } } },
     };
