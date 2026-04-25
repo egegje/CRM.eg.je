@@ -3554,25 +3554,29 @@ function ensureIosSheetHeader() {
   left.appendChild(cancel);
   header.prepend(left);
   header.appendChild(save);
-  // Restore stored size on open
+  // Restore stored size on open by writing inline width/height — the
+  // browser resize handle uses inline styles too, so they round-trip.
   const modal = document.getElementById("task-form-modal");
   const box = document.getElementById("task-modal-box");
   const w = parseInt(localStorage.getItem("crm-task-sheet-w") || "0", 10);
   const h = parseInt(localStorage.getItem("crm-task-sheet-h") || "0", 10);
-  if (w > 480 && h > 480 && box) {
-    box.style.setProperty("--task-sheet-w", w + "px");
-    box.style.setProperty("--task-sheet-h", h + "px");
-  }
-  // Watch for user-initiated CSS resize and persist the result.
+  if (box && w > 480) box.style.width = w + "px";
+  if (box && h > 480) box.style.height = h + "px";
+  // Watch for user-initiated drag and persist (debounced via raf).
   if (box && !box.dataset.resizeBound) {
-    const ro = new ResizeObserver((entries) => {
+    let raf = 0;
+    const ro = new ResizeObserver(() => {
       if (modal.classList.contains("task-sheet-minimized")) return;
-      const r = entries[0]?.contentRect;
-      if (!r) return;
-      box.style.setProperty("--task-sheet-w", r.width + "px");
-      box.style.setProperty("--task-sheet-h", r.height + "px");
-      localStorage.setItem("crm-task-sheet-w", String(Math.round(r.width)));
-      localStorage.setItem("crm-task-sheet-h", String(Math.round(r.height)));
+      if (!modal.classList.contains("task-create-sheet")) return;
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const cw = box.offsetWidth;
+        const ch = box.offsetHeight;
+        if (cw > 0 && ch > 0) {
+          localStorage.setItem("crm-task-sheet-w", String(cw));
+          localStorage.setItem("crm-task-sheet-h", String(ch));
+        }
+      });
     });
     ro.observe(box);
     box.dataset.resizeBound = "1";
@@ -3735,6 +3739,11 @@ async function openTaskForm(id) {
     });
     modal.classList.remove("task-sheet-minimized");
     modal.querySelector(".ios-sheet-minimized-bar")?.remove();
+    // Drop any inline width/height that the create-sheet resize handle
+    // might have left on the box, otherwise the .wide edit modal can't
+    // expand to its proper width and the vsplit area gets crushed.
+    box.style.width = "";
+    box.style.height = "";
   }
   modal.classList.remove("hidden");
   if (!id) setTimeout(() => document.getElementById("task-title-input")?.focus(), 60);

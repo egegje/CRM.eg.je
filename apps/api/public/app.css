@@ -271,12 +271,12 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
 }
 .task-create-sheet .modal-box {
-  width: var(--task-sheet-w, 600px) !important;
-  height: var(--task-sheet-h, calc(100vh - 56px)) !important;
+  width: 600px;
+  height: calc(100vh - 56px);
   max-width: calc(100vw - 32px) !important;
   max-height: calc(100vh - 56px) !important;
-  min-width: 480px !important;
-  min-height: 480px !important;
+  min-width: 480px;
+  min-height: 480px;
   border-radius: 22px !important;
   background: var(--bg-alt) !important;
   display: flex !important;
