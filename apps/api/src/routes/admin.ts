@@ -1,8 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { prisma, type Prisma } from "@crm/db";
-import { requireRole } from "../auth.js";
+import { requireRole, requireUser } from "../auth.js";
 import { hashPassword } from "../auth.js";
+import { accessibleMailboxIds } from "../services/access.js";
 import { setKey, encrypt } from "../crypto.js";
 import { loadConfig } from "../config.js";
 import { NotFound, BadRequest } from "../errors.js";
@@ -158,6 +159,63 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       orderBy: [{ useCount: "desc" }, { lastUsedAt: "desc" }],
       take: q.limit,
     });
+  });
+
+  // Contact card: history of messages and related tasks for one email.
+  // Auth = any logged-in user (we already restrict per-mailbox via accessIds).
+  app.get("/contacts/card", { preHandler: requireUser() }, async (req) => {
+    const q = z.object({ email: z.string().email() }).parse(req.query);
+    const email = q.email;
+    const accessIds = await accessibleMailboxIds(req.user!);
+    const [contact, fromMessages, toMessages, tasks] = await Promise.all([
+      prisma.contact.findFirst({ where: { email: { equals: email, mode: "insensitive" } } }),
+      prisma.message.findMany({
+        where: {
+          fromAddr: { equals: email, mode: "insensitive" },
+          mailboxId: { in: accessIds },
+          deletedAt: null,
+        },
+        select: {
+          id: true, subject: true, fromAddr: true, fromName: true,
+          receivedAt: true, sentAt: true, isRead: true, mailboxId: true,
+        },
+        orderBy: { receivedAt: "desc" },
+        take: 20,
+      }),
+      prisma.message.findMany({
+        where: {
+          toAddrs: { has: email },
+          mailboxId: { in: accessIds },
+          deletedAt: null,
+        },
+        select: {
+          id: true, subject: true, toAddrs: true,
+          receivedAt: true, sentAt: true, mailboxId: true,
+        },
+        orderBy: { sentAt: "desc" },
+        take: 20,
+      }),
+      prisma.task.findMany({
+        where: {
+          OR: [
+            { description: { contains: email, mode: "insensitive" } },
+            { title: { contains: email, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, title: true, status: true, dueDate: true, priority: true },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+    ]);
+    return {
+      email,
+      name: contact?.name || fromMessages[0]?.fromName || "",
+      useCount: contact?.useCount ?? 0,
+      lastUsedAt: contact?.lastUsedAt ?? null,
+      from: fromMessages,
+      to: toMessages,
+      tasks,
+    };
   });
 
   app.post("/admin/contacts/scan-history", { preHandler: requireRole("owner", "admin") }, async () => {

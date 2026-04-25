@@ -701,9 +701,9 @@ function renderPreview(m) {
     <div class="preview-header">
       <h2>${escapeHtml(m.subject || "(без темы)")}</h2>
       <div class="preview-meta">
-        <b>От:</b> ${m.fromName ? escapeHtml(m.fromName) + ' &lt;' + escapeHtml(m.fromAddr) + '&gt;' : escapeHtml(m.fromAddr || "")}<br>
-        <b>Кому:</b> ${escapeHtml((m.toAddrs || []).join(", "))}<br>
-        ${(m.ccAddrs || []).length ? `<b>Копия:</b> ${escapeHtml(m.ccAddrs.join(", "))}<br>` : ""}
+        <b>От:</b> ${m.fromName ? escapeHtml(m.fromName) + ' &lt;' + emailLink(m.fromAddr) + '&gt;' : emailLink(m.fromAddr)}<br>
+        <b>Кому:</b> ${(m.toAddrs || []).map(emailLink).join(", ")}<br>
+        ${(m.ccAddrs || []).length ? `<b>Копия:</b> ${m.ccAddrs.map(emailLink).join(", ")}<br>` : ""}
         <b>Дата:</b> ${date}
       </div>
       <div class="preview-actions" style="align-items:center">
@@ -1013,6 +1013,76 @@ async function onComposeDrop(e) {
   input.files = dt.files;
   updateAttachList();
   await uploadAttachNow();
+}
+
+// Inline link helper that turns an email into a clickable contact-card opener.
+function emailLink(email) {
+  if (!email) return "";
+  const safe = escapeHtml(email);
+  return `<a href="javascript:void(0)" onclick="event.stopPropagation();openContactCard('${safe.replace(/'/g, "\\'")}')" style="color:var(--accent);text-decoration:none;border-bottom:1px dashed var(--accent)">${safe}</a>`;
+}
+
+// Contact card modal — quick history (messages from/to + related tasks)
+// for one email address. Click any "Кому: foo@bar" or "От: foo@bar" line.
+async function openContactCard(email) {
+  if (!email) return;
+  const overlay = document.createElement("div");
+  overlay.className = "modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:680px;width:100%;max-height:85vh;overflow-y:auto;background:var(--bg);border-radius:14px;padding:0">
+      <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:16px">${escapeHtml(email)}</div>
+          <div id="contact-card-meta" style="font-size:11px;color:var(--text-muted);margin-top:2px">⏳ загружаю...</div>
+        </div>
+        <button type="button" onclick="this.closest('.modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
+      <div id="contact-card-body" style="padding:18px 22px"></div>
+    </div>`;
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+  let data;
+  try {
+    data = await api("/contacts/card?email=" + encodeURIComponent(email));
+  } catch (e) {
+    document.getElementById("contact-card-body").innerHTML = '<div style="color:var(--danger)">Ошибка: ' + escapeHtml(e.message) + '</div>';
+    return;
+  }
+  const meta = document.getElementById("contact-card-meta");
+  meta.textContent = (data.name ? escapeHtml(data.name) + " · " : "") +
+    "использовался " + (data.useCount || 0) + " раз" +
+    (data.lastUsedAt ? " · последний " + new Date(data.lastUsedAt).toLocaleDateString("ru") : "");
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("ru", { day: "2-digit", month: "short", year: "2-digit" }) : "";
+  const renderMsgRow = (m, dir) => `
+    <div onclick="document.querySelector('.modal[style*=\\\"z-index:300\\\"]').remove();selectMessage('${m.id}')" style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px">
+      <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${dir === 'in' ? '📥' : '📤'} ${escapeHtml(m.subject || '(без темы)')}</div>
+      <div style="font-size:11px;color:var(--text-muted);white-space:nowrap">${fmtDate(m.sentAt || m.receivedAt)}</div>
+    </div>`;
+  const html = `
+    <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+      <button onclick="document.querySelector('.modal[style*=\\\"z-index:300\\\"]').remove();openCompose({to:'${escapeHtml(email).replace(/'/g, "\\'")}'});" style="padding:6px 12px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">✉ Написать</button>
+    </div>
+    <div style="display:flex;gap:18px;flex-wrap:wrap">
+      <div style="flex:1;min-width:240px">
+        <h4 style="margin:0 0 8px 0;font-size:13px">📥 От него (${data.from.length})</h4>
+        ${data.from.length ? data.from.map((m) => renderMsgRow(m, 'in')).join("") : '<div style="color:var(--text-muted);font-size:12px">нет</div>'}
+      </div>
+      <div style="flex:1;min-width:240px">
+        <h4 style="margin:0 0 8px 0;font-size:13px">📤 Ему (${data.to.length})</h4>
+        ${data.to.length ? data.to.map((m) => renderMsgRow(m, 'out')).join("") : '<div style="color:var(--text-muted);font-size:12px">нет</div>'}
+      </div>
+    </div>
+    ${data.tasks.length ? `
+      <h4 style="margin:18px 0 8px 0;font-size:13px">📋 Связанные задачи (${data.tasks.length})</h4>
+      ${data.tasks.map((t) => `
+        <div onclick="document.querySelector('.modal[style*=\\\"z-index:300\\\"]').remove();openTaskForm('${t.id}')" style="padding:8px 10px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px">
+          <div style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t.priority === 'urgent' ? '🔥 ' : ''}${t.status === 'done' ? '✅ ' : ''}${escapeHtml(t.title)}</div>
+          <div style="font-size:11px;color:var(--text-muted);white-space:nowrap">${t.dueDate ? fmtDate(t.dueDate) : t.status}</div>
+        </div>`).join("")}
+    ` : ""}
+  `;
+  document.getElementById("contact-card-body").innerHTML = html;
 }
 
 async function uploadAttachNow() {
