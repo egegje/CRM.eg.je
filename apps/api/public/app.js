@@ -279,23 +279,29 @@ async function loadMailboxes() {
     d.onclick = () => { exitTasksView(); setCurrentMailbox(mb.id); state.selectedIds.clear(); renderBulkBar(); refreshList(); };
     list.appendChild(d);
   }
-  const sel = document.getElementById("compose-mailbox");
-  // Preserve the user's current selection — refreshList() runs this every
-  // 30s on the live-poll tick, and without this the open compose form's
-  // chosen mailbox would silently reset to the first option, then the
-  // user would Send and the wrong mailbox would go out.
+  repopulateMailboxSelect(document.getElementById("compose-mailbox"), state.mailboxes);
+}
+
+// Replace a <select>'s options with one entry per mailbox while preserving
+// whatever the user had picked, if that mailbox still exists. Pulled out as
+// a pure function because the live-poll regression (mailbox silently
+// resetting to the first option every 30 seconds) was nearly impossible to
+// notice manually — a unit test pins the behavior so it can't drift again.
+function repopulateMailboxSelect(sel, mailboxes) {
+  if (!sel) return;
   const previous = sel.value;
   sel.innerHTML = "";
-  for (const mb of state.mailboxes) {
+  for (const mb of mailboxes) {
     const opt = document.createElement("option");
     opt.value = mb.id;
     opt.textContent = `${mb.displayName} <${mb.email}>`;
     sel.appendChild(opt);
   }
-  if (previous && state.mailboxes.some((mb) => mb.id === previous)) {
+  if (previous && mailboxes.some((mb) => mb.id === previous)) {
     sel.value = previous;
   }
 }
+if (typeof globalThis !== "undefined") globalThis.repopulateMailboxSelect = repopulateMailboxSelect;
 
 async function loadFolders() {
   state.folders = await api("/folders");
