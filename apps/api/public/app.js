@@ -3681,7 +3681,10 @@ async function openTaskForm(id) {
     document.getElementById("task-comments-row").style.display = "flex";
     const vs = document.getElementById("task-vsplit");
     if (vs) vs.style.display = "block";
-    const savedPx = parseInt(localStorage.getItem("crm-task-comments-px") || "220", 10);
+    // Clamp persisted height — bad values from earlier sessions leak in and
+    // give comments half the screen. 80-360 is the sane window.
+    let savedPx = parseInt(localStorage.getItem("crm-task-comments-px") || "200", 10);
+    if (!Number.isFinite(savedPx) || savedPx < 80 || savedPx > 360) savedPx = 200;
     document.getElementById("task-comments-row").style.flex = "0 0 " + savedPx + "px";
     renderTaskComments(t.comments || []);
     renderTaskNotifiedStrip(t.tgNotifies || []);
