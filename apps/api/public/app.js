@@ -3656,8 +3656,9 @@ async function openTaskForm(id) {
   }
   const modal = document.getElementById("task-form-modal");
   modal.classList.toggle("task-create-sheet", !id);
-  // Clear any per-task header action ("Завершить") between opens.
-  modal.querySelector(".task-header-action")?.remove();
+  // In create mode wipe any leftover per-task header action; in edit mode
+  // renderReviewBanner has already managed its own button so don't touch.
+  if (!id) modal.querySelector(".task-header-action")?.remove();
   if (!id) {
     syncTaskPrioritySegmented(f.priority.value || "normal");
     ensureIosSheetSaveButton();
