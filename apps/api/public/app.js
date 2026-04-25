@@ -3622,6 +3622,18 @@ function restoreTaskSheet() {
   box.querySelector(".ios-sheet-minimized-bar")?.remove();
 }
 
+// Make the description textarea grow to fit its content as the user types,
+// up to a max so the modal doesn't blow past the viewport. Bound on first
+// open of any task; toggles between create-sheet (max 60vh) and edit
+// (handled by flex layout).
+function autoGrowTaskDesc() {
+  const ta = document.getElementById("task-desc-input");
+  if (!ta) return;
+  ta.style.height = "auto";
+  const max = window.innerHeight * 0.6;
+  ta.style.height = Math.min(max, ta.scrollHeight + 2) + "px";
+}
+
 async function openTaskForm(id) {
   const f = document.getElementById("task-form");
   f.reset();
@@ -3765,6 +3777,27 @@ async function openTaskForm(id) {
   }
   modal.classList.remove("hidden");
   if (!id) setTimeout(() => document.getElementById("task-title-input")?.focus(), 60);
+  // Auto-grow the description textarea as the user types. In create mode
+  // the textarea sits in normal flow and we resize it via JS; in edit mode
+  // the parent flex container caps it, so we only apply growth for the
+  // create sheet there resize is meaningful.
+  const descTa = document.getElementById("task-desc-input");
+  if (descTa) {
+    if (!descTa.dataset.autogrowBound) {
+      descTa.addEventListener("input", () => {
+        if (modal.classList.contains("task-create-sheet")) autoGrowTaskDesc();
+      });
+      descTa.dataset.autogrowBound = "1";
+    }
+    if (modal.classList.contains("task-create-sheet")) {
+      // Run once after the modal paints so scrollHeight reflects the real
+      // value the browser computed.
+      setTimeout(autoGrowTaskDesc, 30);
+    } else {
+      // In edit mode let the flex layout decide.
+      descTa.style.height = "";
+    }
+  }
 }
 
 function renderCoAssigneePills() {
