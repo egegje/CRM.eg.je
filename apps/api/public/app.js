@@ -3273,6 +3273,10 @@ async function openTaskForm(id) {
     f.priority.value = t.priority;
     f.category.value = t.category || "";
     f.status.value = t.status;
+    const recR = document.getElementById("task-recurrence-rule");
+    const recI = document.getElementById("task-recurrence-interval");
+    if (recR) recR.value = t.recurrence?.rule || "";
+    if (recI) recI.value = t.recurrence?.interval || 1;
     _taskCoAssignees = (t.coAssignees || []).map((ca) => ca.userId);
     renderCoAssigneePills();
     document.getElementById("task-delete-btn").style.display = "inline-block";
@@ -3311,6 +3315,10 @@ async function openTaskForm(id) {
     banner.style.display = "none";
     f.id.value = "";
     f.status.value = "open";
+    const recR = document.getElementById("task-recurrence-rule");
+    const recI = document.getElementById("task-recurrence-interval");
+    if (recR) recR.value = "";
+    if (recI) recI.value = 1;
     renderCoAssigneePills();
     document.getElementById("task-delete-btn").style.display = "none";
     document.getElementById("task-comments-row").style.display = "none";
@@ -3442,6 +3450,12 @@ async function saveTask(e) {
   const id = body.id;
   delete body.id;
   if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
+  // Roll the two recurrence form fields into one structured field for the API.
+  const rule = body.recurrenceRule;
+  const interval = parseInt(body.recurrenceInterval || "1", 10) || 1;
+  delete body.recurrenceRule;
+  delete body.recurrenceInterval;
+  body.recurrence = rule ? { rule, interval } : null;
   body.coAssigneeIds = _taskCoAssignees.slice();
   try {
     if (id) await api("/tasks/" + id, { method: "PATCH", body: JSON.stringify(body) });

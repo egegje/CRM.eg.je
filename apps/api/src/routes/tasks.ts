@@ -3,7 +3,7 @@ import { z } from "zod";
 import { mkdir, writeFile } from "node:fs/promises";
 import { createReadStream } from "node:fs";
 import { join } from "node:path";
-import { prisma, type Prisma } from "@crm/db";
+import { prisma, Prisma } from "@crm/db";
 import { requireUser } from "../auth.js";
 import { NotFound, BadRequest } from "../errors.js";
 import { loadConfig } from "../config.js";
@@ -19,6 +19,13 @@ const Params = z.object({ id: z.string() });
 
 const TASK_STATUSES = ["open", "in_progress", "awaiting_review", "done", "cancelled"] as const;
 
+const RecurrenceRule = z
+  .object({
+    rule: z.enum(["daily", "weekly", "monthly"]),
+    interval: z.number().int().min(1).max(12).default(1),
+  })
+  .nullable();
+
 const Create = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
@@ -29,6 +36,7 @@ const Create = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).default("normal"),
   category: z.string().optional(),
   sourceEmailMessageId: z.string().optional(),
+  recurrence: RecurrenceRule.optional(),
 });
 
 const Patch = z.object({
@@ -41,7 +49,17 @@ const Patch = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   category: z.string().optional().nullable(),
+  recurrence: RecurrenceRule.optional(),
 });
+
+function nextRecurrenceDueDate(prev: Date | null, rule: { rule: string; interval: number }): Date {
+  const base = prev ? new Date(prev) : new Date();
+  const interval = Math.max(1, rule.interval || 1);
+  if (rule.rule === "daily") base.setDate(base.getDate() + interval);
+  else if (rule.rule === "weekly") base.setDate(base.getDate() + 7 * interval);
+  else if (rule.rule === "monthly") base.setMonth(base.getMonth() + interval);
+  return base;
+}
 
 const ListQuery = z.object({
   assigneeId: z.string().optional(),
@@ -161,11 +179,12 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const t = await prisma.task.create({
       data: {
         ...rest,
+        recurrence: rest.recurrence ?? Prisma.JsonNull,
         creatorId: user.id,
         ...(coAssigneeIds && coAssigneeIds.length
           ? { coAssignees: { create: coAssigneeIds.map((userId) => ({ userId })) } }
           : {}),
-      },
+      } as Prisma.TaskUncheckedCreateInput,
       include: TASK_INCLUDE,
     });
     await audit(req, "task.create", { taskId: t.id, title: t.title });
@@ -178,7 +197,18 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const body = Patch.parse(req.body);
     const before = await prisma.task.findUnique({
       where: { id },
-      select: { assigneeId: true, status: true, creatorId: true },
+      select: {
+        assigneeId: true,
+        status: true,
+        creatorId: true,
+        recurrence: true,
+        title: true,
+        description: true,
+        projectId: true,
+        priority: true,
+        category: true,
+        dueDate: true,
+      },
     });
     if (!before) throw new NotFound();
     const { coAssigneeIds, ...rest } = body;
@@ -204,6 +234,36 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
       }
     }
     await audit(req, "task.update", { taskId: id, changes: body });
+    // If a recurring task just got closed, spawn the next instance with
+    // a shifted due date and the same recurrence rule. The old task stays
+    // closed as a record of the past run.
+    if (
+      body.status === "done" &&
+      before.status !== "done" &&
+      before.recurrence &&
+      typeof before.recurrence === "object"
+    ) {
+      const rule = before.recurrence as { rule: string; interval: number };
+      const nextDue = nextRecurrenceDueDate(before.dueDate ?? null, rule);
+      try {
+        await prisma.task.create({
+          data: {
+            title: before.title,
+            description: before.description ?? null,
+            assigneeId: before.assigneeId ?? null,
+            creatorId: before.creatorId,
+            projectId: before.projectId ?? null,
+            priority: before.priority,
+            category: before.category ?? null,
+            dueDate: nextDue,
+            recurrence: before.recurrence as Prisma.InputJsonValue,
+            status: "open",
+          },
+        });
+      } catch (e) {
+        req.log.error({ err: e, taskId: id }, "recurrence: spawn next failed");
+      }
+    }
     const me = req.user!.id;
     if (body.assigneeId !== undefined && body.assigneeId && body.assigneeId !== before.assigneeId) {
       notifyAssignment(t.id, me).catch((e) => console.error("notify:", (e as Error).message));
