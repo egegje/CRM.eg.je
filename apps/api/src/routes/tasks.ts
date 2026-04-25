@@ -228,6 +228,54 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
+  // Bulk operations: close (done), reassign, add tag, delete.
+  // Iterates instead of updateMany so per-row hooks (completedAt, audit)
+  // stay consistent with the single-row PATCH path.
+  app.post("/tasks/bulk", { preHandler: requireUser() }, async (req) => {
+    const body = z
+      .object({
+        ids: z.array(z.string()).min(1),
+        action: z.enum(["close", "reassign", "addTag", "delete"]),
+        assigneeId: z.string().optional(),
+        tagId: z.string().optional(),
+      })
+      .parse(req.body);
+    let affected = 0;
+    for (const id of body.ids) {
+      try {
+        if (body.action === "close") {
+          await prisma.task.update({
+            where: { id },
+            data: { status: "done", completedAt: new Date(), reviewRequestedAt: null },
+          });
+          affected++;
+        } else if (body.action === "reassign") {
+          if (!body.assigneeId) continue;
+          await prisma.task.update({
+            where: { id },
+            data: { assigneeId: body.assigneeId },
+          });
+          affected++;
+        } else if (body.action === "addTag") {
+          if (!body.tagId) continue;
+          await prisma.taskTagAssignment.upsert({
+            where: { taskId_tagId: { taskId: id, tagId: body.tagId } },
+            create: { taskId: id, tagId: body.tagId },
+            update: {},
+          });
+          affected++;
+        } else if (body.action === "delete") {
+          await prisma.task.delete({ where: { id } });
+          affected++;
+        }
+      } catch (e) {
+        req.log.error({ err: e, id, action: body.action }, "tasks/bulk: per-row failed");
+      }
+    }
+    await audit(req, "task.bulk", { action: body.action, affected, total: body.ids.length });
+    return { affected, total: body.ids.length };
+  });
+
   app.post("/tasks/:id/comments", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
     const body = z.object({ text: z.string().min(1) }).parse(req.body);

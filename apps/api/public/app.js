@@ -2723,10 +2723,23 @@ function tagPillsHtml(t) {
     .join("");
 }
 
+if (!state.selectedTaskIds) state.selectedTaskIds = new Set();
+
+function toggleTaskSelect(id, ev) {
+  if (ev) { ev.stopPropagation(); }
+  if (state.selectedTaskIds.has(id)) state.selectedTaskIds.delete(id);
+  else state.selectedTaskIds.add(id);
+  renderTaskBulkBar();
+  // Toggle the checkbox state in DOM without re-rendering everything.
+  const cb = document.querySelector(`input[data-task-check="${id}"]`);
+  if (cb) cb.checked = state.selectedTaskIds.has(id);
+}
+
 function renderTasks(tasks) {
   const el = document.getElementById("tasks-list");
   if (!tasks.length) {
     el.innerHTML = '<div style="color:var(--text-muted);padding:20px;text-align:center">нет задач</div>';
+    renderTaskBulkBar();
     return;
   }
   const prioColor = { urgent: "#ef4444", high: "#f59e0b", normal: "var(--text)", low: "var(--text-muted)" };
@@ -2734,7 +2747,9 @@ function renderTasks(tasks) {
     const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
     const done = t.status === "done";
     const hasNew = taskHasNewComments(t);
+    const checked = state.selectedTaskIds.has(t.id) ? "checked" : "";
     return `<div class="task-row${hasNew ? " has-new" : ""}" style="padding:12px 14px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:center;gap:10px" onclick="openTaskForm('${t.id}')">
+      <input type="checkbox" data-task-check="${t.id}" ${checked} onclick="toggleTaskSelect('${t.id}',event)" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">
       <div style="flex:1;min-width:0">
         <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};word-wrap:break-word;display:flex;align-items:center;gap:6px">
           ${hasNew ? '<span class="task-new-dot" title="новые комментарии"></span>' : ""}${t.priority === "urgent" ? "🔥 " : ""}${done ? "✅ " : ""}${escapeHtml(t.title)}
@@ -2749,6 +2764,61 @@ function renderTasks(tasks) {
       ${done ? "" : `<button onclick="event.stopPropagation();if(confirm('Завершить задачу?'))toggleTaskDone('${t.id}',true)" style="padding:4px 10px;background:#10b981;color:white;border:none;border-radius:5px;cursor:pointer;font-size:11px;white-space:nowrap;flex-shrink:0">Завершить</button>`}
     </div>`;
   }).join("");
+  renderTaskBulkBar();
+}
+
+function renderTaskBulkBar() {
+  let bar = document.getElementById("task-bulk-bar");
+  if (state.selectedTaskIds.size === 0) {
+    bar?.remove();
+    return;
+  }
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.id = "task-bulk-bar";
+    bar.className = "bulk-bar";
+    const tasksView = document.getElementById("tasks-view");
+    if (tasksView) tasksView.prepend(bar);
+  }
+  const userOpts = (_users || [])
+    .map((u) => `<option value="${u.id}">${escapeHtml(u.name || u.email)}</option>`)
+    .join("");
+  const tagOpts = (_tags || [])
+    .map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`)
+    .join("");
+  bar.innerHTML = `
+    <span>${state.selectedTaskIds.size} задач выбрано</span>
+    <button onclick="bulkTaskAction('close')">✓ Завершить</button>
+    <select onchange="if(this.value){bulkTaskAction('reassign',{assigneeId:this.value});this.value=''}">
+      <option value="">→ Назначить...</option>
+      ${userOpts}
+    </select>
+    <select onchange="if(this.value){bulkTaskAction('addTag',{tagId:this.value});this.value=''}">
+      <option value="">+ Тег...</option>
+      ${tagOpts}
+    </select>
+    <button onclick="bulkTaskAction('delete')" style="color:var(--danger)">🗑 Удалить</button>
+    <button onclick="state.selectedTaskIds.clear();renderTaskBulkBar();loadTasks()">×</button>
+  `;
+}
+
+async function bulkTaskAction(action, extra = {}) {
+  const ids = [...state.selectedTaskIds];
+  if (!ids.length) return;
+  if (action === "delete" && !confirm(`Удалить ${ids.length} задач?`)) return;
+  if (action === "close" && !confirm(`Завершить ${ids.length} задач?`)) return;
+  try {
+    const r = await api("/tasks/bulk", {
+      method: "POST",
+      body: JSON.stringify({ ids, action, ...extra }),
+    });
+    showToast(`${r.affected} из ${r.total} обработано`, null);
+  } catch (e) {
+    showToast("Ошибка: " + e.message, null);
+  }
+  state.selectedTaskIds.clear();
+  renderTaskBulkBar();
+  loadTasks();
 }
 
 async function renderTasksGrouped(tasks) {
@@ -2793,7 +2863,9 @@ async function renderTasksGrouped(tasks) {
           const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
           const done = t.status === "done" || t.status === "cancelled";
           const hasNew = taskHasNewComments(t);
+          const checked = state.selectedTaskIds.has(t.id) ? "checked" : "";
           return `<div class="task-row${hasNew ? " has-new" : ""}" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;align-items:start;gap:8px;opacity:${done ? 0.5 : 1}" onclick="openTaskForm('${t.id}')">
+            <input type="checkbox" data-task-check="${t.id}" ${checked} onclick="toggleTaskSelect('${t.id}',event)" style="width:14px;height:14px;cursor:pointer;flex-shrink:0;margin-top:1px">
             <span style="font-size:12px">${statusIcon[t.status] || "⬚"}</span>
             <div style="flex:1;min-width:0">
               <div style="font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"};color:${prioColor[t.priority] || "var(--text)"};font-size:13px;display:flex;align-items:center;gap:6px">
@@ -2812,6 +2884,7 @@ async function renderTasksGrouped(tasks) {
     `;
   }
   el.innerHTML = html;
+  renderTaskBulkBar();
 }
 
 const KANBAN_COLS = [
