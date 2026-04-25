@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=164" />
+<link rel="stylesheet" href="/app.css?v=165" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -163,6 +163,7 @@
       <button data-nav="overdue" draggable="true" onclick="showTasksView('overdue')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">⏰ Просроченные</button>
       <button data-nav="done" draggable="true" onclick="showTasksView('done')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">✔️ Выполненные</button>
       <button data-nav="team" id="team-subnav-btn" draggable="true" onclick="showTasksView('team')" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">👥 Команда</button>
+      <button data-nav="byProject" draggable="true" onclick="showTasksByProject()" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:grab;font-size:12px;color:var(--text)">🏗 По объекту</button>
       <span style="position:relative;display:inline-block">
         <button id="tasks-sheets-btn" onclick="toggleTasksSheets()" class="subnav-btn" style="padding:6px 12px;border:1px solid var(--border);border-radius:5px;background:var(--bg-alt);cursor:pointer;font-size:12px;color:var(--text)">📋 Таблицы</button>
         <div id="tasks-sheets-dropdown" style="display:none;position:absolute;top:100%;left:0;z-index:100;min-width:220px;background:var(--bg);border:1px solid var(--border);border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);padding:6px 0;margin-top:4px"></div>
@@ -239,10 +240,13 @@
             <select name="priority"><option value="low">низкий</option><option value="normal" selected>обычный</option><option value="high">высокий</option><option value="urgent">срочный</option></select>
           </label>
           <label>Метка
-            <select name="category" id="task-category-select"><option value="">—</option></select>
+            <input name="category" id="task-category-input" list="task-category-options" placeholder="начни вводить — подскажу">
+            <datalist id="task-category-options"></datalist>
           </label>
           <label>Проект
-            <select name="projectId"><option value="">—</option></select>
+            <input name="projectName" id="task-project-input" list="task-project-options" placeholder="начни вводить — подскажу" oninput="onTaskProjectInput()">
+            <input type="hidden" name="projectId" id="task-project-hidden">
+            <datalist id="task-project-options"></datalist>
           </label>
           <label>Повторение
             <select name="recurrenceRule" id="task-recurrence-rule">
@@ -367,7 +371,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=164"></script>
+<script src="/app.js?v=165"></script>
 
 </body>
 </html>

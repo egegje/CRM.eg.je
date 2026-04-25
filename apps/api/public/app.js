@@ -1104,6 +1104,16 @@ async function openContactCard(email) {
   document.getElementById("contact-card-body").innerHTML = html;
 }
 
+// Resolve the typed project name to its id whenever the user picks one.
+function onTaskProjectInput() {
+  const input = document.getElementById("task-project-input");
+  const hidden = document.getElementById("task-project-hidden");
+  if (!input || !hidden) return;
+  const name = (input.value || "").trim().toLowerCase();
+  const match = _projects.find((p) => (p.name || "").toLowerCase() === name);
+  hidden.value = match ? match.id : "";
+}
+
 async function uploadAttachNow() {
   var input = document.getElementById("compose-files");
   if (!input || !input.files.length) return;
@@ -1980,6 +1990,7 @@ function switchSection(section) {
     const saved = tasksFilter || localStorage.getItem("crm-tasks-filter") || "me";
     if (saved === "kanban") showKanbanView();
     else if (saved === "calendar") showCalendarView();
+    else if (saved && saved.startsWith("project:")) loadProjectView(saved.split(":")[1]);
     else showTasksView(saved);
   } else if (section === "finance") {
     showFinanceView();
@@ -2594,6 +2605,147 @@ async function openUserKanban(userId) {
     sel.value = userId;
     await loadTasks();
   }
+}
+
+// Project picker: pops a small modal, lets the user choose a project by
+// typing, then opens an "all tasks for this object" view grouped by status.
+async function showTasksByProject() {
+  if (!_projects.length) _projects = await api("/projects").catch(() => []);
+  if (!_projects.length) {
+    showToast("Сначала создай проекты (объекты) в админке", null);
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:301;display:flex;align-items:center;justify-content:center;padding:20px";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:420px;width:100%;background:var(--bg);border-radius:14px;padding:18px 22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <b>🏗 Выбери объект (проект)</b>
+        <button onclick="this.closest('.modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <input id="proj-picker-input" list="proj-picker-options" autofocus placeholder="начни вводить название..." style="width:100%;padding:10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);font-size:14px">
+      <datalist id="proj-picker-options">
+        ${_projects.map((p) => `<option value="${escapeHtml(p.name)}"></option>`).join("")}
+      </datalist>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('.modal').remove()" style="padding:8px 14px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer">Отмена</button>
+        <button onclick="confirmProjectPick()" class="primary" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">Открыть</button>
+      </div>
+    </div>`;
+  overlay.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); confirmProjectPick(); }
+  });
+  document.body.appendChild(overlay);
+  setTimeout(() => document.getElementById("proj-picker-input")?.focus(), 50);
+}
+
+function confirmProjectPick() {
+  const v = (document.getElementById("proj-picker-input")?.value || "").trim().toLowerCase();
+  const p = _projects.find((x) => (x.name || "").toLowerCase() === v);
+  if (!p) { alert("Проект не найден"); return; }
+  document.querySelector('.modal[style*="z-index:301"]')?.remove();
+  loadProjectView(p.id);
+}
+
+let _currentProjectView = null;
+async function loadProjectView(projectId) {
+  _currentProjectView = projectId;
+  tasksMode = "project";
+  tasksFilter = "project:" + projectId;
+  localStorage.setItem("crm-tasks-filter", tasksFilter);
+  // Show the tasks view layout (full-width, no list pane).
+  document.querySelector(".sidebar").classList.add("hidden");
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("tasks-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
+  const proj = _projects.find((p) => p.id === projectId);
+  document.getElementById("tasks-view-title").textContent = "🏗 " + (proj?.name || "Объект");
+  const backBtn = document.getElementById("kanban-back-btn");
+  if (backBtn) backBtn.style.display = "";
+  // Hide irrelevant filter bits.
+  const filtersEl = document.getElementById("tasks-filters");
+  if (filtersEl) filtersEl.style.display = "none";
+  // Fetch all tasks for this project, all statuses.
+  const params = new URLSearchParams();
+  params.set("projectId", projectId);
+  params.set("status", "all");
+  params.set("limit", "500");
+  const tasks = await api("/tasks?" + params.toString()).catch(() => []);
+  renderProjectView(tasks, proj);
+}
+
+function renderProjectView(tasks, proj) {
+  const el = document.getElementById("tasks-list");
+  const buckets = {
+    open: { title: "📥 Открыты", tasks: [] },
+    in_progress: { title: "⚙ В работе", tasks: [] },
+    awaiting_review: { title: "🔎 На проверку", tasks: [] },
+    done: { title: "✅ Выполнено", tasks: [] },
+    cancelled: { title: "✕ Отменены", tasks: [] },
+  };
+  for (const t of tasks) (buckets[t.status]?.tasks || []).push(t);
+  const total = tasks.length;
+  const doneCount = buckets.done.tasks.length + buckets.cancelled.tasks.length;
+  const pctDone = total ? Math.round((doneCount / total) * 100) : 0;
+  const sortByDue = (arr) => arr.sort((a, b) => {
+    const ad = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+    const bd = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+    return ad - bd;
+  });
+  const renderRow = (t) => {
+    const overdue = t.dueDate && new Date(t.dueDate) < new Date() && t.status !== "done";
+    const done = t.status === "done" || t.status === "cancelled";
+    return `<div onclick="openTaskForm('${t.id}')" style="padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;display:flex;justify-content:space-between;gap:8px;opacity:${done ? 0.55 : 1}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:${done ? 400 : 600};text-decoration:${done ? "line-through" : "none"}">${t.priority === "urgent" ? "🔥 " : ""}${escapeHtml(t.title)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">
+          ${t.dueDate ? `${overdue ? "⏰" : "📅"} ${new Date(t.dueDate).toLocaleDateString("ru")} · ` : ""}${escapeHtml(t.priority)}${t.category ? ` · ${escapeHtml(t.category)}` : ""}
+        </div>
+      </div>
+    </div>`;
+  };
+  let html = `
+    <div style="background:var(--bg-alt);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:11px;color:var(--text-muted)">Объект</div>
+          <div style="font-size:18px;font-weight:700">${escapeHtml(proj?.name || "—")}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:11px;color:var(--text-muted)">Прогресс</div>
+          <div style="font-size:18px;font-weight:700">${doneCount} / ${total} <span style="font-size:12px;color:var(--text-muted);font-weight:400">(${pctDone}%)</span></div>
+        </div>
+      </div>
+      <div style="height:6px;background:var(--border);border-radius:3px;margin-top:10px;overflow:hidden">
+        <div style="height:100%;width:${pctDone}%;background:#10b981"></div>
+      </div>
+      <button onclick="openTaskForm();setTimeout(()=>{const h=document.getElementById('task-project-hidden');if(h)h.value='${proj?.id || ""}';const i=document.getElementById('task-project-input');if(i)i.value='${escapeHtml(proj?.name || "")}';},80)" style="margin-top:10px;padding:6px 12px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer;font-size:12px">+ Задача в этом объекте</button>
+    </div>
+  `;
+  for (const key of ["open", "in_progress", "awaiting_review", "done", "cancelled"]) {
+    const b = buckets[key];
+    if (!b.tasks.length) continue;
+    html += `
+      <div style="margin-bottom:14px">
+        <div style="font-weight:600;font-size:13px;padding:8px 0;border-bottom:2px solid var(--accent);margin-bottom:4px">
+          ${b.title} <span style="color:var(--text-muted);font-weight:400;font-size:11px">(${b.tasks.length})</span>
+        </div>
+        ${sortByDue(b.tasks).map(renderRow).join("")}
+      </div>
+    `;
+  }
+  if (!total) {
+    html += '<div style="color:var(--text-muted);text-align:center;padding:20px">Нет задач по этому объекту. Создай первую — кнопка выше.</div>';
+  }
+  el.innerHTML = html;
 }
 
 // Month-grid calendar view of tasks. Picks tasks from the currently
@@ -3335,13 +3487,16 @@ async function openTaskForm(id) {
     ]);
   }
   f.assigneeId.innerHTML = '<option value="">—</option>' + _users.map((u) => `<option value="${u.id}">${escapeHtml(u.name || u.email)}</option>`).join("");
-  f.projectId.innerHTML = '<option value="">—</option>' + _projects.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("");
-  // Populate labels
+  // Project picker is a typeahead (input + datalist) — typing a few letters
+  // narrows the suggestions natively.
+  const projOpts = document.getElementById("task-project-options");
+  if (projOpts) projOpts.innerHTML = _projects.map((p) => `<option value="${escapeHtml(p.name)}" data-id="${p.id}"></option>`).join("");
+  // Populate label suggestions
   try {
     const s = await api("/admin/task-settings").catch(() => ({}));
     const labels = (s.task_labels || "").split(",").map((l) => l.trim()).filter(Boolean);
-    const catSel = document.getElementById("task-category-select");
-    if (catSel) catSel.innerHTML = '<option value="">—</option>' + labels.map((l) => `<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join("");
+    const catOpts = document.getElementById("task-category-options");
+    if (catOpts) catOpts.innerHTML = labels.map((l) => `<option value="${escapeHtml(l)}"></option>`).join("");
   } catch {}
   const box = document.getElementById("task-modal-box");
   const aside = document.getElementById("task-detail-aside");
@@ -3357,7 +3512,14 @@ async function openTaskForm(id) {
     f.title.value = t.title;
     f.description.value = t.description || "";
     f.assigneeId.value = t.assigneeId || "";
-    f.projectId.value = t.projectId || "";
+    // Project: hidden field gets the id, visible input gets the name.
+    const projInput = document.getElementById("task-project-input");
+    const projHidden = document.getElementById("task-project-hidden");
+    if (projHidden) projHidden.value = t.projectId || "";
+    if (projInput) {
+      const p = _projects.find((x) => x.id === t.projectId);
+      projInput.value = p ? p.name : "";
+    }
     f.dueDate.value = t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 16) : "";
     f.priority.value = t.priority;
     f.category.value = t.category || "";
@@ -3404,6 +3566,10 @@ async function openTaskForm(id) {
     banner.style.display = "none";
     f.id.value = "";
     f.status.value = "open";
+    const projInput = document.getElementById("task-project-input");
+    const projHidden = document.getElementById("task-project-hidden");
+    if (projInput) projInput.value = "";
+    if (projHidden) projHidden.value = "";
     const recR = document.getElementById("task-recurrence-rule");
     const recI = document.getElementById("task-recurrence-interval");
     if (recR) recR.value = "";
@@ -3538,6 +3704,15 @@ async function saveTask(e) {
   for (const [k, v] of fd) if (v !== "") body[k] = v;
   const id = body.id;
   delete body.id;
+  // The visible "Проект" field is just for the typeahead — the actual id
+  // sits in the hidden input. Drop the name and resolve the id from
+  // _projects in case the user typed a fresh name that matches by string.
+  delete body.projectName;
+  if (!body.projectId) {
+    const typedName = (document.getElementById("task-project-input")?.value || "").trim().toLowerCase();
+    const match = _projects.find((p) => (p.name || "").toLowerCase() === typedName);
+    if (match) body.projectId = match.id;
+  }
   if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
   // Roll the two recurrence form fields into one structured field for the API.
   const rule = body.recurrenceRule;
