@@ -3504,6 +3504,41 @@ async function toggleTaskDone(id, done) {
 
 let _taskCoAssignees = []; // current set of user ids for the task being edited
 
+// iOS-style segmented priority control. Mirrors changes back into the
+// hidden <select name="priority"> so the form submit stays untouched.
+function syncTaskPrioritySegmented(value) {
+  const seg = document.getElementById("task-priority-segmented");
+  const sel = document.getElementById("task-priority-select");
+  if (!seg) return;
+  if (sel && value) sel.value = value;
+  seg.dataset.prio = value || sel?.value || "normal";
+  seg.querySelectorAll("button").forEach((b) => {
+    b.classList.toggle("active", b.dataset.prio === seg.dataset.prio);
+  });
+  if (!seg.dataset.bound) {
+    seg.querySelectorAll("button").forEach((b) => {
+      b.addEventListener("click", () => syncTaskPrioritySegmented(b.dataset.prio));
+    });
+    seg.dataset.bound = "1";
+  }
+}
+
+// Drop in a top-right "Save" action for the iOS sheet (the existing footer
+// is hidden in create mode). Clicking it just submits the form.
+function ensureIosSheetSaveButton() {
+  const header = document.querySelector("#task-form-modal .modal-header");
+  if (!header) return;
+  let save = header.querySelector(".ios-sheet-save");
+  if (!save) {
+    save = document.createElement("button");
+    save.type = "button";
+    save.className = "ios-sheet-save";
+    save.textContent = "Сохранить";
+    save.addEventListener("click", () => document.getElementById("task-form").requestSubmit());
+    header.appendChild(save);
+  }
+}
+
 async function openTaskForm(id) {
   const f = document.getElementById("task-form");
   f.reset();
@@ -3598,6 +3633,9 @@ async function openTaskForm(id) {
     banner.style.display = "none";
     f.id.value = "";
     f.status.value = "open";
+    f.priority.value = "normal";
+    f.title.placeholder = "Название";
+    f.description.placeholder = "Заметки";
     const projInput = document.getElementById("task-project-input");
     const projHidden = document.getElementById("task-project-hidden");
     if (projInput) projInput.value = "";
@@ -3616,7 +3654,18 @@ async function openTaskForm(id) {
     const strip = document.getElementById("task-notified-strip");
     if (strip) strip.style.display = "none";
   }
-  document.getElementById("task-form-modal").classList.remove("hidden");
+  const modal = document.getElementById("task-form-modal");
+  modal.classList.toggle("task-create-sheet", !id);
+  // Clear any per-task header action ("Завершить") between opens.
+  modal.querySelector(".task-header-action")?.remove();
+  if (!id) {
+    syncTaskPrioritySegmented(f.priority.value || "normal");
+    ensureIosSheetSaveButton();
+  } else {
+    modal.querySelector(".ios-sheet-save")?.remove();
+  }
+  modal.classList.remove("hidden");
+  if (!id) setTimeout(() => document.getElementById("task-title-input")?.focus(), 60);
 }
 
 function renderCoAssigneePills() {
@@ -3661,6 +3710,29 @@ function renderReviewBanner(t) {
   const creatorCloseBtn = iAmCreator && openStatus
     ? `<button type="button" class="secondary" onclick="creatorCloseTask('${t.id}')" title="Автор может завершить задачу, не дожидаясь исполнителя">✔ Завершить задачу</button>`
     : "";
+  // When the only action is "creator can close", lift it into the modal
+  // header next to the title so it doesn't take a whole banner row of its
+  // own. Other states (awaiting_review etc.) still show the full banner.
+  const header = document.querySelector("#task-form-modal .modal-header");
+  let inlineBtn = header?.querySelector(".task-header-action");
+  if (inlineBtn) inlineBtn.remove();
+  const onlyCreatorCloseAction =
+    creatorCloseBtn &&
+    !(t.status === "awaiting_review" && iAmCreator) &&
+    !(t.status === "awaiting_review" && iAmAssignee) &&
+    !(openStatus && iAmAssignee && !iAmCreator);
+  if (onlyCreatorCloseAction && header) {
+    inlineBtn = document.createElement("button");
+    inlineBtn.type = "button";
+    inlineBtn.className = "task-header-action";
+    inlineBtn.textContent = "✔ Завершить";
+    inlineBtn.onclick = () => creatorCloseTask(t.id);
+    // Insert before the X close button so order reads: Title — Завершить — ✕
+    const closeBtn = header.querySelector("button:last-child");
+    header.insertBefore(inlineBtn, closeBtn);
+    banner.style.display = "none";
+    return;
+  }
   if (t.status === "awaiting_review" && iAmCreator) {
     banner.style.display = "flex";
     banner.innerHTML = `
@@ -3682,9 +3754,6 @@ function renderReviewBanner(t) {
         <button type="button" class="primary" onclick="submitForReview('${t.id}')">✅ Выполнить — на проверку</button>
         ${creatorCloseBtn}
       </div>`;
-  } else if (creatorCloseBtn) {
-    banner.style.display = "flex";
-    banner.innerHTML = `<div class="actions">${creatorCloseBtn}</div>`;
   } else {
     banner.style.display = "none";
   }

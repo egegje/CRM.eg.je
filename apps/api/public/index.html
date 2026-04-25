@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=166" />
+<link rel="stylesheet" href="/app.css?v=167" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -222,7 +222,7 @@
           </div>
         </div>
         <aside class="task-detail-aside" id="task-detail-aside">
-          <label>Статус
+          <label id="task-status-label">Статус
             <select name="status"><option value="open">открыта</option><option value="in_progress">в работе</option><option value="awaiting_review">на проверке</option><option value="done">выполнена</option><option value="cancelled">отменена</option></select>
           </label>
           <label>Исполнитель
@@ -237,8 +237,14 @@
           <label>Дедлайн
             <input name="dueDate" type="datetime-local">
           </label>
-          <label>Приоритет
-            <select name="priority"><option value="low">низкий</option><option value="normal" selected>обычный</option><option value="high">высокий</option><option value="urgent">срочный</option></select>
+          <label id="task-priority-label">Приоритет
+            <select name="priority" id="task-priority-select"><option value="low">низкий</option><option value="normal" selected>обычный</option><option value="high">высокий</option><option value="urgent">срочный</option></select>
+            <div id="task-priority-segmented" class="ios-segmented" role="radiogroup" aria-label="Приоритет">
+              <button type="button" data-prio="low">Низкий</button>
+              <button type="button" data-prio="normal">Обычный</button>
+              <button type="button" data-prio="high">Высокий</button>
+              <button type="button" data-prio="urgent">Срочный</button>
+            </div>
           </label>
           <label>Метка
             <input name="category" id="task-category-input" list="task-category-options" placeholder="начни вводить — подскажу">
@@ -372,7 +378,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=166"></script>
+<script src="/app.js?v=167"></script>
 
 </body>
 </html>
