@@ -3642,9 +3642,207 @@ async function renderAdminTab() {
     else if (adminTab === "tgdelivery") c.innerHTML = await renderTgDeliveryTab();
     else if (adminTab === "tasksettings") c.innerHTML = await renderTaskSettingsTab();
     else if (adminTab === "personas") c.innerHTML = await renderPersonasTab();
+    else if (adminTab === "companies") c.innerHTML = await renderCompaniesTab();
+    else if (adminTab === "doctemplates") c.innerHTML = await renderDocTemplatesTab();
     else if (adminTab === "sheets") c.innerHTML = await renderSheetsAdminTab();
   } catch (e) {
     c.innerHTML = '<div class="error">ошибка: ' + escapeHtml(e.message) + "</div>";
+  }
+}
+
+async function renderCompaniesTab() {
+  const list = await api("/admin/companies");
+  const rows = list.map((c) => {
+    const reqs = c.requisites || {};
+    const reqRows = Object.entries(reqs).map(([k, v]) => `${escapeHtml(k)}: ${escapeHtml(String(v))}`).join("<br>");
+    const sealLabel = c.sealPath ? "✓ загружена" : "—";
+    return `<tr>
+      <td>${escapeHtml(c.name)}</td>
+      <td style="font-family:monospace">${escapeHtml(c.inn || "")}</td>
+      <td style="font-size:11px;color:var(--text-muted)">${reqRows || "—"}</td>
+      <td>${sealLabel}</td>
+      <td>
+        <button onclick="editCompanyRequisites('${c.id}')" style="padding:4px 8px;font-size:11px">📝 Реквизиты</button>
+        <label style="display:inline-block;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-alt);cursor:pointer;font-size:11px;margin-left:4px">
+          📥 Печать PNG
+          <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="uploadCompanySeal('${c.id}', this.files[0])">
+        </label>
+      </td>
+    </tr>`;
+  }).join("");
+  return `
+    <p style="font-size:12px;color:var(--text-muted);margin-top:0">Реквизиты подставляются в шаблоны документов (любые ключи: <code>{{инн}}</code>, <code>{{кпп}}</code>, <code>{{адрес}}</code>, ...). Печать — PNG с прозрачным фоном.</p>
+    <table class="admin-table"><thead><tr><th>Название</th><th>ИНН</th><th>Реквизиты</th><th>Печать</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
+
+async function uploadCompanySeal(id, file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch("/admin/companies/" + id + "/seal", {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (r.ok) { showToast("Печать загружена", null); renderAdminTab(); }
+  else { showToast("Ошибка: " + r.status, null); }
+}
+
+async function editCompanyRequisites(id) {
+  const list = await api("/admin/companies");
+  const c = list.find((x) => x.id === id);
+  if (!c) return;
+  const current = JSON.stringify(c.requisites || { кпп: "", огрн: "", адрес: "", расч_счёт: "", банк: "", бик: "", корр_счёт: "" }, null, 2);
+  const v = prompt("Реквизиты в JSON (ключи произвольные, попадут в шаблоны как {{ключ}}):", current);
+  if (v === null) return;
+  try {
+    const parsed = JSON.parse(v);
+    await api("/admin/companies/" + id, { method: "PATCH", body: JSON.stringify({ requisites: parsed }) });
+    showToast("Сохранено", null);
+    renderAdminTab();
+  } catch (e) {
+    alert("Невалидный JSON: " + e.message);
+  }
+}
+
+async function renderDocTemplatesTab() {
+  const list = await api("/admin/doc-templates");
+  const rows = list.map((t) => `<tr>
+    <td>${escapeHtml(t.name)}</td>
+    <td style="font-size:11px;color:var(--text-muted)">${escapeHtml((t.html || "").slice(0, 60))}...</td>
+    <td>
+      <button onclick="editDocTemplate('${t.id}')" style="padding:4px 8px;font-size:11px">✏ Редактировать</button>
+      <button class="danger" onclick="deleteDocTemplate('${t.id}')" style="padding:4px 8px;font-size:11px;margin-left:4px">🗑</button>
+    </td>
+  </tr>`).join("");
+  return `
+    <p style="font-size:12px;color:var(--text-muted);margin-top:0">Шаблоны — обычный HTML с подстановками <code>{{дата}}</code>, <code>{{компания}}</code>, <code>{{инн}}</code>, <code>{{подпись}}</code>, <code>{{печать}}</code> и любыми ключами из реквизитов компании. При генерации откроется готовая страница — Cmd/Ctrl+P → "Сохранить как PDF".</p>
+    <button onclick="editDocTemplate(null)" style="margin-bottom:10px;padding:6px 12px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">+ Новый шаблон</button>
+    <table class="admin-table"><thead><tr><th>Название</th><th>Превью</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+  `;
+}
+
+async function editDocTemplate(id) {
+  let tpl = { name: "", html: '<h2 style="text-align:center">Заявление</h2>\n<p>Дата: {{дата}}</p>\n<p>От: ИП {{подпись_фио}}</p>\n<p>Прошу...</p>\n<div class="stamp-block">\n  <p>С уважением,<br>{{подпись_фио}}</p>\n  {{подпись}}<br>\n  {{печать}}\n</div>' };
+  if (id) {
+    const list = await api("/admin/doc-templates");
+    tpl = list.find((t) => t.id === id) || tpl;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:780px;width:100%;max-height:90vh;background:var(--bg);border-radius:14px;display:flex;flex-direction:column">
+      <div style="padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <b>${id ? "Редактировать" : "Новый"} шаблон</b>
+        <button type="button" onclick="this.closest('.modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div style="padding:14px 20px;flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px">
+        <input id="dt-name" placeholder="Название (например: Заявление на задаток)" value="${escapeHtml(tpl.name)}" style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+        <textarea id="dt-html" placeholder="HTML с {{плейсхолдерами}}" style="width:100%;min-height:280px;font-family:monospace;font-size:12px;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">${escapeHtml(tpl.html)}</textarea>
+        <div style="font-size:11px;color:var(--text-muted)">Доступно из коробки: {{дата}}, {{имя}}, {{подпись_фио}}, {{компания}}, {{инн}}, {{подпись}}, {{печать}}. Плюс любые ключи из реквизитов компании.</div>
+      </div>
+      <div style="padding:12px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" onclick="this.closest('.modal').remove()" style="padding:8px 14px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer">Отмена</button>
+        <button type="button" onclick="saveDocTemplate(${id ? "'" + id + "'" : "null"})" class="primary" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">Сохранить</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function saveDocTemplate(id) {
+  const name = document.getElementById("dt-name").value.trim();
+  const html = document.getElementById("dt-html").value;
+  if (!name || !html) { alert("Заполни название и тело шаблона"); return; }
+  try {
+    if (id) await api("/admin/doc-templates/" + id, { method: "PATCH", body: JSON.stringify({ name, html }) });
+    else await api("/admin/doc-templates", { method: "POST", body: JSON.stringify({ name, html }) });
+    document.querySelector('.modal[style*="z-index:300"]').remove();
+    renderAdminTab();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
+  }
+}
+
+async function deleteDocTemplate(id) {
+  if (!confirm("Удалить шаблон?")) return;
+  await api("/admin/doc-templates/" + id, { method: "DELETE" });
+  renderAdminTab();
+}
+
+// "Создать документ" — modal accessible from compose to insert a generated
+// document. For now opens the rendered HTML in a new tab (Cmd+P → Save PDF
+// → user attaches manually). Server-side PDF rendering can land later.
+async function openDocGenerator() {
+  const [templates, companies, personas] = await Promise.all([
+    api("/admin/doc-templates").catch(() => []),
+    api("/admin/companies").catch(() => []),
+    api("/personas").catch(() => []),
+  ]);
+  if (!templates.length) {
+    alert("Нет шаблонов. Админка → Шаблоны → создать.");
+    return;
+  }
+  const overlay = document.createElement("div");
+  overlay.className = "modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:301;display:flex;align-items:center;justify-content:center;padding:20px";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:480px;width:100%;background:var(--bg);border-radius:14px;padding:18px 22px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <b>📄 Сгенерировать документ</b>
+        <button onclick="this.closest('.modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer">✕</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:12px;color:var(--text-muted)">Шаблон</span>
+          <select id="dg-template" style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+            ${templates.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:12px;color:var(--text-muted)">Компания</span>
+          <select id="dg-company" style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+            <option value="">— не выбирать —</option>
+            ${companies.map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join("")}
+          </select>
+        </label>
+        <label style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-size:12px;color:var(--text-muted)">Подпись (визитка)</span>
+          <select id="dg-persona" style="padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+            <option value="">— без подписи —</option>
+            ${personas.map((p) => `<option value="${p.id}">${escapeHtml(p.name)}</option>`).join("")}
+          </select>
+        </label>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="this.closest('.modal').remove()" style="padding:8px 14px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer">Отмена</button>
+        <button onclick="generateDoc()" class="primary" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer">Открыть для печати</button>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">Откроется во вкладке готовая страница. Cmd/Ctrl+P → "Сохранить как PDF" → файл можно прикрепить к письму.</div>
+    </div>`;
+  document.body.appendChild(overlay);
+}
+
+async function generateDoc() {
+  const id = document.getElementById("dg-template").value;
+  const companyId = document.getElementById("dg-company").value || undefined;
+  const personaId = document.getElementById("dg-persona").value || undefined;
+  try {
+    const res = await fetch("/doc-templates/" + id + "/render", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ companyId, personaId }),
+    });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const html = await res.text();
+    const blob = new Blob([html], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    window.open(url, "_blank");
+    document.querySelector('.modal[style*="z-index:301"]').remove();
+  } catch (e) {
+    alert("Ошибка: " + e.message);
   }
 }
 
@@ -4619,8 +4817,12 @@ async function renderPersonasTab() {
         <div style="font-weight:600;font-size:14px;margin-bottom:4px">${escapeHtml(p.name)}</div>
         <div style="font-size:12px;color:var(--text-muted);white-space:pre-wrap;line-height:1.5">${escapeHtml(p.signature)}</div>
       </div>
-      <div style="display:flex;gap:6px;flex-shrink:0">
+      <div style="display:flex;gap:6px;flex-shrink:0;flex-direction:column">
         <button onclick="editPersona('${p.id}')" style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12px">✏️</button>
+        <label style="padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);cursor:pointer;font-size:11px;text-align:center" title="Загрузить факсимиль (PNG)">
+          ${p.signaturePath ? "✓ подпись" : "📥 подпись"}
+          <input type="file" accept="image/png,image/jpeg" style="display:none" onchange="uploadPersonaSig('${p.id}', this.files[0])">
+        </label>
         <button onclick="deletePersona('${p.id}')" style="padding:6px 10px;border:1px solid var(--danger);border-radius:8px;background:var(--bg);cursor:pointer;font-size:12px;color:var(--danger)">✕</button>
       </div>
     </div>
@@ -4647,6 +4849,18 @@ async function adminCreatePersona(e) {
   const f = new FormData(e.target);
   await api("/admin/personas", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
   renderAdminTab();
+}
+async function uploadPersonaSig(id, file) {
+  if (!file) return;
+  const fd = new FormData();
+  fd.append("file", file);
+  const r = await fetch("/admin/personas/" + id + "/signature", {
+    method: "POST",
+    credentials: "include",
+    body: fd,
+  });
+  if (r.ok) { showToast("Подпись загружена", null); renderAdminTab(); }
+  else { showToast("Ошибка: " + r.status, null); }
 }
 async function editPersona(id) {
   const list = await api("/personas");

@@ -321,10 +321,19 @@ model TgTaskNotify {
 }
 
 model Persona {
+  id            String   @id @default(cuid())
+  name          String
+  signature     String
+  signaturePath String?
+  createdAt     DateTime @default(now())
+}
+
+model DocumentTemplate {
   id        String   @id @default(cuid())
   name      String
-  signature String
+  html      String
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model SberToken {
@@ -342,6 +351,8 @@ model Company {
   inn         String?
   sberCustId  String?
   notes       String?
+  sealPath    String?
+  requisites  Json?
   createdAt   DateTime            @default(now())
   accounts    BankAccount[]
   userAccess  UserCompanyAccess[]

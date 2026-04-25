@@ -274,6 +274,137 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return reply.status(204).send();
   });
 
+  // Upload a facsimile signature PNG for a persona.
+  app.post("/admin/personas/:id/signature", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const file = await req.file();
+    if (!file) throw new BadRequest("no file");
+    const buf = await file.toBuffer();
+    if (buf.length > 5 * 1024 * 1024) throw new BadRequest("файл больше 5 МБ");
+    if (!file.mimetype.startsWith("image/")) throw new BadRequest("ожидается PNG/JPG");
+    const cfg = loadConfig();
+    const dir = (await import("node:path")).join(cfg.attachmentDir, "_signatures");
+    await (await import("node:fs/promises")).mkdir(dir, { recursive: true });
+    const path = (await import("node:path")).join(dir, `${id}.png`);
+    await (await import("node:fs/promises")).writeFile(path, buf);
+    await prisma.persona.update({ where: { id }, data: { signaturePath: path } });
+    return { ok: true };
+  });
+
+  // Companies — minimum CRUD + requisites + seal upload (one-of-each is fine
+  // for now; the existing schema already has Company rows).
+  app.get("/admin/companies", { preHandler: requireRole("owner", "admin") }, async () => {
+    return prisma.company.findMany({ orderBy: { name: "asc" } });
+  });
+  app.patch("/admin/companies/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z
+      .object({
+        name: z.string().optional(),
+        inn: z.string().nullable().optional(),
+        notes: z.string().nullable().optional(),
+        requisites: z.record(z.string(), z.string()).nullable().optional(),
+      })
+      .parse(req.body);
+    return prisma.company.update({ where: { id }, data: body as Prisma.CompanyUpdateInput });
+  });
+  app.post("/admin/companies/:id/seal", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const file = await req.file();
+    if (!file) throw new BadRequest("no file");
+    const buf = await file.toBuffer();
+    if (buf.length > 5 * 1024 * 1024) throw new BadRequest("файл больше 5 МБ");
+    if (!file.mimetype.startsWith("image/")) throw new BadRequest("ожидается PNG/JPG");
+    const cfg = loadConfig();
+    const dir = (await import("node:path")).join(cfg.attachmentDir, "_seals");
+    await (await import("node:fs/promises")).mkdir(dir, { recursive: true });
+    const path = (await import("node:path")).join(dir, `${id}.png`);
+    await (await import("node:fs/promises")).writeFile(path, buf);
+    await prisma.company.update({ where: { id }, data: { sealPath: path } });
+    return { ok: true };
+  });
+
+  // ---- document templates ----
+  app.get("/admin/doc-templates", { preHandler: requireUser() }, async () => {
+    return prisma.documentTemplate.findMany({ orderBy: { name: "asc" } });
+  });
+  app.post("/admin/doc-templates", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const body = z.object({ name: z.string().min(1), html: z.string().min(1) }).parse(req.body);
+    return prisma.documentTemplate.create({ data: body });
+  });
+  app.patch("/admin/doc-templates/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
+    const { id } = Params.parse(req.params);
+    const body = z.object({ name: z.string().optional(), html: z.string().optional() }).parse(req.body);
+    return prisma.documentTemplate.update({ where: { id }, data: body });
+  });
+  app.delete("/admin/doc-templates/:id", { preHandler: requireRole("owner", "admin") }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    await prisma.documentTemplate.delete({ where: { id } });
+    return reply.status(204).send();
+  });
+
+  // Render a template to HTML with placeholders filled. Signature/seal PNGs
+  // are inlined as data: URIs so the resulting HTML is self-contained — the
+  // user can save-as-PDF in their browser and attach to email manually.
+  app.post("/doc-templates/:id/render", { preHandler: requireUser() }, async (req, reply) => {
+    const { id } = Params.parse(req.params);
+    const body = z
+      .object({ companyId: z.string().optional(), personaId: z.string().optional() })
+      .parse(req.body);
+    const tpl = await prisma.documentTemplate.findUnique({ where: { id } });
+    if (!tpl) throw new NotFound();
+    const company = body.companyId
+      ? await prisma.company.findUnique({ where: { id: body.companyId } })
+      : null;
+    const persona = body.personaId
+      ? await prisma.persona.findUnique({ where: { id: body.personaId } })
+      : null;
+    const fs = await import("node:fs/promises");
+    const toDataUri = async (p: string | null | undefined) => {
+      if (!p) return "";
+      try {
+        const b = await fs.readFile(p);
+        return "data:image/png;base64," + b.toString("base64");
+      } catch {
+        return "";
+      }
+    };
+    const signatureSrc = await toDataUri(persona?.signaturePath);
+    const sealSrc = await toDataUri(company?.sealPath);
+    const reqMap = (company?.requisites as Record<string, string> | null) ?? {};
+    const placeholders: Record<string, string> = {
+      "дата": new Date().toLocaleDateString("ru"),
+      "сегодня": new Date().toLocaleDateString("ru"),
+      "имя": persona?.name ?? "",
+      "подпись_фио": persona?.name ?? "",
+      "компания": company?.name ?? "",
+      "инн": company?.inn ?? "",
+      "подпись": signatureSrc
+        ? `<img src="${signatureSrc}" alt="подпись" style="max-height:60px">`
+        : "",
+      "печать": sealSrc
+        ? `<img src="${sealSrc}" alt="печать" style="max-height:120px">`
+        : "",
+    };
+    for (const [k, v] of Object.entries(reqMap)) placeholders[k] = v;
+    let html = tpl.html;
+    for (const [k, v] of Object.entries(placeholders)) {
+      const re = new RegExp("\\{\\{\\s*" + k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\s*\\}\\}", "gi");
+      html = html.replace(re, v);
+    }
+    const fullHtml = `<!doctype html><html><head><meta charset="utf-8"><title>${tpl.name}</title>
+<style>
+  @page { size: A4; margin: 18mm; }
+  body { font-family: "Times New Roman", Times, serif; font-size: 12pt; line-height: 1.5; color: #000; }
+  .stamp-block { margin-top: 32px; position: relative; }
+  .stamp-block img { vertical-align: middle; }
+  table { border-collapse: collapse; }
+</style>
+</head><body>${html}</body></html>`;
+    reply.header("content-type", "text/html; charset=utf-8");
+    return fullHtml;
+  });
+
   // ---- task settings (key/value) ----
   app.get("/admin/task-settings", { preHandler: requireRole("owner", "admin") }, async () => {
     const rows = await prisma.taskSetting.findMany();

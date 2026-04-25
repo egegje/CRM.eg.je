@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=163" />
+<link rel="stylesheet" href="/app.css?v=164" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -116,6 +116,8 @@
       <button class="tab" data-tab="tgdelivery" onclick="switchTab('tgdelivery')">TG доставка</button>
       <button class="tab" data-tab="tasksettings" onclick="switchTab('tasksettings')">Задачи</button>
       <button class="tab" data-tab="personas" onclick="switchTab('personas')">Сотрудники</button>
+      <button class="tab" data-tab="companies" onclick="switchTab('companies')">Компании</button>
+      <button class="tab" data-tab="doctemplates" onclick="switchTab('doctemplates')">Шаблоны</button>
       <button class="tab" data-tab="sheets" onclick="switchTab('sheets')">Таблицы</button>
     </div>
     <div id="admin-view-content" style="padding:16px 0"></div>
@@ -318,8 +320,9 @@
       </div>
       <div class="compose-attach-bar">
         <label class="compose-attach-btn">📎 Прикрепить файл <input type="file" id="compose-files" multiple style="display:none" onchange="updateAttachList();uploadAttachNow()" /></label>
+        <button type="button" onclick="openDocGenerator()" class="compose-tpl-save" title="Сгенерировать документ из шаблона">📄 Документ</button>
         <select id="template-select" onchange="applyTemplate(this.value);this.value=''">
-          <option value="">📋 Шаблон...</option>
+          <option value="">📋 Шаблон текста...</option>
         </select>
         <button type="button" onclick="saveAsTemplate()" class="compose-tpl-save">+ сохранить</button>
         <div id="compose-existing-attachments" class="compose-file-list"></div>
@@ -364,7 +367,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=163"></script>
+<script src="/app.js?v=164"></script>
 
 </body>
 </html>
