@@ -226,7 +226,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 #task-form-modal .modal-box.wide { display: flex; flex-direction: column; height: 94vh; max-height: 94vh; overflow: hidden; }
 #task-form-modal .modal-box.wide form { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
 #task-form-modal .modal-box.wide .task-detail-layout { flex: 1; min-height: 0; }
-.task-detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 0; }
+.task-detail-layout { display: grid; grid-template-columns: 1fr 220px; gap: 0; }
 .modal-box:not(.wide) .task-detail-layout { grid-template-columns: 1fr; }
 .modal-box:not(.wide) .task-detail-aside { background: transparent; border-left: none; padding: 4px 20px 12px; }
 .modal-box:not(.wide) .task-detail-main { padding: 18px 20px 4px; }
