@@ -3710,28 +3710,37 @@ function renderReviewBanner(t) {
   const creatorCloseBtn = iAmCreator && openStatus
     ? `<button type="button" class="secondary" onclick="creatorCloseTask('${t.id}')" title="Автор может завершить задачу, не дожидаясь исполнителя">✔ Завершить задачу</button>`
     : "";
-  // When the only action is "creator can close", lift it into the modal
-  // header next to the title so it doesn't take a whole banner row of its
-  // own. Other states (awaiting_review etc.) still show the full banner.
+  // Lift simple single-button actions into the modal header so they sit
+  // on the title row instead of taking a banner row of their own. Two
+  // cases qualify:
+  //   - creator looking at an open task they can close → "✔ Завершить"
+  //   - assignee (not creator) looking at an open task → "✅ На проверку"
+  // The awaiting_review states keep the full banner since they carry
+  // explanatory copy.
   const header = document.querySelector("#task-form-modal .modal-header");
-  let inlineBtn = header?.querySelector(".task-header-action");
-  if (inlineBtn) inlineBtn.remove();
-  const onlyCreatorCloseAction =
-    creatorCloseBtn &&
-    !(t.status === "awaiting_review" && iAmCreator) &&
-    !(t.status === "awaiting_review" && iAmAssignee) &&
-    !(openStatus && iAmAssignee && !iAmCreator);
-  if (onlyCreatorCloseAction && header) {
-    inlineBtn = document.createElement("button");
-    inlineBtn.type = "button";
-    inlineBtn.className = "task-header-action";
-    inlineBtn.textContent = "✔ Завершить";
-    inlineBtn.onclick = () => creatorCloseTask(t.id);
-    // Insert before the X close button so order reads: Title — Завершить — ✕
-    const closeBtn = header.querySelector("button:last-child");
-    header.insertBefore(inlineBtn, closeBtn);
-    banner.style.display = "none";
-    return;
+  header?.querySelectorAll(".task-header-action").forEach((b) => b.remove());
+  const placeHeaderAction = (label, onClick, variant) => {
+    if (!header) return;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "task-header-action" + (variant ? " " + variant : "");
+    btn.textContent = label;
+    btn.onclick = onClick;
+    const buttons = header.querySelectorAll("button");
+    const closeBtn = buttons[buttons.length - 1];
+    header.insertBefore(btn, closeBtn);
+  };
+  if (t.status !== "awaiting_review") {
+    if (openStatus && iAmAssignee && !iAmCreator) {
+      placeHeaderAction("✅ На проверку", () => submitForReview(t.id), "task-header-action-green");
+      banner.style.display = "none";
+      return;
+    }
+    if (creatorCloseBtn) {
+      placeHeaderAction("✔ Завершить", () => creatorCloseTask(t.id));
+      banner.style.display = "none";
+      return;
+    }
   }
   if (t.status === "awaiting_review" && iAmCreator) {
     banner.style.display = "flex";
@@ -3747,13 +3756,6 @@ function renderReviewBanner(t) {
     banner.innerHTML = `
       <h4>⏳ Отправлено на проверку</h4>
       <div style="font-size:12px;color:var(--text-muted)">Постановщик получит уведомление и подтвердит закрытие или вернёт задачу в работу.</div>`;
-  } else if (openStatus && iAmAssignee && !iAmCreator) {
-    banner.style.display = "flex";
-    banner.innerHTML = `
-      <div class="actions">
-        <button type="button" class="primary" onclick="submitForReview('${t.id}')">✅ Выполнить — на проверку</button>
-        ${creatorCloseBtn}
-      </div>`;
   } else {
     banner.style.display = "none";
   }

@@ -602,9 +602,9 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 /* Hide segmented control in edit mode (only the original select is shown) */
 #task-form-modal:not(.task-create-sheet) #task-priority-segmented { display: none; }
 
-/* Inline header action ("✔ Завершить" sitting next to the title in edit mode).
-   Keeps the original orange/yellow accent so it stays recognizable as the
-   "complete" action that used to live in the banner below. */
+/* Inline header actions sitting next to the title in edit mode.
+   Two flavors share a base style: yellow for creator's "Завершить",
+   green for the assignee's "На проверку". */
 #task-form-modal .modal-header .task-header-action {
   font-size: 13px;
   font-weight: 600;
@@ -619,10 +619,14 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
   transition: background 140ms ease, transform 100ms ease;
 }
-#task-form-modal .modal-header .task-header-action:hover {
-  background: #d97706;
-}
+#task-form-modal .modal-header .task-header-action:hover { background: #d97706; }
 #task-form-modal .modal-header .task-header-action:active { transform: scale(0.97); }
+#task-form-modal .modal-header .task-header-action.task-header-action-green {
+  background: #10b981;
+}
+#task-form-modal .modal-header .task-header-action.task-header-action-green:hover {
+  background: #059669;
+}
 
 /* Compose modal — Mail.ru style */
 .compose-box { width: min(90vw, 900px) !important; max-width: 900px !important; height: 85vh; max-height: 85vh !important; overflow: hidden !important; display: flex; flex-direction: column; border-radius: 12px; box-shadow: 0 8px 40px rgba(0,0,0,0.25); }
