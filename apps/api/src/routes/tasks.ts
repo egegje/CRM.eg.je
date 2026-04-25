@@ -13,6 +13,7 @@ import {
   notifyReviewRequested,
   notifyReviewConfirmed,
   notifyReviewReturned,
+  notifyTaskComment,
 } from "../services/task-tg.js";
 
 const Params = z.object({ id: z.string() });
@@ -340,10 +341,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     const { id } = Params.parse(req.params);
     const body = z.object({ text: z.string().min(1) }).parse(req.body);
     const user = req.user!;
-    return prisma.taskComment.create({
+    const comment = await prisma.taskComment.create({
       data: { taskId: id, userId: user.id, text: body.text },
       include: { user: { select: { id: true, name: true, email: true } } },
     });
+    // Notify everyone else on the task (assignee + co-assignees + creator).
+    notifyTaskComment(id, user.id, body.text).catch((e) =>
+      console.error("comment notify:", (e as Error).message),
+    );
+    return comment;
   });
 
   app.patch(

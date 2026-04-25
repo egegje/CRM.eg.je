@@ -215,3 +215,50 @@ export async function notifyReviewReturned(taskId: string, byUserId: string | nu
     await deliverAndLog(taskId, uid, "reviewReturned", text);
   }
 }
+
+/** Notify everyone involved in a task (assignee + co-assignees + creator)
+ * when a new comment lands. Skips the comment author. */
+export async function notifyTaskComment(
+  taskId: string,
+  byUserId: string,
+  commentText: string,
+): Promise<void> {
+  const t = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { coAssignees: true },
+  });
+  if (!t) return;
+  const targets = new Set<string>();
+  if (t.assigneeId) targets.add(t.assigneeId);
+  for (const ca of t.coAssignees) targets.add(ca.userId);
+  if (t.creatorId) targets.add(t.creatorId);
+  targets.delete(byUserId);
+  if (!targets.size) return;
+  if (await notificationsPaused()) {
+    for (const uid of targets) {
+      await logNotify(taskId, uid, "comment", { status: "skipped", reason: "paused" });
+    }
+    return;
+  }
+  const by = await prisma.user.findUnique({
+    where: { id: byUserId },
+    select: { name: true },
+  });
+  const trimmed = commentText.length > 400
+    ? commentText.slice(0, 400) + "…"
+    : commentText;
+  const text = [
+    `💬 <b>Комментарий к задаче:</b> ${escapeHtml(t.title)}`,
+    by ? `от: ${escapeHtml(by.name)}` : "",
+    "",
+    escapeHtml(trimmed),
+  ].filter((line) => line !== "" || true).join("\n");
+  const pushTitle = "Новый комментарий";
+  const pushBody = `${t.title} · ${by?.name ?? ""}`.trim();
+  const pushUrl = `/#/tasks/${t.id}`;
+  for (const uid of targets) {
+    await deliverAndLog(taskId, uid, "comment", text);
+    sendWebPush(uid, { title: pushTitle, body: pushBody, url: pushUrl, tag: `task-${t.id}` })
+      .catch((e) => console.error("push:", (e as Error).message));
+  }
+}
