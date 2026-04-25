@@ -973,6 +973,48 @@ async function ensureDraft() {
   return draft.id;
 }
 
+// Drag-and-drop into the compose modal: drop files anywhere on the modal,
+// they get appended to the file input and uploaded via the same path as the
+// "Прикрепить файл" button. Hover state is a dashed overlay over the box.
+let _dragDepth = 0;
+function showDropOverlay(on) {
+  const ov = document.getElementById("compose-drop-overlay");
+  if (ov) ov.style.display = on ? "flex" : "none";
+}
+function onComposeDragEnter(e) {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+  e.preventDefault();
+  _dragDepth++;
+  showDropOverlay(true);
+}
+function onComposeDragOver(e) {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "copy";
+}
+function onComposeDragLeave(e) {
+  if (!e.dataTransfer || !Array.from(e.dataTransfer.types || []).includes("Files")) return;
+  _dragDepth = Math.max(0, _dragDepth - 1);
+  if (_dragDepth === 0) showDropOverlay(false);
+}
+async function onComposeDrop(e) {
+  e.preventDefault();
+  _dragDepth = 0;
+  showDropOverlay(false);
+  const files = e.dataTransfer && e.dataTransfer.files;
+  if (!files || !files.length) return;
+  const input = document.getElementById("compose-files");
+  if (!input) return;
+  // Append dropped files to whatever's already selected so multiple drops
+  // accumulate instead of overwriting.
+  const dt = new DataTransfer();
+  for (let i = 0; i < input.files.length; i++) dt.items.add(input.files[i]);
+  for (const f of files) dt.items.add(f);
+  input.files = dt.files;
+  updateAttachList();
+  await uploadAttachNow();
+}
+
 async function uploadAttachNow() {
   var input = document.getElementById("compose-files");
   if (!input || !input.files.length) return;

@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=155" />
+<link rel="stylesheet" href="/app.css?v=156" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -272,8 +272,11 @@
   <button class="tab-burger" onclick="toggleSidebar()">☰</button>
 </nav>
 
-<div id="compose-modal" class="modal hidden">
-  <div class="modal-box compose-box">
+<div id="compose-modal" class="modal hidden" ondragenter="onComposeDragEnter(event)" ondragover="onComposeDragOver(event)" ondragleave="onComposeDragLeave(event)" ondrop="onComposeDrop(event)">
+  <div class="modal-box compose-box" style="position:relative">
+    <div id="compose-drop-overlay" style="display:none;position:absolute;inset:0;z-index:10;border:3px dashed var(--accent);border-radius:14px;background:rgba(99,102,241,0.08);pointer-events:none;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--accent)">
+      📥 Отпустите файлы — прикреплю
+    </div>
     <div class="modal-header compose-header">
       <h3 id="compose-modal-title">Новое письмо</h3>
       <div class="compose-header-btns">
@@ -348,7 +351,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=155"></script>
+<script src="/app.js?v=156"></script>
 
 </body>
 </html>
