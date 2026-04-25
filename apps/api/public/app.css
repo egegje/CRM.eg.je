@@ -234,8 +234,31 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-detail-aside { padding: 20px 18px; background: var(--bg-alt); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
 #task-form-modal .modal-box.wide #task-desc-label { flex: 1 1 auto; min-height: 80px; display: flex; flex-direction: column; gap: 4px; }
 #task-form-modal .modal-box.wide #task-desc-input { flex: 1; min-height: 0; resize: none; }
-#task-vsplit { height: 6px; cursor: row-resize; background: var(--border); border-radius: 3px; flex-shrink: 0; transition: background 0.1s; }
-#task-vsplit:hover, #task-vsplit.dragging { background: var(--accent); }
+#task-vsplit {
+  height: 12px;
+  cursor: row-resize;
+  background: transparent;
+  border-radius: 4px;
+  flex-shrink: 0;
+  position: relative;
+  margin: 4px 0;
+}
+#task-vsplit::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--border) 90%, var(--text) 10%);
+  transition: background 0.15s, width 0.15s;
+}
+#task-vsplit:hover::before, #task-vsplit.dragging::before {
+  background: var(--accent);
+  width: 96px;
+}
 #task-form-modal .modal-box.wide #task-comments-row { flex: 0 0 220px; min-height: 80px; overflow: hidden; }
 #task-form-modal .modal-box.wide #task-comments-list { flex: 1; max-height: none !important; }
 .task-detail-aside label { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
@@ -282,10 +305,42 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
-  resize: both;
   box-shadow: 0 24px 60px oklch(0 0 0 / 0.32), 0 1px 0 oklch(1 0 0 / 0.04) inset;
   animation: taskSheetIn 320ms cubic-bezier(0.22, 1, 0.36, 1);
   letter-spacing: -0.01em;
+  position: relative;
+}
+/* Visible custom resize handle in the bottom-right corner.
+   Native CSS resize:both was unreliable here because of the modal's flex
+   centering parent — handle never appeared in the right place and the
+   browser's tiny default striped corner was easy to miss. */
+.task-create-sheet .ios-sheet-resize-handle {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  z-index: 5;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  color: color-mix(in oklch, var(--text-muted) 90%, transparent);
+  user-select: none;
+}
+.task-create-sheet .ios-sheet-resize-handle::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  background:
+    linear-gradient(135deg, transparent 50%, currentColor 50%, currentColor 56%, transparent 56%),
+    linear-gradient(135deg, transparent 60%, currentColor 60%, currentColor 66%, transparent 66%),
+    linear-gradient(135deg, transparent 70%, currentColor 70%, currentColor 76%, transparent 76%);
+  background-size: 100% 100%;
+  border-bottom-right-radius: 8px;
+}
+.task-create-sheet .ios-sheet-resize-handle:hover {
+  color: var(--accent);
 }
 @keyframes taskSheetIn {
   from { transform: translateY(28px); opacity: 0; }

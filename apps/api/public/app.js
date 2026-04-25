@@ -3554,33 +3554,47 @@ function ensureIosSheetHeader() {
   left.appendChild(cancel);
   header.prepend(left);
   header.appendChild(save);
-  // Restore stored size on open by writing inline width/height — the
-  // browser resize handle uses inline styles too, so they round-trip.
+  // Restore stored size on open by writing inline width/height.
   const modal = document.getElementById("task-form-modal");
   const box = document.getElementById("task-modal-box");
   const w = parseInt(localStorage.getItem("crm-task-sheet-w") || "0", 10);
   const h = parseInt(localStorage.getItem("crm-task-sheet-h") || "0", 10);
   if (box && w > 480) box.style.width = w + "px";
   if (box && h > 480) box.style.height = h + "px";
-  // Watch for user-initiated drag and persist (debounced via raf).
-  if (box && !box.dataset.resizeBound) {
-    let raf = 0;
-    const ro = new ResizeObserver(() => {
-      if (modal.classList.contains("task-sheet-minimized")) return;
-      if (!modal.classList.contains("task-create-sheet")) return;
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const cw = box.offsetWidth;
-        const ch = box.offsetHeight;
-        if (cw > 0 && ch > 0) {
-          localStorage.setItem("crm-task-sheet-w", String(cw));
-          localStorage.setItem("crm-task-sheet-h", String(ch));
-        }
-      });
-    });
-    ro.observe(box);
-    box.dataset.resizeBound = "1";
+  // Add a clearly-visible resize handle in the bottom-right corner. We
+  // drive the drag in JS so it always works regardless of the flex parent.
+  if (box && !box.querySelector(".ios-sheet-resize-handle")) {
+    const handle = document.createElement("div");
+    handle.className = "ios-sheet-resize-handle";
+    handle.title = "Потяни — изменить размер";
+    handle.addEventListener("mousedown", (e) => startTaskSheetResize(e, box));
+    box.appendChild(handle);
   }
+}
+
+function startTaskSheetResize(e, box) {
+  e.preventDefault();
+  const startX = e.clientX;
+  const startY = e.clientY;
+  const startW = box.offsetWidth;
+  const startH = box.offsetHeight;
+  const minW = 480, minH = 480;
+  const maxW = window.innerWidth - 32;
+  const maxH = window.innerHeight - 32;
+  function onMove(ev) {
+    const w = Math.max(minW, Math.min(maxW, startW + (ev.clientX - startX)));
+    const h = Math.max(minH, Math.min(maxH, startH + (ev.clientY - startY)));
+    box.style.width = w + "px";
+    box.style.height = h + "px";
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    localStorage.setItem("crm-task-sheet-w", String(box.offsetWidth));
+    localStorage.setItem("crm-task-sheet-h", String(box.offsetHeight));
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
 }
 
 function minimizeTaskSheet() {
@@ -3739,6 +3753,7 @@ async function openTaskForm(id) {
     });
     modal.classList.remove("task-sheet-minimized");
     modal.querySelector(".ios-sheet-minimized-bar")?.remove();
+    modal.querySelector(".ios-sheet-resize-handle")?.remove();
     // Drop any inline width/height that the create-sheet resize handle
     // might have left on the box, otherwise the .wide edit modal can't
     // expand to its proper width and the vsplit area gets crushed.
