@@ -1104,6 +1104,34 @@ async function openContactCard(email) {
   document.getElementById("contact-card-body").innerHTML = html;
 }
 
+// Drag the divider between description and comments to change their split.
+// Persists the comments-row height in localStorage so the user's preferred
+// split survives reloads.
+function startTaskVSplit(e) {
+  e.preventDefault();
+  const handle = document.getElementById("task-vsplit");
+  const commentsRow = document.getElementById("task-comments-row");
+  if (!handle || !commentsRow) return;
+  handle.classList.add("dragging");
+  const startY = e.clientY;
+  const startBasis = commentsRow.getBoundingClientRect().height;
+  function onMove(ev) {
+    const dy = ev.clientY - startY;
+    // Drag down → comments shrink; drag up → comments grow.
+    const next = Math.max(80, Math.min(800, startBasis - dy));
+    commentsRow.style.flex = "0 0 " + next + "px";
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    handle.classList.remove("dragging");
+    const m = commentsRow.style.flex.match(/(\d+)px/);
+    if (m) localStorage.setItem("crm-task-comments-px", m[1]);
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
 // Resolve the typed project name to its id whenever the user picks one.
 function onTaskProjectInput() {
   const input = document.getElementById("task-project-input");
@@ -3533,6 +3561,10 @@ async function openTaskForm(id) {
     document.getElementById("task-delete-btn").style.display = "inline-block";
     document.getElementById("task-delete-btn").onclick = () => deleteTask(t.id);
     document.getElementById("task-comments-row").style.display = "flex";
+    const vs = document.getElementById("task-vsplit");
+    if (vs) vs.style.display = "block";
+    const savedPx = parseInt(localStorage.getItem("crm-task-comments-px") || "220", 10);
+    document.getElementById("task-comments-row").style.flex = "0 0 " + savedPx + "px";
     renderTaskComments(t.comments || []);
     renderTaskNotifiedStrip(t.tgNotifies || []);
     document.getElementById("task-tags-row").style.display = "flex";
@@ -3577,6 +3609,8 @@ async function openTaskForm(id) {
     renderCoAssigneePills();
     document.getElementById("task-delete-btn").style.display = "none";
     document.getElementById("task-comments-row").style.display = "none";
+    const vs = document.getElementById("task-vsplit");
+    if (vs) vs.style.display = "none";
     document.getElementById("task-tags-row").style.display = "none";
     document.getElementById("task-attach-row").style.display = "none";
     const strip = document.getElementById("task-notified-strip");

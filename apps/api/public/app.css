@@ -219,13 +219,25 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .modal-header h3 { margin: 0; }
 .modal-header button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text); }
 
-/* Task detail: two-column layout (main text + comments | side meta) */
+/* Task detail: two-column layout (main text + comments | side meta).
+   When the modal is .wide we want it to fill ~94vh so the description has
+   real estate. The main column is a vertical flex with description (flex)
+   and comments (fixed-flex-basis), separated by a draggable resizer. */
+#task-form-modal .modal-box.wide { display: flex; flex-direction: column; height: 94vh; max-height: 94vh; overflow: hidden; }
+#task-form-modal .modal-box.wide form { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#task-form-modal .modal-box.wide .task-detail-layout { flex: 1; min-height: 0; }
 .task-detail-layout { display: grid; grid-template-columns: 1fr 320px; gap: 0; }
 .modal-box:not(.wide) .task-detail-layout { grid-template-columns: 1fr; }
 .modal-box:not(.wide) .task-detail-aside { background: transparent; border-left: none; padding: 4px 20px 12px; }
 .modal-box:not(.wide) .task-detail-main { padding: 18px 20px 4px; }
-.task-detail-main { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.task-detail-main { padding: 20px 24px; display: flex; flex-direction: column; gap: 14px; min-width: 0; min-height: 0; }
 .task-detail-aside { padding: 20px 18px; background: var(--bg-alt); border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+#task-form-modal .modal-box.wide #task-desc-label { flex: 1 1 auto; min-height: 80px; display: flex; flex-direction: column; gap: 4px; }
+#task-form-modal .modal-box.wide #task-desc-input { flex: 1; min-height: 0; resize: none; }
+#task-vsplit { height: 6px; cursor: row-resize; background: var(--border); border-radius: 3px; flex-shrink: 0; transition: background 0.1s; }
+#task-vsplit:hover, #task-vsplit.dragging { background: var(--accent); }
+#task-form-modal .modal-box.wide #task-comments-row { flex: 0 0 220px; min-height: 80px; overflow: hidden; }
+#task-form-modal .modal-box.wide #task-comments-list { flex: 1; max-height: none !important; }
 .task-detail-aside label { font-size: 11px; color: var(--text-muted); display: flex; flex-direction: column; gap: 4px; }
 .task-detail-aside select, .task-detail-aside input { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--bg); color: var(--text); font-size: 13px; }
 .task-title-inline { font-size: 22px; font-weight: 600; line-height: 1.25; padding: 6px 0; border: none; background: transparent; color: var(--text); width: 100%; }
