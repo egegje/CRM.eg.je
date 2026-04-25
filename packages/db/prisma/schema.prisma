@@ -146,12 +146,17 @@ model Attachment {
 }
 
 model Rule {
-  id        String   @id @default(cuid())
-  triggerType String  // "from" | "to" | "subject"
-  contains  String
-  folderId  String
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
+  id              String   @id @default(cuid())
+  name            String?
+  triggerType     String   // "from" | "from_domain" | "to" | "subject"
+  contains        String
+  folderId        String?  // optional: move to folder
+  tagId           String?  // optional: apply task tag (only if createTask=true)
+  createTask      Boolean  @default(false)
+  assignToUserId  String?  // assignee for the auto-created task
+  markRead        Boolean  @default(false)
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now())
 }
 
 model Contact {

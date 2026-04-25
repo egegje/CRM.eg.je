@@ -490,20 +490,25 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     return prisma.rule.findMany({ orderBy: { createdAt: "desc" } });
   });
 
-  const CreateRule = z.object({
-    triggerType: z.enum(["from", "to", "subject"]),
+  const RuleBody = z.object({
+    name: z.string().nullable().optional(),
+    triggerType: z.enum(["from", "from_domain", "to", "subject"]),
     contains: z.string().min(1),
-    folderId: z.string().min(1),
-    enabled: z.boolean().default(true),
+    folderId: z.string().nullable().optional(),
+    tagId: z.string().nullable().optional(),
+    createTask: z.boolean().optional(),
+    assignToUserId: z.string().nullable().optional(),
+    markRead: z.boolean().optional(),
+    enabled: z.boolean().optional(),
   });
   app.post("/admin/rules", { preHandler: requireRole("owner", "admin") }, async (req) => {
-    const body = CreateRule.parse(req.body);
+    const body = RuleBody.parse(req.body);
     return prisma.rule.create({ data: body });
   });
 
   app.patch("/admin/rules/:id", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const { id } = Params.parse(req.params);
-    const body = z.object({ enabled: z.boolean().optional(), contains: z.string().optional() }).parse(req.body);
+    const body = RuleBody.partial().parse(req.body);
     return prisma.rule.update({ where: { id }, data: body });
   });
 

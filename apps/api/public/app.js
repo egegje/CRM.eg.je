@@ -3855,31 +3855,82 @@ async function adminDeleteMailbox(id) {
 }
 
 async function renderRulesTab() {
-  const [rules, folders] = await Promise.all([api("/admin/rules"), api("/folders")]);
+  const [rules, folders, users, tags] = await Promise.all([
+    api("/admin/rules"),
+    api("/folders"),
+    api("/admin/users").catch(() => []),
+    api("/tags").catch(() => []),
+  ]);
   const folderMap = Object.fromEntries(folders.map((f) => [f.id, f.name]));
-  const folderOpts = folders.filter((f) => f.kind === "custom" || f.kind === "trash").map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("");
+  const userMap = Object.fromEntries(users.map((u) => [u.id, u.name || u.email]));
+  const tagMap = Object.fromEntries(tags.map((t) => [t.id, t.name]));
+  const folderOpts = '<option value="">— не двигать —</option>' + folders.filter((f) => f.kind === "custom" || f.kind === "trash").map((f) => `<option value="${f.id}">${escapeHtml(f.name)}</option>`).join("");
+  const userOpts = '<option value="">— не назначать —</option>' + users.map((u) => `<option value="${u.id}">${escapeHtml(u.name || u.email)}</option>`).join("");
+  const tagOpts = '<option value="">— без тега —</option>' + tags.map((t) => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
+  const triggerLabel = (t) => ({ from: "от", from_domain: "домен", to: "кому", subject: "тема" })[t] || t;
+  const actionsLabel = (r) => {
+    const out = [];
+    if (r.folderId) out.push("→ " + (folderMap[r.folderId] || "?"));
+    if (r.markRead) out.push("✓ прочитано");
+    if (r.createTask) {
+      const who = r.assignToUserId ? userMap[r.assignToUserId] : "?";
+      out.push(`📋 задача (${escapeHtml(who || "?")})`);
+      if (r.tagId) out.push("#" + (tagMap[r.tagId] || "?"));
+    }
+    return out.length ? out.join(", ") : "—";
+  };
   const rows = rules.map((r) => `<tr>
-    <td>${escapeHtml(r.triggerType)}</td>
+    <td>${escapeHtml(r.name || "")}</td>
+    <td>${triggerLabel(r.triggerType)}</td>
     <td>${escapeHtml(r.contains)}</td>
-    <td>${escapeHtml(folderMap[r.folderId] || r.folderId)}</td>
+    <td>${actionsLabel(r)}</td>
     <td><label><input type="checkbox" ${r.enabled ? "checked" : ""} onchange="adminToggleRule('${r.id}', this.checked)"> вкл</label></td>
     <td><button class="danger" onclick="adminDeleteRule('${r.id}')">удалить</button></td>
   </tr>`).join("");
   return `
-    <p style="color:var(--text-muted);font-size:12px;margin-top:0">Если в письме поле <b>type</b> содержит <b>значение</b>, то переместить в указанную папку.</p>
-    <form class="admin-form" onsubmit="adminCreateRule(event)">
-      <select name="triggerType"><option value="from">from</option><option value="to">to</option><option value="subject">subject</option></select>
-      <input name="contains" placeholder="значение" required>
-      <select name="folderId" required>${folderOpts}</select>
-      <button type="submit">+ Добавить</button>
+    <p style="color:var(--text-muted);font-size:12px;margin-top:0">Когда приходит письмо и условие выполняется, применяются все указанные действия. Действия можно комбинировать (переместить + создать задачу + пометить прочитанным).</p>
+    <form class="admin-form" onsubmit="adminCreateRule(event)" style="display:flex;flex-direction:column;gap:8px;align-items:flex-start">
+      <input name="name" placeholder="имя правила (например: Россети → Андрей)" style="width:100%;max-width:480px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-muted)">Если</span>
+        <select name="triggerType">
+          <option value="from">от (адрес)</option>
+          <option value="from_domain">от (домен)</option>
+          <option value="to">кому</option>
+          <option value="subject">тема</option>
+        </select>
+        <span style="font-size:12px;color:var(--text-muted)">содержит</span>
+        <input name="contains" placeholder="например: rosseti.ru" required style="min-width:200px">
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--text-muted)">то</span>
+        <select name="folderId">${folderOpts}</select>
+        <label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" name="markRead" value="true"> отметить прочитанным</label>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:12px;display:flex;gap:4px;align-items:center"><input type="checkbox" name="createTask" value="true"> создать задачу для</label>
+        <select name="assignToUserId">${userOpts}</select>
+        <span style="font-size:12px;color:var(--text-muted)">с тегом</span>
+        <select name="tagId">${tagOpts}</select>
+      </div>
+      <button type="submit" style="margin-top:4px">+ Добавить правило</button>
     </form>
-    <table class="admin-table"><thead><tr><th>Тип</th><th>Содержит</th><th>→ Папка</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
+    <table class="admin-table"><thead><tr><th>Имя</th><th>Поле</th><th>Содержит</th><th>Действия</th><th>Статус</th><th></th></tr></thead><tbody>${rows}</tbody></table>
   `;
 }
 async function adminCreateRule(e) {
   e.preventDefault();
   const f = new FormData(e.target);
-  await api("/admin/rules", { method: "POST", body: JSON.stringify(Object.fromEntries(f)) });
+  const obj = Object.fromEntries(f);
+  // Normalize empty strings → null and checkbox values → boolean for the API.
+  ["folderId", "tagId", "assignToUserId", "name"].forEach((k) => { if (!obj[k]) obj[k] = null; });
+  obj.markRead = obj.markRead === "true";
+  obj.createTask = obj.createTask === "true";
+  if (obj.createTask && !obj.assignToUserId) {
+    alert("Если правило создаёт задачу — выберите кого назначить.");
+    return;
+  }
+  await api("/admin/rules", { method: "POST", body: JSON.stringify(obj) });
   renderAdminTab();
 }
 async function adminToggleRule(id, enabled) {

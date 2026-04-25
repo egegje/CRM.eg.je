@@ -107,13 +107,48 @@ async function persistMessage(
   // apply routing rules (only for inbox messages)
   const rules = await prisma.rule.findMany({ where: { enabled: true } });
   for (const r of rules) {
-    const haystack =
-      r.triggerType === "from" ? parsed.from
-      : r.triggerType === "to" ? parsed.to.join(",")
-      : parsed.subject;
-    if (haystack.toLowerCase().includes(r.contains.toLowerCase())) {
+    const fromAddr = (parsed.from || "").toLowerCase();
+    const fromDomain = fromAddr.includes("@") ? fromAddr.split("@")[1] : "";
+    let haystack = "";
+    switch (r.triggerType) {
+      case "from": haystack = fromAddr; break;
+      case "from_domain": haystack = fromDomain; break;
+      case "to": haystack = parsed.to.join(",").toLowerCase(); break;
+      case "subject": haystack = (parsed.subject || "").toLowerCase(); break;
+      default: continue;
+    }
+    if (!haystack.includes(r.contains.toLowerCase())) continue;
+    // Match — apply all configured actions in order. Failures on individual
+    // actions are logged but don't block the rest of the sync.
+    if (r.folderId) {
       await prisma.message.update({ where: { id: created.id }, data: { folderId: r.folderId } }).catch(() => {});
-      break;
+    }
+    if (r.markRead) {
+      await prisma.message.update({ where: { id: created.id }, data: { isRead: true } }).catch(() => {});
+    }
+    if (r.createTask && r.assignToUserId) {
+      const titlePrefix = r.name ? `[${r.name}] ` : "";
+      const task = await prisma.task
+        .create({
+          data: {
+            title: titlePrefix + (parsed.subject || "(без темы)"),
+            description: `Автоматически создано по правилу.\n\nОт: ${parsed.from}\nКому: ${parsed.to.join(", ")}\n\n${(parsed.text || "").slice(0, 1000)}`,
+            assigneeId: r.assignToUserId,
+            creatorId: r.assignToUserId,
+            sourceEmailMessageId: created.id,
+            priority: "normal",
+            status: "open",
+          },
+        })
+        .catch((e) => {
+          console.error("[rules] task create failed:", (e as Error).message);
+          return null;
+        });
+      if (task && r.tagId) {
+        await prisma.taskTagAssignment
+          .create({ data: { taskId: task.id, tagId: r.tagId } })
+          .catch(() => {});
+      }
     }
   }
   // upsert contacts (auto-collected address book)
