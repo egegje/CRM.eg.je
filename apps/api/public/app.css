@@ -271,15 +271,18 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
 }
 .task-create-sheet .modal-box {
-  width: 560px !important;
-  max-width: 100% !important;
+  width: var(--task-sheet-w, 600px) !important;
+  height: var(--task-sheet-h, calc(100vh - 56px)) !important;
+  max-width: calc(100vw - 32px) !important;
   max-height: calc(100vh - 56px) !important;
-  height: auto !important;
+  min-width: 480px !important;
+  min-height: 480px !important;
   border-radius: 22px !important;
   background: var(--bg-alt) !important;
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
+  resize: both;
   box-shadow: 0 24px 60px oklch(0 0 0 / 0.32), 0 1px 0 oklch(1 0 0 / 0.04) inset;
   animation: taskSheetIn 320ms cubic-bezier(0.22, 1, 0.36, 1);
   letter-spacing: -0.01em;
@@ -289,14 +292,17 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Header: Cancel | Title | Save (native iOS pattern) */
+/* Header: Cancel | Title | Save  +  Minimize handle on the far left.
+   Native iOS pattern. The original X button is repurposed as the
+   "Отмена" text on the left in JS; a Save button is added on the right. */
 .task-create-sheet .modal-header {
   display: grid !important;
-  grid-template-columns: 1fr auto 1fr;
+  grid-template-columns: auto 1fr auto !important;
   gap: 12px;
-  padding: 12px 14px !important;
+  padding: 12px 18px !important;
   border-bottom: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
   background: var(--bg-alt);
+  align-items: center;
 }
 .task-create-sheet .modal-header h3 {
   font-size: 16px;
@@ -304,28 +310,23 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   letter-spacing: -0.2px;
   text-align: center;
   margin: 0;
+  grid-column: 2;
+  justify-self: center;
 }
-.task-create-sheet .modal-header > button {
-  font-size: 0;
-  padding: 0;
-  width: 60px;
-  text-align: left;
-  color: var(--text-muted);
-  cursor: pointer;
-  border: none;
+.task-create-sheet .ios-sheet-cancel {
   background: transparent;
-  justify-self: end;
-  border-radius: 8px;
+  border: none;
+  padding: 0;
   height: 32px;
-}
-.task-create-sheet .modal-header > button::before {
-  content: "Отмена";
   font-size: 15px;
   font-weight: 400;
   color: var(--accent);
+  cursor: pointer;
   letter-spacing: -0.1px;
+  grid-column: 1;
+  justify-self: start;
 }
-.task-create-sheet .modal-header > button:hover::before { opacity: 0.7; }
+.task-create-sheet .ios-sheet-cancel:hover { opacity: 0.7; }
 .task-create-sheet .ios-sheet-save {
   background: transparent;
   border: none;
@@ -336,12 +337,65 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   color: var(--accent);
   cursor: pointer;
   letter-spacing: -0.1px;
-  justify-self: start;
+  grid-column: 3;
+  justify-self: end;
 }
 .task-create-sheet .ios-sheet-save:hover { opacity: 0.7; }
 .task-create-sheet .ios-sheet-save:disabled {
   color: color-mix(in oklch, var(--accent) 35%, transparent);
   cursor: not-allowed;
+}
+/* Hide the original X button entirely in create mode — its job
+   (close-on-click) is taken over by the styled "Отмена" text. */
+.task-create-sheet .modal-header > button:not(.ios-sheet-cancel):not(.ios-sheet-save):not(.ios-sheet-minimize) {
+  display: none !important;
+}
+.task-create-sheet .ios-sheet-minimize {
+  background: transparent;
+  border: none;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-right: 6px;
+  border-radius: 6px;
+}
+.task-create-sheet .ios-sheet-minimize:hover { background: color-mix(in oklch, var(--text) 8%, transparent); }
+
+/* Minimized state — collapses to a small bar at the bottom-right */
+#task-form-modal.task-sheet-minimized {
+  background: transparent !important;
+  pointer-events: none;
+  align-items: flex-end !important;
+  justify-content: flex-end !important;
+  padding: 16px !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#task-form-modal.task-sheet-minimized .modal-box {
+  pointer-events: auto;
+  width: 240px !important;
+  height: 44px !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  resize: none;
+  border-radius: 22px !important;
+  cursor: pointer;
+  box-shadow: 0 6px 20px oklch(0 0 0 / 0.18) !important;
+}
+#task-form-modal.task-sheet-minimized .modal-box > *:not(.ios-sheet-minimized-bar) { display: none !important; }
+.ios-sheet-minimized-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
 }
 
 /* Form layout */
@@ -602,7 +656,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 /* Hide segmented control in edit mode (only the original select is shown) */
 #task-form-modal:not(.task-create-sheet) #task-priority-segmented { display: none; }
 
-/* Inline header actions sitting next to the title in edit mode.
+/* Inline header actions sitting on the left of the title in edit mode.
    Two flavors share a base style: yellow for creator's "Завершить",
    green for the assignee's "На проверку". */
 #task-form-modal .modal-header .task-header-action {
@@ -614,7 +668,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   background: #f59e0b;
   color: white;
   cursor: pointer;
-  margin-right: 4px;
+  margin-right: 12px;
   letter-spacing: -0.1px;
   box-shadow: 0 1px 2px oklch(0 0 0 / 0.08);
   transition: background 140ms ease, transform 100ms ease;

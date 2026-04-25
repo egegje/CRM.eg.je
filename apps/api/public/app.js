@@ -3523,20 +3523,85 @@ function syncTaskPrioritySegmented(value) {
   }
 }
 
-// Drop in a top-right "Save" action for the iOS sheet (the existing footer
-// is hidden in create mode). Clicking it just submits the form.
-function ensureIosSheetSaveButton() {
+// Build the iOS sheet header chrome: Minimize + Cancel on the left,
+// centered title, Save on the right. Idempotent — replaces existing buttons
+// each call so re-opens don't accumulate. The original X close button is
+// hidden via CSS while .task-create-sheet is on the modal.
+function ensureIosSheetHeader() {
   const header = document.querySelector("#task-form-modal .modal-header");
   if (!header) return;
-  let save = header.querySelector(".ios-sheet-save");
-  if (!save) {
-    save = document.createElement("button");
-    save.type = "button";
-    save.className = "ios-sheet-save";
-    save.textContent = "Сохранить";
-    save.addEventListener("click", () => document.getElementById("task-form").requestSubmit());
-    header.appendChild(save);
+  header.querySelectorAll(".ios-sheet-cancel, .ios-sheet-save, .ios-sheet-minimize").forEach((b) => b.remove());
+  const min = document.createElement("button");
+  min.type = "button";
+  min.className = "ios-sheet-minimize";
+  min.title = "Свернуть";
+  min.textContent = "—";
+  min.addEventListener("click", minimizeTaskSheet);
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "ios-sheet-cancel";
+  cancel.textContent = "Отмена";
+  cancel.addEventListener("click", closeTaskForm);
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "ios-sheet-save";
+  save.textContent = "Сохранить";
+  save.addEventListener("click", () => document.getElementById("task-form").requestSubmit());
+  // Wrap minimize + cancel together so they sit on the left.
+  const left = document.createElement("div");
+  left.style.cssText = "display:flex;align-items:center;gap:6px;grid-column:1;justify-self:start";
+  left.appendChild(min);
+  left.appendChild(cancel);
+  header.prepend(left);
+  header.appendChild(save);
+  // Restore stored size on open
+  const modal = document.getElementById("task-form-modal");
+  const box = document.getElementById("task-modal-box");
+  const w = parseInt(localStorage.getItem("crm-task-sheet-w") || "0", 10);
+  const h = parseInt(localStorage.getItem("crm-task-sheet-h") || "0", 10);
+  if (w > 480 && h > 480 && box) {
+    box.style.setProperty("--task-sheet-w", w + "px");
+    box.style.setProperty("--task-sheet-h", h + "px");
   }
+  // Watch for user-initiated CSS resize and persist the result.
+  if (box && !box.dataset.resizeBound) {
+    const ro = new ResizeObserver((entries) => {
+      if (modal.classList.contains("task-sheet-minimized")) return;
+      const r = entries[0]?.contentRect;
+      if (!r) return;
+      box.style.setProperty("--task-sheet-w", r.width + "px");
+      box.style.setProperty("--task-sheet-h", r.height + "px");
+      localStorage.setItem("crm-task-sheet-w", String(Math.round(r.width)));
+      localStorage.setItem("crm-task-sheet-h", String(Math.round(r.height)));
+    });
+    ro.observe(box);
+    box.dataset.resizeBound = "1";
+  }
+}
+
+function minimizeTaskSheet() {
+  const modal = document.getElementById("task-form-modal");
+  const box = document.getElementById("task-modal-box");
+  if (!modal || !box) return;
+  modal.classList.add("task-sheet-minimized");
+  // Add a small "tap to expand" bar inside the box.
+  if (!box.querySelector(".ios-sheet-minimized-bar")) {
+    const bar = document.createElement("div");
+    bar.className = "ios-sheet-minimized-bar";
+    const f = document.getElementById("task-form");
+    const titleVal = (f?.title?.value || "Новая задача").slice(0, 30);
+    bar.innerHTML = `<span style="opacity:0.6">↗</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(titleVal)}</span>`;
+    bar.addEventListener("click", restoreTaskSheet);
+    box.appendChild(bar);
+  }
+}
+
+function restoreTaskSheet() {
+  const modal = document.getElementById("task-form-modal");
+  const box = document.getElementById("task-modal-box");
+  if (!modal || !box) return;
+  modal.classList.remove("task-sheet-minimized");
+  box.querySelector(".ios-sheet-minimized-bar")?.remove();
 }
 
 async function openTaskForm(id) {
@@ -3661,9 +3726,15 @@ async function openTaskForm(id) {
   if (!id) modal.querySelector(".task-header-action")?.remove();
   if (!id) {
     syncTaskPrioritySegmented(f.priority.value || "normal");
-    ensureIosSheetSaveButton();
+    ensureIosSheetHeader();
   } else {
-    modal.querySelector(".ios-sheet-save")?.remove();
+    modal.querySelectorAll(".ios-sheet-save, .ios-sheet-cancel, .ios-sheet-minimize").forEach((b) => {
+      const left = b.parentElement?.style?.gridColumn === "1" ? b.parentElement : null;
+      b.remove();
+      if (left && !left.children.length) left.remove();
+    });
+    modal.classList.remove("task-sheet-minimized");
+    modal.querySelector(".ios-sheet-minimized-bar")?.remove();
   }
   modal.classList.remove("hidden");
   if (!id) setTimeout(() => document.getElementById("task-title-input")?.focus(), 60);
@@ -3727,9 +3798,9 @@ function renderReviewBanner(t) {
     btn.className = "task-header-action" + (variant ? " " + variant : "");
     btn.textContent = label;
     btn.onclick = onClick;
-    const buttons = header.querySelectorAll("button");
-    const closeBtn = buttons[buttons.length - 1];
-    header.insertBefore(btn, closeBtn);
+    // Park the button on the far left of the header — to the left of the
+    // "Задача" title — so it doesn't crowd the close X on the right.
+    header.prepend(btn);
   };
   if (t.status !== "awaiting_review") {
     if (openStatus && iAmAssignee && !iAmCreator) {
