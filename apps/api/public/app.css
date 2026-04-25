@@ -607,22 +607,32 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-create-sheet #task-priority-segmented[data-prio="urgent"] button.active { color: oklch(0.55 0.21 25); }
 .task-create-sheet #task-priority-segmented[data-prio="high"] button.active { color: oklch(0.62 0.16 65); }
 
-/* Соисполнители row: pills below label, only takes the space it needs */
+/* Соисполнители row: same shape as the Исполнитель row above —
+   label on the left, dropdown on the right. The pills container only
+   takes a row when it has children. */
 .task-create-sheet .task-detail-aside > label:has(#task-coassignee-editor) {
-  flex-direction: column !important;
-  align-items: stretch !important;
-  gap: 6px !important;
-  padding: 8px 14px !important;
+  flex-wrap: wrap;
 }
-.task-create-sheet #task-coassignee-editor { gap: 6px; }
+.task-create-sheet #task-coassignee-editor {
+  display: contents;
+}
 .task-create-sheet #task-coassignee-add {
-  background: color-mix(in oklch, var(--text) 6%, transparent) !important;
-  text-align: left !important;
-  padding: 5px 8px !important;
-  border-radius: 6px !important;
-  flex: 1;
-  height: 26px;
+  flex: 0 1 60%;
+  text-align: right !important;
+  padding: 0 !important;
+  border: none;
+  background: transparent !important;
+  font-size: 13px;
+  color: var(--text);
+  appearance: none;
+  -webkit-appearance: none;
+  height: 22px;
 }
+.task-create-sheet #task-coassignee-pills {
+  flex: 1 0 100%;
+  margin-top: 6px;
+}
+.task-create-sheet #task-coassignee-pills:empty { display: none; }
 
 /* Recurrence row: select on the right + tiny interval pill, single line */
 .task-create-sheet .task-detail-aside > label:has(#task-recurrence-rule) {
