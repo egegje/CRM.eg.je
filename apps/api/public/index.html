@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/app.css?v=158" />
+<link rel="stylesheet" href="/app.css?v=159" />
 <link rel="manifest" href="/manifest.json?v=148" />
 <meta name="theme-color" content="#7c3aed" />
 </head>
@@ -147,6 +147,7 @@
       <div style="display:flex;gap:6px;align-items:center">
         <button id="kanban-back-btn" onclick="showTasksView(localStorage.getItem('crm-tasks-filter') || 'me')" style="display:none;padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">← Назад</button>
         <button onclick="showKanbanView()" style="padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">🗂 Канбан</button>
+        <button onclick="showCalendarView()" style="padding:8px 14px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">📅 Календарь</button>
         <button class="primary" onclick="openTaskForm()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">+ Задача</button>
       </div>
     </div>
@@ -351,7 +352,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="/app.js?v=158"></script>
+<script src="/app.js?v=159"></script>
 
 </body>
 </html>

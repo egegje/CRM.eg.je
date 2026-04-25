@@ -1890,6 +1890,7 @@ function switchSection(section) {
   } else if (section === "tasks") {
     const saved = tasksFilter || localStorage.getItem("crm-tasks-filter") || "me";
     if (saved === "kanban") showKanbanView();
+    else if (saved === "calendar") showCalendarView();
     else showTasksView(saved);
   } else if (section === "finance") {
     showFinanceView();
@@ -2504,6 +2505,122 @@ async function openUserKanban(userId) {
     sel.value = userId;
     await loadTasks();
   }
+}
+
+// Month-grid calendar view of tasks. Picks tasks from the currently
+// active filter (Мои / Поставлено мной / etc) and lays them out on the
+// dueDate they have. Click a day cell to create a new task with that
+// date prefilled.
+let _calendarMonth = null;
+
+async function showCalendarView() {
+  tasksMode = "calendar";
+  localStorage.setItem("crm-tasks-filter", "calendar");
+  document.querySelector(".sidebar").classList.add("hidden");
+  document.querySelector(".list-pane").classList.add("hidden");
+  document.querySelector(".preview-pane").classList.add("hidden");
+  document.getElementById("finance-view").classList.add("hidden");
+  document.getElementById("team-view")?.classList.add("hidden");
+  document.getElementById("admin-view")?.classList.add("hidden");
+  document.getElementById("home-view")?.classList.add("hidden");
+  document.getElementById("resizer-1").style.display = "none";
+  document.getElementById("resizer-2").style.display = "none";
+  document.getElementById("tasks-view").classList.remove("hidden");
+  document.getElementById("app").style.gridTemplateColumns = window.innerWidth <= 900 ? "1fr" : "56px 1fr";
+  document.getElementById("tasks-view-title").textContent = "📅 Календарь задач";
+  const backBtn = document.getElementById("kanban-back-btn");
+  if (backBtn) backBtn.style.display = "";
+  if (!_calendarMonth) _calendarMonth = new Date();
+  await loadCalendar();
+}
+
+async function loadCalendar() {
+  // Fetch tasks across all statuses for the current filter — we want to
+  // show completed ones too so the calendar isn't a half-empty graveyard.
+  const params = new URLSearchParams();
+  if (tasksFilter === "me" && state.user) params.set("assigneeId", state.user.id);
+  if (tasksFilter === "createdByMe" && state.user) params.set("creatorId", state.user.id);
+  if (tasksFilter === "unassigned") params.set("unassigned", "true");
+  params.set("status", "all");
+  params.set("limit", "500");
+  let tasks = await api("/tasks?" + params.toString()).catch(() => []);
+  tasks = tasks.filter((t) => t.dueDate);
+  renderCalendar(tasks);
+}
+
+function renderCalendar(tasks) {
+  const el = document.getElementById("tasks-list");
+  const now = new Date();
+  const month = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth(), 1);
+  const monthName = month.toLocaleDateString("ru", { month: "long", year: "numeric" });
+  // Build a map: yyyy-mm-dd -> [tasks]
+  const byDay = {};
+  for (const t of tasks) {
+    const d = new Date(t.dueDate);
+    const key = d.toISOString().slice(0, 10);
+    (byDay[key] = byDay[key] || []).push(t);
+  }
+  // Calendar grid: 6 weeks × 7 days, starting Monday.
+  const firstDow = (month.getDay() + 6) % 7; // Mon=0
+  const start = new Date(month);
+  start.setDate(start.getDate() - firstDow);
+  const cells = [];
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    cells.push(d);
+  }
+  const weekdays = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  const prioColor = { urgent: "#ef4444", high: "#f59e0b", normal: "var(--accent)", low: "var(--text-muted)" };
+  const html = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;align-items:center">
+        <button onclick="calMove(-1)" style="padding:6px 12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer">←</button>
+        <div style="font-size:16px;font-weight:600;text-transform:capitalize;min-width:170px;text-align:center">${escapeHtml(monthName)}</div>
+        <button onclick="calMove(1)" style="padding:6px 12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer">→</button>
+        <button onclick="calToday()" style="padding:6px 12px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px">Сегодня</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      ${weekdays.map((w) => `<div style="background:var(--bg-alt);padding:6px;text-align:center;font-size:12px;font-weight:600;color:var(--text-muted)">${w}</div>`).join("")}
+      ${cells.map((d) => {
+        const key = d.toISOString().slice(0, 10);
+        const inMonth = d.getMonth() === month.getMonth();
+        const isToday = d.toDateString() === now.toDateString();
+        const items = byDay[key] || [];
+        const cellBg = isToday ? "rgba(99,102,241,0.08)" : "var(--bg)";
+        const dayColor = inMonth ? "var(--text)" : "var(--text-muted)";
+        return `<div onclick="calCreate('${key}')" style="background:${cellBg};min-height:96px;padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:3px;opacity:${inMonth ? 1 : 0.45}">
+          <div style="font-size:11px;font-weight:${isToday ? 700 : 500};color:${dayColor};margin-bottom:2px">${d.getDate()}</div>
+          ${items.slice(0, 4).map((t) => {
+            const done = t.status === "done" || t.status === "cancelled";
+            return `<div onclick="event.stopPropagation();openTaskForm('${t.id}')" title="${escapeHtml(t.title)}" style="font-size:11px;padding:2px 5px;border-radius:3px;background:${prioColor[t.priority] || "var(--accent)"};color:white;text-overflow:ellipsis;overflow:hidden;white-space:nowrap;cursor:pointer;text-decoration:${done ? "line-through" : "none"};opacity:${done ? 0.5 : 1}">${escapeHtml(t.title)}</div>`;
+          }).join("")}
+          ${items.length > 4 ? `<div style="font-size:10px;color:var(--text-muted)">+ ещё ${items.length - 4}</div>` : ""}
+        </div>`;
+      }).join("")}
+    </div>
+    <div style="font-size:11px;color:var(--text-muted);margin-top:10px">Кликни по дню — создать задачу с этим сроком. Кликни по задаче — открыть.</div>
+  `;
+  el.innerHTML = html;
+}
+
+function calMove(delta) {
+  if (!_calendarMonth) _calendarMonth = new Date();
+  _calendarMonth = new Date(_calendarMonth.getFullYear(), _calendarMonth.getMonth() + delta, 1);
+  loadCalendar();
+}
+function calToday() {
+  _calendarMonth = new Date();
+  loadCalendar();
+}
+function calCreate(dateKey) {
+  // Open the new-task form with dueDate prefilled to this day at 17:00.
+  openTaskForm();
+  setTimeout(() => {
+    const f = document.getElementById("task-form");
+    if (f && f.dueDate) f.dueDate.value = dateKey + "T17:00";
+  }, 100);
 }
 
 async function showKanbanView() {
