@@ -442,7 +442,7 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 16px 24px !important;
+  padding: 14px 14px 18px !important;
 }
 .task-create-sheet .task-detail-main,
 .task-create-sheet .task-detail-aside {
@@ -470,17 +470,17 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-create-sheet #task-title-label {
   display: block;
   font-size: 0;
-  margin: 0 0 8px;
+  margin: 0 0 6px;
 }
 .task-create-sheet #task-title-input {
   width: 100%;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
-  letter-spacing: -0.4px;
+  letter-spacing: -0.3px;
   border: none;
   background: var(--bg);
-  border-radius: 14px;
-  padding: 16px 18px;
+  border-radius: 10px;
+  padding: 10px 14px;
   color: var(--text);
 }
 .task-create-sheet #task-title-input::placeholder {
@@ -496,18 +496,18 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-create-sheet #task-desc-label {
   display: block;
   font-size: 0;
-  margin: 0 0 18px;
+  margin: 0 0 12px;
 }
 .task-create-sheet #task-desc-input {
   width: 100%;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: 14px;
+  line-height: 1.45;
   border: none;
   background: var(--bg);
-  border-radius: 14px;
-  padding: 14px 18px;
+  border-radius: 10px;
+  padding: 10px 14px;
   color: var(--text);
-  min-height: 110px;
+  min-height: 80px;
   resize: vertical;
   font-family: inherit;
 }
@@ -516,27 +516,35 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   box-shadow: 0 0 0 2px color-mix(in oklch, var(--accent) 38%, transparent);
 }
 
-/* Aside fields rendered as iOS grouped-table rows */
+/* Aside fields rendered as a single grouped iOS Settings-style table.
+   One rounded container with hairline separators between rows — much
+   denser than the previous "card per field" layout. */
 .task-create-sheet .task-detail-aside {
   display: flex !important;
   flex-direction: column !important;
-  gap: 14px !important;
+  gap: 0 !important;
+  background: var(--bg) !important;
+  border-radius: 14px !important;
+  padding: 0 !important;
+  overflow: hidden;
 }
-/* Each <label> in the aside becomes a card row */
 .task-create-sheet .task-detail-aside > label {
   display: flex !important;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  background: var(--bg);
-  border-radius: 14px;
-  padding: 12px 16px;
+  gap: 10px;
+  background: transparent;
+  border-radius: 0;
+  padding: 8px 14px;
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
-  min-height: 50px;
+  min-height: 36px;
   letter-spacing: -0.1px;
+}
+.task-create-sheet .task-detail-aside > label + label {
+  border-top: 1px solid color-mix(in oklch, var(--border) 55%, transparent);
 }
 .task-create-sheet .task-detail-aside > label > select,
 .task-create-sheet .task-detail-aside > label > input:not([type="hidden"]):not([type="number"]) {
@@ -544,12 +552,14 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
   border: none;
   background: transparent;
   text-align: right;
-  font-size: 14px;
+  font-size: 13px;
   color: var(--text);
   padding: 0 !important;
   font-family: inherit;
   appearance: none;
   -webkit-appearance: none;
+  height: 22px;
+  line-height: 22px;
 }
 .task-create-sheet .task-detail-aside > label > select:focus,
 .task-create-sheet .task-detail-aside > label > input:focus {
@@ -564,23 +574,23 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-create-sheet #task-priority-label {
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 10px !important;
-  padding: 14px 16px !important;
+  gap: 6px !important;
+  padding: 8px 14px !important;
 }
 .task-create-sheet .ios-segmented {
   display: flex;
   background: color-mix(in oklch, var(--text) 8%, transparent);
-  border-radius: 9px;
+  border-radius: 7px;
   padding: 2px;
   gap: 2px;
 }
 .task-create-sheet .ios-segmented button {
   flex: 1;
-  padding: 7px 10px;
+  padding: 5px 8px;
   border: none;
   background: transparent;
-  border-radius: 7px;
-  font-size: 13px;
+  border-radius: 5px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text);
   cursor: pointer;
@@ -597,46 +607,45 @@ mark { background: yellow; color: inherit; padding: 0 2px; }
 .task-create-sheet #task-priority-segmented[data-prio="urgent"] button.active { color: oklch(0.55 0.21 25); }
 .task-create-sheet #task-priority-segmented[data-prio="high"] button.active { color: oklch(0.62 0.16 65); }
 
-/* Соисполнители row: pills below label */
+/* Соисполнители row: pills below label, only takes the space it needs */
 .task-create-sheet .task-detail-aside > label:has(#task-coassignee-editor) {
   flex-direction: column !important;
   align-items: stretch !important;
-  gap: 10px !important;
-  padding: 14px 16px !important;
+  gap: 6px !important;
+  padding: 8px 14px !important;
 }
-.task-create-sheet #task-coassignee-editor { gap: 8px; }
+.task-create-sheet #task-coassignee-editor { gap: 6px; }
 .task-create-sheet #task-coassignee-add {
   background: color-mix(in oklch, var(--text) 6%, transparent) !important;
   text-align: left !important;
-  padding: 8px 10px !important;
-  border-radius: 8px !important;
+  padding: 5px 8px !important;
+  border-radius: 6px !important;
   flex: 1;
+  height: 26px;
 }
 
-/* Recurrence row: collapse into a simple select with a small interval pill */
+/* Recurrence row: select on the right + tiny interval pill, single line */
 .task-create-sheet .task-detail-aside > label:has(#task-recurrence-rule) {
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
+  gap: 6px;
 }
 .task-create-sheet #task-recurrence-rule {
   flex: 0 1 auto;
 }
 .task-create-sheet #task-recurrence-interval {
-  width: 56px;
-  padding: 6px 10px !important;
+  width: 40px;
+  padding: 2px 6px !important;
   text-align: right;
   background: color-mix(in oklch, var(--text) 6%, transparent);
   border: none;
-  border-radius: 8px;
-  font-size: 13px;
+  border-radius: 5px;
+  font-size: 12px;
   color: var(--text);
+  height: 22px;
 }
 .task-create-sheet .task-detail-aside > label:has(#task-recurrence-rule) > span {
-  flex: 1 0 100%;
-  text-align: center;
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 6px !important;
+  display: none !important;
 }
 
 /* iOS-style sheet footer with primary save action */
