@@ -37,6 +37,8 @@ model User {
   createdAt    DateTime        @default(now())
   lastLoginAt  DateTime?
   signature    String?
+  totpSecret   String?
+  totpEnabled  Boolean         @default(false)
   folders      Folder[]
   scheduled    ScheduledSend[]
   taskComments TaskComment[]

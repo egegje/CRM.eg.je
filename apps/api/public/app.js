@@ -126,14 +126,31 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = new FormData(e.target);
   const errEl = document.getElementById("login-error");
+  const totpInput = document.getElementById("login-totp-input");
+  const totpCode = (f.get("totpCode") || "").toString().trim();
   try {
     const res = await fetch("/auth/login", {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ email: f.get("email"), password: f.get("password") }),
+      body: JSON.stringify({
+        email: f.get("email"),
+        password: f.get("password"),
+        ...(totpCode ? { totpCode } : {}),
+      }),
     });
     if (res.status === 401) {
+      let body = {};
+      try { body = await res.json(); } catch {}
+      if (body.totpRequired) {
+        // Reveal the 2FA input. If we already had one and it was wrong, say so.
+        totpInput.style.display = "block";
+        totpInput.focus();
+        errEl.textContent = totpCode
+          ? "Неверный код двухфакторной аутентификации"
+          : "Введите код из приложения-аутентификатора";
+        return;
+      }
       errEl.textContent = "Неверный email или пароль";
       return;
     }
@@ -143,6 +160,8 @@ document.getElementById("login-form").addEventListener("submit", async (e) => {
     }
     state.user = await res.json();
     errEl.textContent = "";
+    totpInput.style.display = "none";
+    totpInput.value = "";
     await bootApp();
   } catch (err) {
     errEl.textContent = "Нет связи с сервером. Проверьте интернет и попробуйте снова.";
@@ -4858,6 +4877,96 @@ if ("serviceWorker" in navigator) {
     .register("/sw.js")
     .then((reg) => ensureWebPush(reg))
     .catch(() => {});
+}
+
+// Profile modal — currently has 2FA enrollment + sign out. Hangs off the
+// person icon in the icon bar.
+async function openMyProfile() {
+  const u = state.user || (await api("/me").catch(() => null));
+  if (!u) return;
+  const me = await api("/me").catch(() => null); // includes totpEnabled
+  const totpOn = !!me?.totpEnabled;
+  const overlay = document.createElement("div");
+  overlay.id = "profile-modal-overlay";
+  overlay.className = "modal";
+  overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center;padding:20px";
+  overlay.innerHTML = `
+    <div class="modal-box" style="max-width:480px;width:100%;background:var(--bg);border-radius:14px;padding:0;max-height:85vh;overflow-y:auto">
+      <div style="padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-weight:700;font-size:16px">${escapeHtml(u.name || u.email)}</div>
+          <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${escapeHtml(u.email)} · ${escapeHtml(u.role)}</div>
+        </div>
+        <button type="button" onclick="this.closest('.modal').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
+      <div style="padding:18px 22px;display:flex;flex-direction:column;gap:14px">
+        <div style="border:1px solid var(--border);border-radius:8px;padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <b style="font-size:13px">🔐 Двухфакторная аутентификация (2FA)</b>
+            <span style="font-size:11px;color:${totpOn ? '#10b981' : 'var(--text-muted)'}">${totpOn ? 'включена' : 'выключена'}</span>
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Код из приложения-аутентификатора (Google Authenticator, Aegis, 1Password) при каждом входе.</div>
+          ${totpOn
+            ? `<button onclick="totpDisable()" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);cursor:pointer;font-size:12px">Отключить 2FA</button>`
+            : `<button onclick="totpStart()" style="padding:6px 12px;border:1px solid var(--accent);background:var(--accent);color:white;border-radius:6px;cursor:pointer;font-size:12px">Включить 2FA</button>`}
+          <div id="totp-setup-area" style="margin-top:10px"></div>
+        </div>
+        <button onclick="logout();this.closest('.modal').remove()" style="padding:8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:13px">Выйти</button>
+      </div>
+    </div>`;
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+  document.body.appendChild(overlay);
+}
+
+async function totpStart() {
+  const area = document.getElementById("totp-setup-area");
+  area.innerHTML = '<div style="color:var(--text-muted)">⏳ Генерирую секрет...</div>';
+  try {
+    const r = await api("/me/totp/setup", { method: "POST" });
+    area.innerHTML = `
+      <div style="margin-top:10px;padding:10px;background:var(--bg-alt);border-radius:8px">
+        <div style="font-size:12px;margin-bottom:6px">1. Отсканируй QR-код в приложении-аутентификаторе:</div>
+        <img src="${r.qr}" alt="QR" style="width:180px;height:180px;background:white;padding:6px;border-radius:6px">
+        <div style="font-size:11px;margin-top:6px;color:var(--text-muted)">Если QR не сканируется — введи секрет вручную: <code style="font-family:monospace;background:var(--bg);padding:2px 4px;border-radius:3px">${escapeHtml(r.secret)}</code></div>
+      </div>
+      <div style="margin-top:10px">
+        <div style="font-size:12px;margin-bottom:6px">2. Введи 6-значный код из приложения, чтобы подтвердить:</div>
+        <input id="totp-confirm-code" placeholder="123 456" inputmode="numeric" style="width:100%;padding:8px;font-size:16px;font-family:monospace;text-align:center;letter-spacing:4px;border:1px solid var(--border);border-radius:6px;background:var(--bg)">
+        <button onclick="totpEnable()" style="margin-top:8px;width:100%;padding:8px;background:var(--accent);color:white;border:none;border-radius:6px;cursor:pointer;font-size:13px">Подтвердить и включить</button>
+      </div>`;
+  } catch (e) {
+    area.innerHTML = '<div style="color:var(--danger);font-size:12px">Ошибка: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function totpEnable() {
+  const code = document.getElementById("totp-confirm-code").value.trim();
+  if (!code) return;
+  try {
+    await api("/me/totp/enable", { method: "POST", body: JSON.stringify({ code }) });
+    showToast("2FA включена. При следующем входе понадобится код.", null);
+    document.getElementById("profile-modal-overlay")?.remove();
+    openMyProfile();
+  } catch (e) {
+    alert("Не удалось включить: " + e.message);
+  }
+}
+
+async function totpDisable() {
+  const code = prompt("Чтобы выключить 2FA — введи текущий код из приложения (или оставь пусто и введи пароль):") || "";
+  let password = "";
+  if (!code) {
+    password = prompt("Пароль от CRM:") || "";
+    if (!password) return;
+  }
+  try {
+    await api("/me/totp/disable", { method: "POST", body: JSON.stringify({ code, password }) });
+    showToast("2FA выключена.", null);
+    document.getElementById("profile-modal-overlay")?.remove();
+    openMyProfile();
+  } catch (e) {
+    alert("Не удалось выключить: " + e.message);
+  }
 }
 
 /* password reset flow */
