@@ -280,12 +280,20 @@ async function loadMailboxes() {
     list.appendChild(d);
   }
   const sel = document.getElementById("compose-mailbox");
+  // Preserve the user's current selection — refreshList() runs this every
+  // 30s on the live-poll tick, and without this the open compose form's
+  // chosen mailbox would silently reset to the first option, then the
+  // user would Send and the wrong mailbox would go out.
+  const previous = sel.value;
   sel.innerHTML = "";
   for (const mb of state.mailboxes) {
     const opt = document.createElement("option");
     opt.value = mb.id;
     opt.textContent = `${mb.displayName} <${mb.email}>`;
     sel.appendChild(opt);
+  }
+  if (previous && state.mailboxes.some((mb) => mb.id === previous)) {
+    sel.value = previous;
   }
 }
 
@@ -1149,7 +1157,7 @@ async function uploadAttachNow() {
   var files = input.files;
   for (var i = 0; i < files.length; i++) {
     var bar = document.querySelector("#attach-item-" + i + " .attach-progress");
-    if (bar && bar.style.width === "100%") continue; // already uploaded
+    if (bar && bar.style.width === "100%") continue;
     try {
       await uploadFile("/messages/" + draftId + "/attachments", files[i], function(pct) {
         if (bar) bar.style.width = pct + "%";
@@ -1159,6 +1167,15 @@ async function uploadAttachNow() {
       if (bar) { bar.style.width = "100%"; bar.style.background = "oklch(0.6 0.2 25)"; }
     }
   }
+  // Sync the visible attachment list with what's actually on the draft, then
+  // clear the file input so the next "Прикрепить файл" click ADDS to the
+  // existing set instead of replacing it (default file-input behavior).
+  try {
+    const m = await api("/messages/" + draftId);
+    renderExistingAttachments(m.attachments || []);
+  } catch {}
+  input.value = "";
+  document.getElementById("compose-attachments").innerHTML = "";
 }
 
 function updateAttachList() {
