@@ -1721,6 +1721,64 @@ function debouncedSearch() {
 }
 
 /* hotkeys */
+const HOTKEYS = [
+  { keys: "?", desc: "Эта справка" },
+  { keys: "j", desc: "Следующее письмо в списке" },
+  { keys: "k", desc: "Предыдущее письмо" },
+  { keys: "c", desc: "Новое письмо" },
+  { keys: "r", desc: "Ответить отправителю" },
+  { keys: "f", desc: "Переслать" },
+  { keys: "e", desc: "Архив (в папку Архив, если есть)" },
+  { keys: "#", desc: "Удалить выбранное письмо" },
+  { keys: "Delete", desc: "Удалить выбранное письмо" },
+  { keys: "u", desc: "Пометить непрочитанным" },
+  { keys: "s", desc: "В важное / убрать важное" },
+  { keys: "/", desc: "Сфокусироваться на поиске" },
+  { keys: "Esc", desc: "Закрыть открытое окно" },
+  { keys: "⌘/Ctrl+Enter", desc: "Отправить письмо из формы" },
+];
+
+function showHotkeyHelp() {
+  const existing = document.getElementById("hotkey-help-overlay");
+  if (existing) { existing.remove(); return; }
+  const ov = document.createElement("div");
+  ov.id = "hotkey-help-overlay";
+  ov.className = "modal";
+  ov.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:300;display:flex;align-items:center;justify-content:center";
+  ov.innerHTML = `
+    <div class="modal-box" style="max-width:460px;padding:24px;background:var(--bg);border-radius:14px;box-shadow:0 12px 48px rgba(0,0,0,0.25)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0;font-size:16px">⌨️ Горячие клавиши</h3>
+        <button type="button" onclick="document.getElementById('hotkey-help-overlay').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--text-muted)">✕</button>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        ${HOTKEYS.map((h) => `
+          <tr>
+            <td style="padding:6px 8px;font-family:monospace;color:var(--accent);font-weight:600;white-space:nowrap;vertical-align:top">${escapeHtml(h.keys)}</td>
+            <td style="padding:6px 8px;color:var(--text)">${escapeHtml(h.desc)}</td>
+          </tr>
+        `).join("")}
+      </table>
+      <div style="margin-top:14px;font-size:11px;color:var(--text-muted)">Шорткаты не срабатывают, когда курсор в текстовом поле — печатай свободно.</div>
+    </div>`;
+  ov.onclick = (e) => { if (e.target === ov) ov.remove(); };
+  document.body.appendChild(ov);
+}
+
+function moveSelection(delta) {
+  const list = state.messages || [];
+  if (!list.length) return;
+  let idx = list.findIndex((m) => m.id === state.selectedId);
+  if (idx === -1) idx = delta > 0 ? -1 : 0;
+  const next = Math.max(0, Math.min(list.length - 1, idx + delta));
+  if (list[next]) {
+    selectMessage(list[next].id);
+    // Scroll the row into view if it's offscreen.
+    const row = document.querySelector('.msg-item.selected');
+    if (row) row.scrollIntoView({ block: "nearest" });
+  }
+}
+
 document.addEventListener("keydown", (e) => {
   // Cmd/Ctrl+Enter in compose form → submit
   if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -1730,11 +1788,59 @@ document.addEventListener("keydown", (e) => {
       return;
     }
   }
-  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
-  if (e.key === "Escape") { closeCompose(); }
-  if (e.key === "r" && state.selectedId) replyTo(state.selectedId);
-  if (e.key === "Delete" && state.selectedId) deleteMsg(state.selectedId);
-  if (e.key === "?") alert("Горячие клавиши:\nR — ответить\nDelete — удалить\nEsc — закрыть\n⌘/Ctrl+Enter — отправить письмо\n? — эта справка");
+  if (e.key === "Escape") {
+    const help = document.getElementById("hotkey-help-overlay");
+    if (help) { help.remove(); return; }
+    closeCompose();
+    return;
+  }
+  // Don't hijack typing inside inputs/textareas/contenteditables.
+  const tag = e.target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable) return;
+  // Ignore modifier-augmented keys we didn't claim above.
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+  switch (e.key) {
+    case "?":
+      showHotkeyHelp();
+      break;
+    case "j":
+      moveSelection(1);
+      break;
+    case "k":
+      moveSelection(-1);
+      break;
+    case "c":
+      e.preventDefault();
+      openCompose();
+      break;
+    case "r":
+      if (state.selectedId) replyTo(state.selectedId);
+      break;
+    case "f":
+      if (state.selectedId) forwardMsg(state.selectedId);
+      break;
+    case "u":
+      if (state.selectedId) {
+        const m = (state.messages || []).find((x) => x.id === state.selectedId);
+        if (m) toggleRead(m.id, m.isRead);
+      }
+      break;
+    case "s":
+      if (state.selectedId) {
+        const m = (state.messages || []).find((x) => x.id === state.selectedId);
+        if (m) toggleStar(m.id, m.isStarred);
+      }
+      break;
+    case "#":
+    case "Delete":
+      if (state.selectedId) deleteMsg(state.selectedId);
+      break;
+    case "/":
+      e.preventDefault();
+      document.getElementById("search-input")?.focus();
+      break;
+  }
 });
 
 /* stats */
