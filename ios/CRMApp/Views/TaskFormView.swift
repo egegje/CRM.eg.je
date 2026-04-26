@@ -221,7 +221,7 @@ struct TagsGrid: View {
         FlowLayout(spacing: 6) {
             ForEach(tags) { tag in
                 let isOn = selected.contains(tag.id)
-                let col = Color(hex: tag.color) ?? .accentColor
+                let col = Color(hex: tag.color)
                 Button {
                     if isOn { selected.remove(tag.id) } else { selected.insert(tag.id) }
                 } label: {
@@ -258,7 +258,7 @@ struct NewTagSheet: View {
                 Section("Цвет") {
                     HStack {
                         ForEach(palette, id: \.self) { c in
-                            let col = Color(hex: c) ?? .gray
+                            let col = Color(hex: c)
                             Circle()
                                 .fill(col)
                                 .frame(width: 28, height: 28)
@@ -300,19 +300,6 @@ struct NewTagSheet: View {
                 dismiss()
             }
         } catch {}
-    }
-}
-
-extension Color {
-    init?(hex: String) {
-        var s = hex
-        if s.hasPrefix("#") { s.removeFirst() }
-        guard s.count == 6, let v = UInt32(s, radix: 16) else { return nil }
-        self = Color(
-            red: Double((v >> 16) & 0xFF) / 255,
-            green: Double((v >> 8) & 0xFF) / 255,
-            blue: Double(v & 0xFF) / 255
-        )
     }
 }
 
