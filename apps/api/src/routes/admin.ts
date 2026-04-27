@@ -8,6 +8,7 @@ import { setKey, encrypt } from "../crypto.js";
 import { loadConfig } from "../config.js";
 import { NotFound, BadRequest } from "../errors.js";
 import { syncSentForMailbox } from "../workers/sync.js";
+import { audit } from "../services/audit.js";
 
 setKey(loadConfig().encKey);
 
@@ -413,16 +414,25 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
 
   app.put("/admin/task-settings", { preHandler: requireRole("owner", "admin") }, async (req) => {
     const body = z.record(z.string(), z.string().nullable()).parse(req.body);
+    const changed: Record<string, { from: string | null; to: string | null }> = {};
     for (const [key, value] of Object.entries(body)) {
-      if (value === null || value === "") {
+      const prev = await prisma.taskSetting.findUnique({ where: { key } });
+      const prevVal = prev?.value ?? null;
+      const nextVal = value === "" ? null : value;
+      if (prevVal === nextVal) continue;
+      changed[key] = { from: prevVal, to: nextVal };
+      if (nextVal === null) {
         await prisma.taskSetting.delete({ where: { key } }).catch(() => {});
       } else {
         await prisma.taskSetting.upsert({
           where: { key },
-          create: { key, value },
-          update: { value },
+          create: { key, value: nextVal },
+          update: { value: nextVal },
         });
       }
+    }
+    if (Object.keys(changed).length) {
+      await audit(req, "task-settings.update", { changed });
     }
     return { ok: true };
   });

@@ -290,8 +290,11 @@ model TaskComment {
   text      String
   createdAt DateTime  @default(now())
   updatedAt DateTime?
+  replyToId String?
   task      Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User      @relation(fields: [userId], references: [id])
+  replyTo   TaskComment?  @relation("TaskCommentReply", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   TaskComment[] @relation("TaskCommentReply")
 }
 
 model TaskView {

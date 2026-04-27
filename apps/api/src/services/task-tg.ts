@@ -222,6 +222,7 @@ export async function notifyTaskComment(
   taskId: string,
   byUserId: string,
   commentText: string,
+  replyToId: string | null = null,
 ): Promise<void> {
   const t = await prisma.task.findUnique({
     where: { id: taskId },
@@ -244,15 +245,27 @@ export async function notifyTaskComment(
     where: { id: byUserId },
     select: { name: true },
   });
+  let quoteLine = "";
+  if (replyToId) {
+    const parent = await prisma.taskComment.findUnique({
+      where: { id: replyToId },
+      include: { user: { select: { name: true } } },
+    });
+    if (parent) {
+      const snip = parent.text.length > 120 ? parent.text.slice(0, 120) + "…" : parent.text;
+      quoteLine = `↩ в ответ ${escapeHtml(parent.user?.name || "—")}: <i>${escapeHtml(snip)}</i>`;
+    }
+  }
   const trimmed = commentText.length > 400
     ? commentText.slice(0, 400) + "…"
     : commentText;
   const text = [
     `💬 <b>Комментарий к задаче:</b> ${escapeHtml(t.title)}`,
     by ? `от: ${escapeHtml(by.name)}` : "",
+    quoteLine,
     "",
     escapeHtml(trimmed),
-  ].filter((line) => line !== "" || true).join("\n");
+  ].filter(Boolean).join("\n");
   const pushTitle = "Новый комментарий";
   const pushBody = `${t.title} · ${by?.name ?? ""}`.trim();
   const pushUrl = `/#/tasks/${t.id}`;

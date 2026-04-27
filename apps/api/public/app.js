@@ -3342,15 +3342,55 @@ async function kanbanDrop(e, status) {
   loadTasks();
 }
 
+let _taskCommentReplyTo = null; // { id, authorName, snippet }
+
+function setTaskCommentReply(id, authorName, snippet) {
+  _taskCommentReplyTo = id ? { id, authorName, snippet } : null;
+  const banner = document.getElementById("task-comment-reply-banner");
+  if (!banner) return;
+  if (!_taskCommentReplyTo) {
+    banner.style.display = "none";
+    banner.innerHTML = "";
+    return;
+  }
+  banner.style.display = "flex";
+  const short = snippet.length > 100 ? snippet.slice(0, 100) + "…" : snippet;
+  banner.innerHTML = `
+    <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">↩ ответ <b>${escapeHtml(authorName)}</b>: ${escapeHtml(short)}</span>
+    <button type="button" onclick="setTaskCommentReply(null)" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:14px;padding:0 4px">✕</button>
+  `;
+  const input = document.getElementById("task-comment-input");
+  if (input) input.focus();
+}
+
+function replyToTaskComment(commentId) {
+  const div = document.getElementById("cmt-" + commentId);
+  if (!div) return;
+  const author = div.getAttribute("data-cmt-author") || "—";
+  const text = div.getAttribute("data-cmt-text") || "";
+  setTaskCommentReply(commentId, author, text);
+}
+
+function onTaskCommentKey(e) {
+  if (e.key !== "Enter") return;
+  // Ctrl+Enter / Cmd+Enter / Shift+Enter — insert newline (default behavior for textarea).
+  if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+  // Plain Enter — send.
+  e.preventDefault();
+  addTaskComment();
+}
+
 async function addTaskComment() {
   const input = document.getElementById("task-comment-input");
   const text = input.value.trim();
   if (!text) return;
   const id = document.getElementById("task-form").id.value;
   if (!id) return;
-  await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify({ text }) });
+  const payload = { text };
+  if (_taskCommentReplyTo) payload.replyToId = _taskCommentReplyTo.id;
+  await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify(payload) });
   input.value = "";
-  // re-render comments
+  setTaskCommentReply(null);
   const t = await api("/tasks/" + id);
   renderTaskComments(t.comments || []);
 }
@@ -3474,12 +3514,21 @@ function renderTaskComments(comments) {
     const editBtn = canEdit
       ? ` <a href="#" onclick="event.preventDefault();editTaskComment('${c.id}')" style="font-size:10px;color:#7c3aed;text-decoration:none">редактировать</a>`
       : '';
+    const replyBtn = ` <a href="#" onclick="event.preventDefault();replyToTaskComment('${c.id}')" style="font-size:10px;color:#7c3aed;text-decoration:none">↩ ответить</a>`;
+    let quote = '';
+    if (c.replyTo) {
+      const parentAuthor = (c.replyTo.user && c.replyTo.user.name) || "—";
+      const parentText = c.replyTo.text || "";
+      const snip = parentText.length > 120 ? parentText.slice(0, 120) + "…" : parentText;
+      quote = `<div onclick="document.getElementById('cmt-${c.replyTo.id}')?.scrollIntoView({behavior:'smooth',block:'center'})" style="cursor:pointer;border-left:3px solid var(--accent);padding:4px 8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);background:rgba(0,0,0,0.04);border-radius:3px"><b>${escapeHtml(parentAuthor)}</b>: ${escapeHtml(snip)}</div>`;
+    }
     return `
-      <div id="cmt-${c.id}" data-cmt-text="${escapeHtml(c.text).replace(/"/g, '&quot;')}" style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
+      <div id="cmt-${c.id}" data-cmt-text="${escapeHtml(c.text).replace(/"/g, '&quot;')}" data-cmt-author="${escapeHtml(authorName).replace(/"/g, '&quot;')}" style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
         <div style="font-size:10px;color:var(--text-muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <b style="color:var(--text)">${escapeHtml(authorName)}</b>
-          · ${new Date(c.createdAt).toLocaleString("ru")}${edited}${editBtn}
+          · ${new Date(c.createdAt).toLocaleString("ru")}${edited}${replyBtn}${editBtn}
         </div>
+        ${quote}
         <div style="font-size:12px;white-space:pre-wrap;word-wrap:break-word">${escapeHtml(c.text)}</div>
       </div>
     `;

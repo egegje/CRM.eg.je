@@ -78,7 +78,17 @@ const TASK_INCLUDE = {
   project: true,
   comments: {
     orderBy: { createdAt: "asc" as const },
-    include: { user: { select: { id: true, name: true, email: true } } },
+    include: {
+      user: { select: { id: true, name: true, email: true } },
+      replyTo: {
+        select: {
+          id: true,
+          text: true,
+          userId: true,
+          user: { select: { id: true, name: true } },
+        },
+      },
+    },
   },
   tagAssignments: { include: { tag: true } },
   attachments: true,
@@ -339,14 +349,30 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/tasks/:id/comments", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
-    const body = z.object({ text: z.string().min(1) }).parse(req.body);
+    const body = z
+      .object({ text: z.string().min(1), replyToId: z.string().nullable().optional() })
+      .parse(req.body);
     const user = req.user!;
+    let replyToId: string | null = null;
+    if (body.replyToId) {
+      const parent = await prisma.taskComment.findUnique({ where: { id: body.replyToId } });
+      if (parent && parent.taskId === id) replyToId = parent.id;
+    }
     const comment = await prisma.taskComment.create({
-      data: { taskId: id, userId: user.id, text: body.text },
-      include: { user: { select: { id: true, name: true, email: true } } },
+      data: { taskId: id, userId: user.id, text: body.text, replyToId },
+      include: {
+        user: { select: { id: true, name: true, email: true } },
+        replyTo: {
+          select: {
+            id: true,
+            text: true,
+            userId: true,
+            user: { select: { id: true, name: true } },
+          },
+        },
+      },
     });
-    // Notify everyone else on the task (assignee + co-assignees + creator).
-    notifyTaskComment(id, user.id, body.text).catch((e) =>
+    notifyTaskComment(id, user.id, body.text, replyToId).catch((e) =>
       console.error("comment notify:", (e as Error).message),
     );
     return comment;
