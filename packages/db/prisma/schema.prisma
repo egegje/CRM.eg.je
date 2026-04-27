@@ -295,6 +295,7 @@ model TaskComment {
   user      User      @relation(fields: [userId], references: [id])
   replyTo   TaskComment?  @relation("TaskCommentReply", fields: [replyToId], references: [id], onDelete: SetNull)
   replies   TaskComment[] @relation("TaskCommentReply")
+  attachments TaskAttachment[]
 }
 
 model TaskView {
@@ -416,11 +417,15 @@ model TaskAttachment {
   id          String   @id @default(cuid())
   taskId      String
   task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  commentId   String?
+  comment     TaskComment? @relation(fields: [commentId], references: [id], onDelete: Cascade)
   filename    String
   mime        String
   size        Int
   storagePath String
   createdAt   DateTime @default(now())
+
+  @@index([commentId])
 }
 
 model TaskTag {

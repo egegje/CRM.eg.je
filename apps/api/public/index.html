@@ -216,8 +216,11 @@
             <span style="font-size:12px;font-weight:600;color:var(--text)">Комментарии</span>
             <div id="task-comments-list" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
             <div id="task-comment-reply-banner" style="display:none;align-items:center;gap:6px;padding:6px 10px;border-left:3px solid var(--accent);background:var(--bg-alt);border-radius:4px;font-size:11px;color:var(--text-muted)"></div>
+            <div id="task-comment-attach-row" style="display:none;flex-wrap:wrap;gap:6px"></div>
             <div style="display:flex;gap:6px;align-items:flex-end">
               <textarea id="task-comment-input" rows="2" placeholder="написать комментарий — Enter отправить, Ctrl+Enter новый абзац" onkeydown="onTaskCommentKey(event)" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:5px;background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;resize:vertical;min-height:36px"></textarea>
+              <input type="file" id="task-comment-file" multiple style="display:none" onchange="onTaskCommentFiles(this)">
+              <button type="button" title="Прикрепить файл к комментарию" onclick="document.getElementById('task-comment-file').click()" style="padding:8px 12px;background:var(--bg-alt);color:var(--text);border:1px solid var(--border);border-radius:5px;cursor:pointer">📎</button>
               <button type="button" onclick="addTaskComment()" style="padding:8px 14px;background:var(--accent);color:white;border:none;border-radius:5px;cursor:pointer">Отправить</button>
             </div>
           </div>
@@ -236,7 +239,10 @@
             </div>
           </label>
           <label>Дедлайн
-            <input name="dueDate" type="datetime-local">
+            <div style="display:flex;gap:6px">
+              <input id="task-duedate-date" type="date" style="flex:1;min-width:0">
+              <input id="task-duedate-time" type="time" value="18:00" step="60" style="width:96px;flex-shrink:0">
+            </div>
           </label>
           <label id="task-priority-label">Приоритет
             <select name="priority" id="task-priority-select"><option value="low">низкий</option><option value="normal" selected>обычный</option><option value="high">высокий</option><option value="urgent">срочный</option></select>

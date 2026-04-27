@@ -2911,7 +2911,12 @@ function calCreate(dateKey) {
   openTaskForm();
   setTimeout(() => {
     const f = document.getElementById("task-form");
-    if (f && f.dueDate) f.dueDate.value = dateKey + "T17:00";
+    {
+      const dD = document.getElementById("task-duedate-date");
+      const dT = document.getElementById("task-duedate-time");
+      if (dD) dD.value = dateKey;
+      if (dT) dT.value = "18:00";
+    }
   }, 100);
 }
 
@@ -3343,6 +3348,34 @@ async function kanbanDrop(e, status) {
 }
 
 let _taskCommentReplyTo = null; // { id, authorName, snippet }
+let _taskCommentPendingFiles = []; // File[] selected via 📎, uploaded after comment is created
+
+function renderTaskCommentAttachRow() {
+  const row = document.getElementById("task-comment-attach-row");
+  if (!row) return;
+  if (!_taskCommentPendingFiles.length) {
+    row.style.display = "none";
+    row.innerHTML = "";
+    return;
+  }
+  row.style.display = "flex";
+  row.innerHTML = _taskCommentPendingFiles.map((f, i) =>
+    `<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-alt);border:1px solid var(--border);border-radius:12px;font-size:11px">📎 ${escapeHtml(f.name)} <span style="color:var(--text-muted)">${fmtSize(f.size)}</span> <button type="button" onclick="removeTaskCommentPendingFile(${i})" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:0;font-size:13px;line-height:1">✕</button></span>`
+  ).join("");
+}
+
+function onTaskCommentFiles(input) {
+  if (!input.files || !input.files.length) return;
+  for (const f of input.files) _taskCommentPendingFiles.push(f);
+  input.value = "";
+  renderTaskCommentAttachRow();
+  document.getElementById("task-comment-input")?.focus();
+}
+
+function removeTaskCommentPendingFile(idx) {
+  _taskCommentPendingFiles.splice(idx, 1);
+  renderTaskCommentAttachRow();
+}
 
 function setTaskCommentReply(id, authorName, snippet) {
   _taskCommentReplyTo = id ? { id, authorName, snippet } : null;
@@ -3383,13 +3416,29 @@ function onTaskCommentKey(e) {
 async function addTaskComment() {
   const input = document.getElementById("task-comment-input");
   const text = input.value.trim();
-  if (!text) return;
+  const hasFiles = _taskCommentPendingFiles.length > 0;
+  if (!text && !hasFiles) return;
   const id = document.getElementById("task-form").id.value;
   if (!id) return;
-  const payload = { text };
+  const payload = { text: text || "📎" }; // backend requires non-empty text
   if (_taskCommentReplyTo) payload.replyToId = _taskCommentReplyTo.id;
-  await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify(payload) });
+  const created = await api("/tasks/" + id + "/comments", { method: "POST", body: JSON.stringify(payload) });
+  if (hasFiles && created && created.id) {
+    for (const f of _taskCommentPendingFiles) {
+      const fd = new FormData();
+      fd.append("file", f);
+      try {
+        await fetch(`/tasks/${id}/attachments?commentId=${encodeURIComponent(created.id)}`, {
+          method: "POST",
+          credentials: "include",
+          body: fd,
+        });
+      } catch (e) { console.error("comment attach upload:", e); }
+    }
+  }
   input.value = "";
+  _taskCommentPendingFiles = [];
+  renderTaskCommentAttachRow();
   setTaskCommentReply(null);
   const t = await api("/tasks/" + id);
   renderTaskComments(t.comments || []);
@@ -3522,6 +3571,14 @@ function renderTaskComments(comments) {
       const snip = parentText.length > 120 ? parentText.slice(0, 120) + "…" : parentText;
       quote = `<div onclick="document.getElementById('cmt-${c.replyTo.id}')?.scrollIntoView({behavior:'smooth',block:'center'})" style="cursor:pointer;border-left:3px solid var(--accent);padding:4px 8px;margin-bottom:4px;font-size:11px;color:var(--text-muted);background:rgba(0,0,0,0.04);border-radius:3px"><b>${escapeHtml(parentAuthor)}</b>: ${escapeHtml(snip)}</div>`;
     }
+    const attachments = (c.attachments || []).map((a) => {
+      const isImage = (a.mime || "").startsWith("image/");
+      if (isImage) {
+        return `<a href="/tasks/attachments/${a.id}" target="_blank" style="display:inline-block;margin-top:4px;margin-right:6px"><img src="/tasks/attachments/${a.id}" alt="${escapeHtml(a.filename)}" style="max-width:200px;max-height:200px;border-radius:5px;border:1px solid var(--border);display:block"></a>`;
+      }
+      return `<a href="/tasks/attachments/${a.id}" target="_blank" style="display:inline-flex;align-items:center;gap:4px;margin-top:4px;margin-right:6px;padding:4px 8px;border:1px solid var(--border);border-radius:5px;font-size:11px;text-decoration:none;color:var(--text);background:var(--bg)">📎 ${escapeHtml(a.filename)} <span style="color:var(--text-muted)">${fmtSize(a.size)}</span></a>`;
+    }).join("");
+    const attachBlock = attachments ? `<div style="margin-top:4px;display:flex;flex-wrap:wrap">${attachments}</div>` : '';
     return `
       <div id="cmt-${c.id}" data-cmt-text="${escapeHtml(c.text).replace(/"/g, '&quot;')}" data-cmt-author="${escapeHtml(authorName).replace(/"/g, '&quot;')}" style="background:var(--bg-alt);padding:6px 10px;border-radius:6px">
         <div style="font-size:10px;color:var(--text-muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap">
@@ -3530,6 +3587,7 @@ function renderTaskComments(comments) {
         </div>
         ${quote}
         <div style="font-size:12px;white-space:pre-wrap;word-wrap:break-word">${escapeHtml(c.text)}</div>
+        ${attachBlock}
       </div>
     `;
   }).join("");
@@ -3750,7 +3808,23 @@ async function openTaskForm(id) {
       const p = _projects.find((x) => x.id === t.projectId);
       projInput.value = p ? p.name : "";
     }
-    f.dueDate.value = t.dueDate ? new Date(t.dueDate).toISOString().slice(0, 16) : "";
+    {
+      const dD = document.getElementById("task-duedate-date");
+      const dT = document.getElementById("task-duedate-time");
+      if (t.dueDate) {
+        const dt = new Date(t.dueDate);
+        const yyyy = dt.getFullYear();
+        const mm = String(dt.getMonth() + 1).padStart(2, "0");
+        const dd = String(dt.getDate()).padStart(2, "0");
+        const hh = String(dt.getHours()).padStart(2, "0");
+        const mi = String(dt.getMinutes()).padStart(2, "0");
+        if (dD) dD.value = `${yyyy}-${mm}-${dd}`;
+        if (dT) dT.value = `${hh}:${mi}`;
+      } else {
+        if (dD) dD.value = "";
+        if (dT) dT.value = "18:00";
+      }
+    }
     f.priority.value = t.priority;
     f.category.value = t.category || "";
     f.status.value = t.status;
@@ -3770,6 +3844,10 @@ async function openTaskForm(id) {
     let savedPx = parseInt(localStorage.getItem("crm-task-comments-px") || "220", 10);
     if (!Number.isFinite(savedPx) || savedPx < 80 || savedPx > 360) savedPx = 220;
     document.getElementById("task-comments-row").style.flex = "0 0 " + savedPx + "px";
+    // Reset comment composer state for the freshly opened task.
+    _taskCommentPendingFiles = [];
+    renderTaskCommentAttachRow();
+    setTaskCommentReply(null);
     renderTaskComments(t.comments || []);
     renderTaskNotifiedStrip(t.tgNotifies || []);
     document.getElementById("task-tags-row").style.display = "flex";
@@ -4022,7 +4100,20 @@ async function saveTask(e) {
     const match = _projects.find((p) => (p.name || "").toLowerCase() === typedName);
     if (match) body.projectId = match.id;
   }
-  if (body.dueDate) body.dueDate = new Date(body.dueDate).toISOString();
+  delete body.dueDate;
+  {
+    const dDateEl = document.getElementById("task-duedate-date");
+    const dTimeEl = document.getElementById("task-duedate-time");
+    const dDate = (dDateEl?.value || "").trim();
+    if (dDate) {
+      const dTime = (dTimeEl?.value || "").trim() || "18:00";
+      body.dueDate = new Date(`${dDate}T${dTime}`).toISOString();
+    } else {
+      // For PATCH (existing task) we want to clear dueDate -> send null.
+      // For POST (new task) the API doesn't accept null, so omit the field.
+      if (id) body.dueDate = null;
+    }
+  }
   // Roll the two recurrence form fields into one structured field for the API.
   const rule = body.recurrenceRule;
   const interval = parseInt(body.recurrenceInterval || "1", 10) || 1;

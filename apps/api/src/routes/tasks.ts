@@ -88,10 +88,12 @@ const TASK_INCLUDE = {
           user: { select: { id: true, name: true } },
         },
       },
+      attachments: true,
     },
   },
   tagAssignments: { include: { tag: true } },
-  attachments: true,
+  // Top-level task attachments only — comment-scoped ones render inline with their comment.
+  attachments: { where: { commentId: null } },
   coAssignees: true,
 };
 
@@ -470,8 +472,15 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
   // ---- task attachments ----
   app.post("/tasks/:id/attachments", { preHandler: requireUser() }, async (req) => {
     const { id } = Params.parse(req.params);
+    const q = z.object({ commentId: z.string().optional() }).parse(req.query);
     const t = await prisma.task.findUnique({ where: { id } });
     if (!t) throw new NotFound();
+    let commentId: string | null = null;
+    if (q.commentId) {
+      const c = await prisma.taskComment.findUnique({ where: { id: q.commentId } });
+      if (!c || c.taskId !== id) throw new BadRequest("comment not on this task");
+      commentId = c.id;
+    }
     const file = await req.file();
     if (!file) throw new BadRequest("no file");
     const buf = await file.toBuffer();
@@ -484,6 +493,7 @@ export async function taskRoutes(app: FastifyInstance): Promise<void> {
     return prisma.taskAttachment.create({
       data: {
         taskId: id,
+        commentId,
         filename: file.filename,
         mime: file.mimetype,
         size: buf.length,
